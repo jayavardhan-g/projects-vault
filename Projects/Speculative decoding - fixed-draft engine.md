@@ -35,4 +35,10 @@ and ended as a **fixed-draft engine** (one draft, γ=4) whose output distributio
 
 **State.** Done. The env `speculative_decoding` was deleted and has no registry record. Options left open in PROGRESS §7: tree drafting, a cross-domain benchmark.
 
+**Docs in this vault** (copied 2026-10-14 from `/data/jayavardhan/projects/speculative_decoding/`):
+- [[Sources/speculative_decoding/README|README]]
+- [[Sources/speculative_decoding/RESULTS|RESULTS]]
+- [[Sources/speculative_decoding/PROGRESS|PROGRESS]]
+- [[Sources/speculative_decoding/SETUP|SETUP]]
+
 **Source.** `RESULTS.md` (fixed-draft numbers), `README.md` (full story incl. the adaptive exploration), `PROGRESS.md` §4 (findings not to re-derive).

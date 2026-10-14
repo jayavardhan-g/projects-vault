@@ -1,0 +1,512 @@
+# Retrieval-Head-Guided Efficient Long-Context RAG
+
+Standard RAG decides what to put in the context window with an *external* signal:
+embedding similarity between the query and candidate chunks. This project uses an
+*internal* one — the attention of the specific heads that empirically do the
+copy-from-context work inside the generator itself — to decide what to keep and
+how far to compress a long context.
+
+The headline question: **at a matched context budget, does selecting context with
+the model's own retrieval heads beat selecting it with a dense retriever?**
+
+**The answer is no as a replacement and yes as a complement.** Used alone the
+head signal is *worse* than a dense retriever. Used to rescore a dense shortlist
+it is significantly better than either:
+
+> A dense-shortlist → retrieval-head-rescore cascade improves HotpotQA F1 by
+> **+0.054** over bge-m3 dense retrieval at a matched 256-token budget on 32k
+> contexts (0.661 vs 0.607, 95% CI [+0.028, +0.085], p < 0.001, n = 300), while
+> using **99.2% less context than naive long-context and answering +0.18 F1
+> better**, at 7× lower latency.
+
+## Method
+
+Systems compared at matched context budgets on multi-hop QA:
+
+| System | Context selection signal |
+|---|---|
+| Naive long-context | none — everything in the window |
+| Dense-retrieval RAG | external embedding similarity (bge-m3) |
+| Cross-encoder reranker | external, with query–document cross-attention |
+| Head-guided (standalone) | internal attention from identified retrieval heads |
+| **Fusion / cascade (ours)** | **dense + internal head attention** |
+
+## Stage 1 — Retrieval-head identification
+
+Reimplements the retrieval score from Wu et al., *Retrieval Head Mechanistically
+Explains Long-Context Factuality*.
+
+A needle sentence is planted at a known depth in a long distractor context (Paul
+Graham essays) and the model is asked a question only the needle answers. At each
+decode step, a head scores a hit if its attention **argmax** lands on a needle
+token that is exactly the token being generated — the head caught copying.
+
+The headline metric is **copy-precision**: of the decode steps where the emitted
+token was in the needle, the fraction where the head's argmax pointed at it.
+Wu et al.'s `|g_h| / |k|` is reported alongside it.
+
+### Why not the published normalizer as headline
+
+`|g_h| / |k|` divides by the *whole needle*, but the model only copies the
+*answer span*. On a 26-token needle whose answer is ~10 tokens, a head copying
+perfectly cannot score above 0.371. In the first sweep this made retrieval heads
+look like they collapsed on rare proper nouns (`L15H30`: 0.87 on natural facts
+vs 0.28 on a rare name) — a textbook "heads don't generalize" result that was
+purely an artifact. That needle's recall was 0.97: the model retrieved it
+perfectly.
+
+Dividing each needle's observed score by its achievable ceiling gave a ratio of
+0.76–0.89 across all eight needles — uniform once the ceiling was accounted for.
+Under copy-precision, which is invariant to answer-span length, `L15H30` scores
+0.800–0.918 on every needle.
+
+Scores are broken out per individual needle as well as per needle kind: a kind
+holding a single needle is confounded with that needle's identity, which is how
+the artifact disguised itself.
+
+### Result
+
+**25 of 1024 heads score above 0.1**, and the signal is sparse and concentrated:
+
+| rank | head | copy-precision | Wu et al. score |
+|---|---|---|---|
+| 1 | L15H30 | 0.865 | 0.725 |
+| 2 | L8H1 | 0.430 | 0.362 |
+| 3 | L16H1 | 0.376 | 0.319 |
+| 4 | L24H27 | 0.372 | 0.308 |
+| 5 | L16H20 | 0.338 | 0.282 |
+
+240 instances (3 context lengths × 10 depths × 8 needles), needle recall 0.988,
+154 s on one H200. Recomputing over only the 237 answered instances leaves the
+top-20 unchanged (overlap 20/20), so the list is not an artifact of failures.
+
+### Verifying the head list
+
+Wu et al. publish head scores for llama-2-7b-80k, llama-2-13b-64k,
+Mistral-7B-v0.2, Mixtral-8x7B, Qwen1.5-14B(-Chat) and Yi-6B-200K — but **not for
+any Llama-3.x model**, so there is no published list to reproduce here. Against
+llama-2-7b-80k the *shape* matches (2.1% vs 3.2% of heads above 0.1) while the
+positions do not (top-20 overlap 1/20, Spearman +0.015) — expected, since
+retrieval heads are model-specific.
+
+So the list is verified **causally** instead, the same evidence the original
+paper uses. Heads are zeroed at the input to `o_proj`, and random heads of
+matched count are masked as a control:
+
+| heads masked | identified | random (3 seeds) | gap |
+|---|---|---|---|
+| 1 | 0.975 | 0.975 | +0.000 |
+| 5 | 0.688 | 0.975 | **+0.287** |
+| 10 | 0.625 | 0.962 | **+0.337** |
+
+Masking 5 identified heads costs 29 points of needle recall; masking 5 random
+heads costs nothing.
+
+**`L15H30` alone is dispensable.** The top head by a factor of two changes recall
+by 0.000 when masked on its own — the capability is redundant across the top few.
+The compression mechanism therefore keys on the top-k set (k ≥ 5), not a single
+head.
+
+```bash
+python -m heads.run_ablation --heads results/head_id/<tag>_retrieval_heads.json
+python -m heads.test_masking     # the mask mechanism itself
+python -m heads.compare_published --scores results/head_id/<tag>_head_scores.json
+```
+
+### Why the score is computed at decode time only
+
+`output_attentions` was removed in transformers 5.x, and attention weights are
+only produced by the eager path — SDPA and flash never materialize the matrix.
+Running the model eager throughout is not viable: an eager prefill allocates a
+`[heads, T, T]` matrix per layer, roughly 4 GB per layer at T=8k, growing
+quadratically.
+
+The score only ever reads attention at *decode* steps, where the query length is
+1 and the matrix is `[heads, 1, T]` — about 1 MB per layer. Since
+`LlamaAttention.forward` re-reads `config._attn_implementation` on every call,
+the pipeline prefills under SDPA and flips to eager only for the single-token
+steps, capturing weights with a forward hook. The final prompt token is fed
+inside the decode loop rather than the prefill, so even the attention producing
+the *first* generated token is captured at `q_len=1`.
+
+## Stage 2 — The benchmark and the baselines
+
+### Why HotpotQA is padded rather than used as-is
+
+HotpotQA's distractor setting gives 10 paragraphs — **mean 1,312 Llama tokens,
+median 1,283**. Llama-3.1 has a 128k window, so at that length nothing is lost in
+the middle, there is nothing to compress, and every method ties. Measuring
+long-context compression on it would be measuring nothing.
+
+So each question keeps its 2 gold paragraphs and its 8 hard TF-IDF distractors,
+and is padded with paragraphs pooled from *other* questions up to a target
+length (4k / 16k / 32k). That buys a context-length knob, exact sentence-level
+gold labels, and controllable gold *depth* for the lost-in-the-middle probe.
+
+Pooled paragraphs are excluded by title whenever the title appears anywhere in
+the source question's own 10, which prevents re-inserting gold content at an
+unlabelled position. The pool is drawn from the **train** split so padding never
+pulls another evaluation question's gold paragraph in. The honest caveat: a
+pooled paragraph under a different title could still mention the answer. That
+risk is inherent to any distractor pool (fullwiki included) and is not corrected
+for.
+
+### The unit of retrieval is the sentence
+
+HotpotQA annotates supporting facts per sentence, so making the sentence the
+retrieval unit lets Recall be scored directly against the annotation with no
+span mapping in between. Sentences are scored title-prefixed (`"<title>:
+<sentence>"`) because a bare HotpotQA sentence often drops its subject ("He was
+born in…"), which no retriever can recover.
+
+### Matched budget
+
+Budget is **tokens of retrieved context handed to the generator**, excluding the
+question and prompt scaffolding. Every method spends it through the same greedy
+packer, so a difference in results is a difference in the retrieval signal and
+not in how greedily one implementation packed its context. Measured on the
+rendered string, the budget binds tightly and is never exceeded (e.g. 1024 →
+973 tokens).
+
+### Methods compared
+
+| | signal |
+|---|---|
+| naive long-context | none — the whole padded context |
+| truncation | document order until the budget runs out |
+| BM25 | lexical |
+| dense (bge-m3) | embedding similarity |
+| hybrid | reciprocal-rank fusion of the two |
+| oracle | gold sentences first — a ceiling, not a baseline |
+
+BM25 is reported alongside bge-m3 deliberately: multi-hop questions are
+entity-heavy, which is exactly where a lexical retriever stays competitive, and
+a headline result that only beats a weak retriever is not worth much. The oracle
+says how much of the remaining error is retrieval failure versus the generator
+failing on a context that already contains the answer.
+
+Exact search is used rather than a FAISS index — each instance has its own
+haystack of a few hundred to a few thousand sentences, so one matmul is both
+exact and faster than building a per-instance ANN index. An index only earns its
+cost against a single large shared corpus, which is not this setting.
+
+```bash
+python -m data.test_hotpot        # 18 construction checks, offline, seconds
+python -m baselines.run_baselines --n 300 --context-lengths 4000 16000 32000 \
+    --budgets 256 512 1024 2048
+python -m baselines.run_latency   # unbatched latency vs naive long-context
+python -m eval.plot --summary results/baselines/<tag>_baselines_summary.json
+```
+
+### Results — 300 questions, 3 context lengths, 4 budgets
+
+![Answer F1 at matched context budgets](results/baselines/accuracy_vs_compression.png)
+
+**Retrieval beats stuffing the window, and the gap widens with length.** At a
+256-token budget — 1/128th of a 32k context — dense retrieval scores higher than
+feeding the model everything:
+
+| context | naive long-context F1 | dense @256 F1 | Δ | compression |
+|---|---|---|---|---|
+| 4,000 | 0.576 | 0.610 | +0.034 | 93.8% |
+| 16,000 | 0.500 | 0.603 | +0.103 | 98.4% |
+| 32,000 | 0.480 | 0.605 | +0.125 | 99.2% |
+
+Naive long-context decays as the context grows (0.576 → 0.500 → 0.480) while
+dense retrieval is essentially flat (0.610 → 0.603 → 0.605). The decay *is*
+lost-in-the-middle: the gold sentences are always present in the naive
+condition, so nothing was lost to retrieval — only to the model's ability to use
+a long context.
+
+**More context hurts even when the evidence is guaranteed present.** The oracle
+condition always contains every gold sentence, and its F1 still *falls* as the
+budget grows — 0.753 → 0.729 → 0.680 → 0.630 at 4k across 256 → 2048 tokens. The
+only thing changing is how much non-gold text sits alongside the answer. This is
+the cleanest evidence in the run that compression is worth doing at all, and it
+is why every method peaks at 256–1024 rather than at the largest budget.
+
+**The headroom that justifies the rest of the project.** Dense retrieval reaches
+0.605 F1 at 32k/256; the oracle reaches 0.747 at the same budget. That **~0.14 F1
+gap is not a generation limit — it is a retrieval-signal limit**, and it is
+exactly the gap the retrieval-head method has to attack. The bar for Stage 3 is
+therefore dense retrieval, not naive long-context. (Stage 3 closes roughly a
+third of it: 0.607 → 0.661 against the oracle's 0.747.)
+
+BM25 is a real baseline rather than a strawman (0.555 F1 at 4k/256, within 0.055
+of dense) but loses at every budget and length. Hybrid RRF lands between the two
+and never beats dense alone — fusing a weaker lexical signal into a stronger
+dense one costs more than it adds here. Truncation collapses with length (0.179
+→ 0.100 → 0.059 at a 256-token budget), confirming the padded haystack really
+does bury the evidence rather than leaving it near the front.
+
+### Latency
+
+Unbatched, one request at a time, 10 warm-up calls discarded, 25 questions per
+length. Jobs are shuffled across conditions — grouped by length, whichever block
+ran first absorbed the residual warm-up and read 196 ms against 77 ms elsewhere
+for an identically sized prompt.
+
+| context | naive | dense @256 | speedup |
+|---|---|---|---|
+| 4,000 | 235 ms | 108 ms | 2.2× |
+| 16,000 | 644 ms | 110 ms | 5.8× |
+| 32,000 | 1,381 ms | 92 ms | **15.0×** |
+
+So at 32k the retrieval baseline is simultaneously **more accurate (+0.125 F1)
+and 15× faster** than reading the whole context.
+
+## Stage 3 — Retrieval-head-guided compression
+
+### How the signal is read
+
+The head signal needs a query-conditioned attention map over candidate
+sentences. Getting one cheaply reuses the Stage 1 trick: prefill the context
+under SDPA, then run **one** decode step — the step that produces the first
+answer token — under eager attention, where the matrix is `[heads, 1, T]` rather
+than `[heads, T, T]`. Attention from the top-k retrieval heads is renormalized
+over the union of sentence spans (excluding the BOS sink and the question block)
+and summed per sentence.
+
+Each sentence's token span is exact: the prompt is assembled from separately
+tokenized segments, because a span located by substring search afterwards would
+be off by a token wherever BPE merges across a sentence boundary — and those
+boundaries are precisely what is being measured. `compress/test_spans.py`
+asserts every span decodes back to its own sentence and that the assembled
+prompt is byte-identical to what the generator receives.
+
+Twelve variants (3 aggregations × k ∈ 1/5/10/25) are produced from a single
+forward pass, since prefill dominates and the variants differ only in the
+reduction. `head_sum_k5` wins; **k = 1 is near-useless** (R@5 0.128), which
+independently confirms Stage 1's ablation finding that `L15H30` alone is
+dispensable.
+
+### The standalone signal fails, and why
+
+A kill criterion was fixed before the run: the head signal had to clear dense's
+R@5 of 0.770 and precision@256 of 0.321. It missed both — **R@5 0.672,
+precision@256 0.284** — so the replacement framing is dead.
+
+The reason is mechanistic and worth more than the number. **Retrieval heads are
+a *copying* signal, and multi-hop evidence selection is not a copying task.**
+Attention at the answer token points where the answer is about to be copied
+from, not at the bridge fact needed to get there. The ratio of full-support to
+gold-recall shows it directly:
+
+| method | full_support@256 / gold_recall@256 |
+|---|---|
+| cross-encoder | 0.802 |
+| dense | 0.746 |
+| head_sum_k5 | **0.613** |
+
+It is disproportionately bad at retrieving *both* gold sentences, which is the
+one thing multi-hop requires.
+
+### Why fusion, and why it is not just "ensembling helps"
+
+The head signal is not a worse retriever so much as a **different** one. Mean
+Spearman against dense is +0.213 over all sentences and **+0.072 restricted to
+the gold sentences** — on the sentences that matter, the two are nearly
+orthogonal.
+
+Fusing them (z-scored, weight 0.20 on the head signal) beats both:
+
+| ranking signal | R@5 | full support@256 | precision@256 |
+|---|---|---|---|
+| oracle | 0.999 | 0.997 | 0.397 |
+| **dense + head** | **0.844** | **0.747** | **0.348** |
+| cross-encoder | 0.836 | 0.697 | 0.340 |
+| dense + cross-encoder (RRF) | 0.832 | 0.703 | 0.340 |
+| dense | 0.770 | 0.610 | 0.321 |
+
+Two controls make this a claim about the head signal rather than about fusion:
+
+**Placebos at the same weight all make dense worse** — length 0.736, random
+0.750, BM25 0.761, against dense's own 0.770 and dense+head's 0.844. Length was
+the control that mattered most: `head_sum` accumulates attention over tokens and
+is length-biased by construction, and gold sentences happen to be 1.18× the mean
+length, so a length prior was a live explanation. It did not survive.
+
+**Fusing dense with the cross-encoder adds nothing.** It is a stronger signal but
+a correlated one (ρ = +0.43), and it lifts full support from 0.697 to 0.703.
+Decorrelation is doing the work, not fusion.
+
+### The cascade — making the signal affordable
+
+There is a circularity at the centre of this idea: the head signal needs a
+forward pass over the long context to exist, which is the cost compression is
+supposed to avoid. Measured, that pass costs **1497 ms**, which makes the fused
+method *slower than naive long-context* (1986 ms vs 1381 ms). As an efficiency
+result, a non-starter.
+
+The cascade fixes it — dense scores everything cheaply, the top 1024 tokens are
+kept, and the head pass runs on the shortlist alone. Prefill dominates, so the
+pass falls to **105 ms**:
+
+| method | full support | F1 | head pass |
+|---|---|---|---|
+| fusion (full context) | 0.757 | 0.670 | 1497 ms |
+| **cascade (S = 1024)** | 0.700 | **0.661** | **105 ms** |
+| cascade (S = 4096) | 0.730 | 0.661 | 211 ms |
+| dense | 0.610 | 0.607 | — |
+| naive long-context | — | 0.480 | — |
+
+The cost is a ceiling: the head signal can only rerank what dense already
+retrieved, so the shortlist's recall bounds the method. The shortlist starts at
+1024 tokens because Stage 2 established dense reaches 0.957 full support by 2048.
+
+### Significance, and the control that carries the result
+
+Dev and test halves *disagreed* about the ranking of the top three methods, and
+the same method differed by ~0.09 F1 between halves — the halves differ in
+difficulty by more than the methods differ from each other. Since every method
+answers identical questions, a paired bootstrap over questions is the right test.
+10k resamples, budget 256, n = 300:
+
+| comparison | mean F1 diff | 95% CI | p |
+|---|---|---|---|
+| cascade vs dense | +0.0545 | [+0.0278, +0.0845] | **0.0000** |
+| **cascade vs same-shortlist-dense-only** | **+0.0531** | [+0.0251, +0.0836] | **0.0002** |
+| fusion (full ctx) vs dense | +0.0632 | [+0.0296, +0.0990] | **0.0000** |
+| fusion (full ctx) vs cascade | +0.0087 | [−0.0172, +0.0344] | 0.5318 |
+| cross-encoder vs dense | +0.0344 | [−0.0050, +0.0747] | 0.0906 |
+| fusion vs cross-encoder | +0.0289 | [−0.0094, +0.0685] | 0.1434 |
+
+The second row is the control the result rests on: **same shortlist, same budget,
+same packer, same generator — the only difference is whether the head signal
+rescored it.** The dense-only arm reproduces plain dense exactly (F1 0.608 vs
+0.607), leaving no room for the gain to have come from shortlisting.
+
+The fourth row says the cascade gives up nothing measurable against the
+full-context pass at 14× lower signal cost.
+
+**What is deliberately not claimed:** fusion is *not* significantly better than
+the cross-encoder (p = 0.14) or than the head signal alone (p = 0.69), and the
+cross-encoder is *not* significantly better than dense (p = 0.09) despite
+clearly winning on retrieval metrics. Only "beats dense" survives testing.
+
+### Why the head signal wins on 0.44 full support
+
+Because annotated-evidence recall is the wrong yardstick for it. The signal
+points at what the model is about to copy, so it finds the **answer string**
+better than dense while finding the annotated **supporting facts** worse:
+
+| method | answer present in selected context |
+|---|---|
+| fusion | 0.898 |
+| head_sum_k5 | 0.863 |
+| cross-encoder | 0.842 |
+| dense | 0.796 |
+
+HotpotQA's supporting-fact annotation is not the only sufficient evidence, so a
+method optimising answer-location scores badly on evidence recall and well on F1.
+
+### Latency, with the signal cost included
+
+Stage 2's latency table measures **generation only**, so its "15× faster than
+naive" silently assumes retrieval is free. Encoding this benchmark's per-question
+haystack costs 397 ms. Both regimes are reported rather than the flattering one —
+`per-query` charges the encoder every question (what this benchmark literally
+does, since each question carries its own haystack), `pre-indexed` amortizes it
+(what a deployed system with a fixed corpus does):
+
+| method | per-query | vs naive | pre-indexed | vs naive |
+|---|---|---|---|---|
+| naive long-context | 1381 ms | 1.00× | 1381 ms | 1.00× |
+| dense @256 | 489 ms | 2.83× | 92 ms | 15.0× |
+| **cascade @256 (S = 1024)** | **594 ms** | **2.33×** | **197 ms** | **7.0×** |
+| fusion, full context @256 | 1986 ms | 0.70× | 1589 ms | 0.87× |
+
+Timings shuffle job order and discard the first ten calls. Grouping conditions
+into blocks instead reported S = 2048 as *faster* than S = 1024 — impossible for
+a prefill, and the same warm-up contamination Stage 2 hit.
+
+```bash
+python -m compress.test_spans           # 9 span-exactness checks, offline
+python -m compress.run_diagnostic --n 300 --context-lengths 32000 \
+    --pool-size 8000 --budgets 256 512 --dump-scores    # ~15 min
+python -m compress.analyze_fusion       # placebo controls (CPU only)
+python -m compress.run_fusion_eval --budgets 256 512 1024   # held-out weight + QA
+python -m compress.analyze_eval         # answer containment + paired bootstrap
+python -m compress.run_cascade          # the cascade + dense-only control
+python -m compress.run_cascade_latency --n 25               # shuffled-order cost
+```
+
+`run_fusion_eval`, `analyze_eval`, `run_cascade` and `run_cascade_latency` all
+reuse the score dump written by `run_diagnostic --dump-scores`, so the expensive
+head pass is paid once.
+
+### Limitations
+
+1. **The head list was identified on needle-in-a-haystack over essays**, not on
+   multi-hop QA. The standalone failure is direct evidence that cross-domain
+   transfer is partial. Generalization across task types is not yet measured.
+2. **The signal is read at a single decode step**, so it structurally cannot find
+   a bridge fact the model is not currently copying.
+3. **The head-selection method is unablated.** The number of heads is swept
+   (k = 5 best), but "copy-precision is the right way to pick heads" remains an
+   assumption.
+4. **Only 32k was tuned.** The fusion weight was selected at that length.
+
+## Layout
+
+```
+data/        pooled-distractor HotpotQA construction, budget packing
+heads/       retrieval-head identification (needles, haystack, capture, scoring)
+baselines/   dense-retrieval RAG, BM25, cross-encoder reranker, naive long-context
+compress/    retrieval-head-guided compression: spans, head scoring, fusion,
+             the dense-shortlist cascade, and their controls
+eval/        Recall@k, QA accuracy/F1, figures
+results/
+```
+
+## A note on model loading on this box
+
+The HF cache lives on NFS, and transformers materializes checkpoint tensors
+through an mmap. Sequential reads off that mount run at ~80 MB/s but mmap
+page-faults do not: **bge-m3 did not finish loading in 280 s from the cache, and
+loads in 30 s from local disk.** `paths.resolve_model` therefore prefers a local
+mirror under `/data/jayavardhan/lcrag_models/` and falls back to the HF id.
+
+## Setup
+
+```bash
+conda create -p /mnt/warm_storage/jayavardhan/tools/conda-envs/lcrag python=3.11
+/mnt/warm_storage/jayavardhan/tools/conda-envs/lcrag/bin/pip install \
+    torch transformers accelerate datasets sentencepiece protobuf \
+    numpy pandas matplotlib tqdm huggingface_hub hf_transfer rank_bm25
+```
+
+Neither `sentence-transformers` nor `faiss` is required — see the baseline
+notes above for why.
+
+Mirror the checkpoints to local disk (see the loading note above; on NFS this
+is the difference between 30 s and not finishing):
+
+```bash
+cp -rL <hf_cache>/models--BAAI--bge-m3/snapshots/<rev>/. \
+    /data/jayavardhan/lcrag_models/bge-m3/
+cp -rL <hf_cache>/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/<rev>/. \
+    /data/jayavardhan/lcrag_models/Meta-Llama-3.1-8B-Instruct/
+cp -rL <hf_cache>/models--BAAI--bge-reranker-v2-m3/snapshots/<rev>/. \
+    /data/jayavardhan/lcrag_models/bge-reranker-v2-m3/
+```
+
+Then run the pipeline in order (everything is offline; keep the flags set):
+
+```bash
+export HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1
+python -m data.test_hotpot                                          # 18 checks
+python -m heads.run_head_id --context-lengths 2000 4000 8000 --n-depths 10
+python -m baselines.run_baselines --n 300 --context-lengths 4000 16000 32000 \
+    --budgets 256 512 1024 2048
+python -m compress.run_diagnostic --n 300 --context-lengths 32000 \
+    --pool-size 8000 --budgets 256 512 --dump-scores
+python -m compress.run_fusion_eval --budgets 256 512 1024
+python -m compress.run_cascade
+```
+
+Model: `NousResearch/Meta-Llama-3.1-8B-Instruct` (an ungated mirror of
+`meta-llama/Llama-3.1-8B-Instruct`; identical weights, no access request needed).
+Encoder: `BAAI/bge-m3`. Reranker: `BAAI/bge-reranker-v2-m3` — same family as the
+bi-encoder, so the comparison is about architecture rather than training data.
+Data: HotpotQA distractor, validation split.

@@ -29,4 +29,8 @@ Recreate it with `mamba env create --name photo-seek --file environment.yml`, th
 
 **Next step.** Implement the CLIP embedder and FAISS store first, which makes the search path work end to end.
 
+**Docs in this vault** (copied 2026-10-14 from `/data/jayavardhan/projects/photo_seek/`):
+- [[Sources/photo_seek/README|README]]
+- [[Sources/photo_seek/SETUP|SETUP]]
+
 **Source.** `README.md`, `SETUP.md`, `CLAUDE.md`.

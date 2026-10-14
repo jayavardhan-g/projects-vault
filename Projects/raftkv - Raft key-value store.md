@@ -27,4 +27,8 @@ that no data was lost, restarts the node, and confirms the nodes converge. It re
 pushed to two different GitHub repos. `RaftKV/` adds only the planning doc and an empty `Notes.md`. Pick one before you
 link either from a resume.
 
+**Docs in this vault** (copied 2026-10-14 from `/data/jayavardhan/projects/raftkv/` and `RaftKV/`):
+- [[Sources/raftkv/README|README]]
+- [[Sources/raftkv/Project|Project]]
+
 **Source.** `raftkv/README.md` (27 KB guide: build, multi-laptop setup, dashboard, log format, troubleshooting), `RaftKV/Project.md` (the original spec).

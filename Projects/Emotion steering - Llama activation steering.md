@@ -26,4 +26,9 @@ independent emotion classifier predicts the intended emotion:
 collapses into non-words before the mood changes, which is why the guard exists. The [[Project strategy and resume plan]] judged a plain repeat of
 this method redundant. Its suggested follow-ups were SAE feature discovery and speech-LLM interpretability.
 
+**Docs in this vault** (copied 2026-10-14 from `/data/jayavardhan/projects/emotion_steering/`):
+- figures (4): `Sources/emotion_steering/`
+
+![[Sources/emotion_steering/stage1_success_vs_layer.png]]
+
 **Source.** `Project.ipynb`, `sweep_stage1_final.csv`, `sweep_stage2_final.csv`, `stage1_*.png`.

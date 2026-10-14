@@ -34,4 +34,9 @@ A preempted request can outgrow the token budget. The server runs as one process
 **State.** Done. The envs `vllmmini` and `vllm-ref` were path-based on warm storage and are gone. Warm storage also holds
 `/mnt/warm_storage/jayavardhan/mini-vllm-artifacts/` (build scratch). Natural next step: chunked and fused prefill.
 
+**Docs in this vault** (copied 2026-10-14 from `/data/jayavardhan/projects/vLLMmini/`):
+- [[Sources/vLLMmini/README|README]]
+- [[Sources/vLLMmini/PROGRESS|PROGRESS]]
+- [[Sources/vLLMmini/SETUP|SETUP]]
+
 **Source.** `README.md` (55 KB, per-phase write-up), `PROGRESS.md`, `SETUP.md` (two ways vLLM refuses to start on this box), `results/*.json`.

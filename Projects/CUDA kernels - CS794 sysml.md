@@ -28,4 +28,12 @@ tags: [project, gpu, cuda, coursework]
 
 **State.** Done. The env `sysml` was deleted and has no registry record.
 
+**Docs in this vault** (copied 2026-10-14 from `/data/jayavardhan/projects/sysml/`):
+- [[Sources/sysml/RESULTS|RESULTS]]
+- [[Sources/sysml/SETUP|SETUP]]
+- [[Sources/sysml/CLAUDE|CLAUDE]]
+- figures (5): `Sources/sysml/`
+
+![[Sources/sysml/results/pa2_tflops_vs_n.png]]
+
 **Source.** `RESULTS.md`, `CLAUDE.md` (the assignment brief), `results/*.csv|png`.

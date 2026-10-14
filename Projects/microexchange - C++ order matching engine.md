@@ -25,4 +25,8 @@ snapshot/replay, and `rdtsc` latency timing. `./microexchange` runs a demo, 40 u
 
 **State.** Done. It has a single commit. The `_to_delete/` folder (old CMake/Makefile, test binaries and WAL files) can be removed.
 
+**Docs in this vault** (copied 2026-10-14 from `/data/jayavardhan/projects/microexchange/`):
+- [[Sources/microexchange/README|README]]
+- [[Sources/microexchange/PROJECT|PROJECT]]
+
 **Source.** `README.md`, `PROJECT.md` (full write-up and before/after tables).

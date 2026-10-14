@@ -34,4 +34,16 @@ There is no faithfulness/citation evaluation, and the Streamlit UI has never bee
 
 **State.** All commits are pushed (2026-10-14). The env `bountybrain` (Python 3.11.15) was deleted and has no registry record. SETUP.md lists four vLLM traps.
 
+**Docs in this vault** (copied 2026-10-14 from `/data/jayavardhan/projects/bountybrain/`):
+- [[Sources/bountybrain/README|README]]
+- [[Sources/bountybrain/RESULTS|RESULTS]]
+- [[Sources/bountybrain/PROGRESS|PROGRESS]]
+- [[Sources/bountybrain/SETUP|SETUP]]
+- [[Sources/bountybrain/ATTRIBUTION|ATTRIBUTION]]
+- [[Sources/bountybrain/examples/README|examples/README]]
+- [[Sources/bountybrain/examples/sample_plan|examples/sample_plan]]
+- [[Sources/bountybrain/prompts/classify_weakness|prompts/classify_weakness]]
+- [[Sources/bountybrain/prompts/generate_query|prompts/generate_query]]
+- [[Sources/bountybrain/prompts/tutorial|prompts/tutorial]]
+
 **Source.** `README.md`, `RESULTS.md`, `PROGRESS.md` (hand-over and priorities), `SETUP.md`, `ATTRIBUTION.md`.

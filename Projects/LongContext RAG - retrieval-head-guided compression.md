@@ -40,4 +40,24 @@ than the cross-encoder (p=0.14).
 **State.** Done. All commits are pushed (2026-10-14), but README edits and results files are uncommitted. The env `lcrag` was path-based on warm storage and no longer exists, so recreate it by name ([[Environments]]).
 The local model mirrors in `/data/jayavardhan/lcrag_models/` are **gone** as of 2026-10-14, so re-copy them before any rerun.
 
+**Docs in this vault** (copied 2026-10-14 from `/data/jayavardhan/projects/LongContext_RAG/`):
+- [[Sources/LongContext_RAG/README|README]]
+- [[Sources/LongContext_RAG/Project|Project]]
+- [[Sources/LongContext_RAG/PROGRESS|PROGRESS]]
+- [[Sources/LongContext_RAG/CHECKPOINTS|CHECKPOINTS]]
+- [[Sources/LongContext_RAG/results/ablation/Meta-Llama-3.1-8B-Instruct_ablation|results/ablation/Meta-Llama-3.1-8B-Instruct_ablation]]
+- [[Sources/LongContext_RAG/results/baselines/Meta-Llama-3.1-8B-Instruct_baselines|results/baselines/Meta-Llama-3.1-8B-Instruct_baselines]]
+- [[Sources/LongContext_RAG/results/baselines/Meta-Llama-3.1-8B-Instruct_latency|results/baselines/Meta-Llama-3.1-8B-Instruct_latency]]
+- [[Sources/LongContext_RAG/results/cascade/cascade|results/cascade/cascade]]
+- [[Sources/LongContext_RAG/results/cascade/cascade_latency|results/cascade/cascade_latency]]
+- [[Sources/LongContext_RAG/results/diagnostic/Meta-Llama-3.1-8B-Instruct_diagnostic|results/diagnostic/Meta-Llama-3.1-8B-Instruct_diagnostic]]
+- [[Sources/LongContext_RAG/results/diagnostic/eval_analysis|results/diagnostic/eval_analysis]]
+- [[Sources/LongContext_RAG/results/diagnostic/fusion_controls|results/diagnostic/fusion_controls]]
+- [[Sources/LongContext_RAG/results/diagnostic/fusion_eval|results/diagnostic/fusion_eval]]
+- [[Sources/LongContext_RAG/results/head_id/Meta-Llama-3.1-8B-Instruct_head_list|results/head_id/Meta-Llama-3.1-8B-Instruct_head_list]]
+- [[Sources/LongContext_RAG/results/head_id/published_comparison|results/head_id/published_comparison]]
+- figures (6): `Sources/LongContext_RAG/`
+
+![[Sources/LongContext_RAG/results/baselines/accuracy_vs_compression.png]]
+
 **Source.** `README.md` (full write-up), `PROGRESS.md` (45 KB session log), `CHECKPOINTS.md`, `results/*/*.md`.

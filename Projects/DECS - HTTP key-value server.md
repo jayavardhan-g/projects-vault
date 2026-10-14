@@ -31,4 +31,10 @@ CPU never saturated, so the limit sits elsewhere: the DB, the pool size or the l
 **Note.** `server.cpp` hard-codes a local Postgres connection string with a password, and that file is in the public repo.
 It is a lab credential, but it is worth scrubbing.
 
+**Docs in this vault** (copied 2026-10-14 from `/data/jayavardhan/projects/decs/`):
+- [[Sources/decs/README|README]]
+- figures (16): `Sources/decs/`
+
+![[Sources/decs/project/load_gen/results/final tests/results_get_only.png]]
+
 **Source.** `README.md`, `project/server.cpp`, `project/load_gen/` (scripts, CSVs, plots, `summary.json`).
