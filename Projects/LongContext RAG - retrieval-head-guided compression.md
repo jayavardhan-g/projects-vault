@@ -37,7 +37,7 @@ than the cross-encoder (p=0.14).
 
 **Lessons** → [[Measurement traps]] (block-order warm-up, normaliser artefact), [[Infrastructure traps]] (NFS mmap model loading).
 
-**State.** Done. 2 local commits are not pushed. The env `lcrag` was path-based on warm storage and no longer exists, so recreate it by name ([[Environments]]).
+**State.** Done. All commits are pushed (2026-10-14), but README edits and results files are uncommitted. The env `lcrag` was path-based on warm storage and no longer exists, so recreate it by name ([[Environments]]).
 The local model mirrors in `/data/jayavardhan/lcrag_models/` are **gone** as of 2026-10-14, so re-copy them before any rerun.
 
 **Source.** `README.md` (full write-up), `PROGRESS.md` (45 KB session log), `CHECKPOINTS.md`, `results/*/*.md`.

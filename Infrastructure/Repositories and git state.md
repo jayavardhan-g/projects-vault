@@ -6,8 +6,8 @@ tags: [infrastructure, git]
 
 | folder | GitHub repo (jayavardhan-g/…) | commits | unpushed |
 |---|---|--:|--:|
-| `bountybrain` | bountybrain | 18 | **3** |
-| `LongContext_RAG` | LongContext_RAG | 6 | **2** |
+| `bountybrain` | bountybrain | 18 | 0 |
+| `LongContext_RAG` | LongContext_RAG | 6 | 0 (remote is HTTPS; push over SSH) |
 | `vLLMmini` | mini-vLLM | 34 | 0 |
 | `speculative_decoding` | speculative_decoding | 25 | 0 |
 | `photo_seek` | Photo-Seek | 11 | 0 |
@@ -22,7 +22,7 @@ tags: [infrastructure, git]
 The single-commit repos were imported with their full history squashed into one "first commit" between 2026-08-14 and 08-19.
 
 **Things to tidy:**
-- Push `bountybrain` (3 commits) and `LongContext_RAG` (2 commits). Pushing is the user's job.
+- ~~Push bountybrain and LongContext_RAG~~ — done 2026-10-14. LongContext_RAG still has uncommitted README edits and results files.
 - `raftkv` and `RaftKV/RAFT` hold the same code in two public repos. → [[raftkv - Raft key-value store]]
 - `decs/project/server.cpp` has a Postgres password in a public repo. → [[DECS - HTTP key-value server]]
 - `microexchange/_to_delete/` holds leftover build files.

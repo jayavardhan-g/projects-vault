@@ -32,6 +32,6 @@ There is no faithfulness/citation evaluation, and the Streamlit UI has never bee
 
 **Lessons** → [[Evaluation honesty patterns]].
 
-**State.** 3 commits are not pushed. The env `bountybrain` (Python 3.11.15) was deleted and has no registry record. SETUP.md lists four vLLM traps.
+**State.** All commits are pushed (2026-10-14). The env `bountybrain` (Python 3.11.15) was deleted and has no registry record. SETUP.md lists four vLLM traps.
 
 **Source.** `README.md`, `RESULTS.md`, `PROGRESS.md` (hand-over and priorities), `SETUP.md`, `ATTRIBUTION.md`.

@@ -7,7 +7,7 @@ tags: [meta]
 Work that was started or planned and left unfinished, roughly from cheapest to most expensive.
 
 **Housekeeping (minutes)**
-- Push `bountybrain` (3 commits) and `LongContext_RAG` (2 commits). → [[Repositories and git state]]
+- ~~Push bountybrain and LongContext_RAG~~ — done 2026-10-14. → [[Repositories and git state]]
 - Pick one of the duplicate Raft repos. Scrub the Postgres password from the DECS repo.
 
 **Finish existing projects**
