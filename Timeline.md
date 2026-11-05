@@ -22,3 +22,4 @@ Dates come from git logs and file times. Coursework projects were done earlier a
 | 2026-08-25 | Photo-Seek env set up by name; last session on any side project |
 | 2026-08 → 10 | Focus moves to the M.Tech thesis (separate vault: `/data/jayavardhan/mtp/vault`) |
 | 2026-10-14 | This vault created |
+| 2026-11-04 | [[Interview plan (Nov 2026)]]: 15-day prep for 14 resume projects (thesis excluded); [[Claude instructions - interview prep]] for later sessions |
