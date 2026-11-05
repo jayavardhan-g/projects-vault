@@ -30,7 +30,7 @@ Read it fully before you answer. If you have no access to the server, ask him to
 | Prep packs | `vault/Interview prep/Prep packs/<Project> - prep.md` (the copies in the repos are stale snapshots) |
 | Day notes | `vault/Interview prep/Days/Day NN - <topic>.md`: write each day's lesson here before the day, and his notes go here too |
 | One note per project | `vault/Projects/` (this vault) |
-| This vault on GitHub | `jayavardhan-g/vaults`, folder `projects/` |
+| This vault on GitHub | `jayavardhan-g/projects-vault` (repo root = the vault) |
 
 Several repos have their real work on the branch **`upgrade-2026-10`**, not on `main`: photo_seek, bountybrain,
 microexchange and raftkv. Read that branch. The numbers in the upgraded docs replace the older ones.
