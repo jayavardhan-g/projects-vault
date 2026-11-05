@@ -1,0 +1,18 @@
+{
+  "switcher:open": [],
+  "editor:toggle-italics": [],
+  "editor:toggle-bold": [],
+  "command-palette:open": [
+    {
+      "modifiers": [
+        "Mod",
+        "Shift"
+      ],
+      "key": "P"
+    }
+  ],
+  "editor:open-search-replace": [],
+  "editor:insert-link": [],
+  "editor:toggle-checklist-status": [],
+  "editor:delete-paragraph": []
+}

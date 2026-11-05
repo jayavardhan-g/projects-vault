@@ -1,0 +1,10 @@
+{
+  "files": [
+    {
+      "file": "Tools/Obsidian-Cheatsheet.md",
+      "useMoment": false
+    }
+  ],
+  "useExistingPane": true,
+  "useHoverEditor": false
+}

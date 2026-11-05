@@ -1,1 +1,7 @@
-{"newFileLocation":"folder","newFileFolderPath":"Log","useMarkdownLinks":false,"alwaysUpdateLinks":true}
+{
+  "newFileLocation": "folder",
+  "newFileFolderPath": "Log",
+  "useMarkdownLinks": false,
+  "alwaysUpdateLinks": true,
+  "vimMode": true
+}
