@@ -14,6 +14,28 @@ here. The welfare platform (resume 3 only) is out of scope.
 **This note is the master tracker.** Tick boxes as you go, and add weak topics at the bottom. Claude sessions follow
 [[Claude instructions - interview prep]].
 
+## Revised schedule (2026-11-08): two days were missed, so the rest is compressed
+
+The day sections below keep their old numbering. This table says which section to study on which date. For Nov 8–10,
+use the detailed day notes instead: they have exact functions, line numbers, maths, reading and a rebuild exercise.
+
+| date | study | where |
+|---|---|---|
+| Sun Nov 8 | mini-vLLM I: paging, scheduler | [[Day 02 - mini-vLLM I]] |
+| Mon Nov 9 | mini-vLLM II: prefix cache, Triton, benchmarks | [[Day 03 - mini-vLLM II]] |
+| Tue Nov 10 | Speculative decoding | [[Day 04 - Speculative decoding]] |
+| Wed Nov 11 | CUDA kernels, plus a 60-min Mock 1 in the evening | section Day 5 |
+| Thu Nov 12 | Seminar and speech basics (morning, 3 h: blocks 1–2 and 4), then CosyVoice (afternoon; drop its S blocks) | sections Day 6 and Day 7 |
+| Fri Nov 13 | CS728 and LeNet-5 | section Day 8 |
+| Sat Nov 14 | Photo-Seek I and II in one day (deep C blocks and P only; drop all S blocks) | sections Day 9 and Day 10 |
+| Sun Nov 15 | Emotion steering (2 h) and BountyBrain, plus a 60-min Mock 2 | sections Day 10 (emotion) and Day 11 |
+| Mon Nov 16 | DECS and Micro Exchange | section Day 12 |
+| Tue Nov 17 | Raft, plus a 60-min Mock 3 | section Day 13 |
+| Wed Nov 18 | Full-resume mocks (resumes 4 and 5), weak topics, cheat sheet | section Day 14 |
+
+Each project day now has a **rebuild block**: rewrite the project's core mechanism yourself in about 100 lines
+(60–90 min). This replaces rebuilding the whole project, which there is no time for.
+
 ## How a day works
 
 - **Each day covers only that day's project or projects.** Don't open other projects, and don't ask Claude about them.
