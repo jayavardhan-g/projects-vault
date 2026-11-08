@@ -1,12 +1,12 @@
 ---
 type: study-day
-day: 2
+day: 1
 date: 2026-11-08
 tags: [interview, day, mini-vllm]
 ---
-# Day 2 (Sun Nov 8): mini-vLLM I: paged KV cache and continuous batching
+# Day 1 (Sun Nov 8): mini-vLLM I: paged KV cache and continuous batching
 
-Part of [[Interview plan (Nov 2026)]]. Repo `vLLMmini` (branch `main`). About 7 h.
+Part of [[Interview plan (Nov 2026)]]. Repo `vLLMmini` (branch `main`). About 7.5 h, including the prerequisite.
 
 **Resume bullet it defends:** "Built a paged KV-cache memory manager and continuous-batching scheduler for LLM inference,
 reducing GPU memory fragmentation by **4.3×** and achieving **3.82×** throughput over the HuggingFace baseline."
@@ -21,15 +21,16 @@ reducing GPU memory fragmentation by **4.3×** and achieving **3.82×** throughp
 
 | # | Time | Kind | What |
 |---|---|---|---|
-| 0 | 15 min | recall | Day 1 recap ([[Day 01 - LLM inference basics]]): KV formula, prefill vs decode, the roofline |
-| 1 | 30 min | read | The README for the big picture: *Architecture* (line 14), *Model* (466), *The Phase 0 baseline* (554) |
+| 0 | 60 min | theory | **Prerequisite** [[Prereq - LLM inference basics]]: sections 1–6 and the self-check. KV formula, prefill vs decode, the roofline. *If you already did it on Nov 5, spend 15 min recalling it.* |
+| 0b | 30 min | code | `model/llama.py`: one token through one layer, writing down the tensor shapes (hidden 2048, 32 query and 8 KV heads, head_dim 64) |
+| 1 | 20 min | read | The README for the big picture: *Architecture* (line 14), *Model* (466), *The Phase 0 baseline* (554) |
 | 2 | 60 min | theory | PagedAttention (section A below) |
 | 3 | 75 min | code | `block_allocator.py`, `block_table.py`, `kv_cache.py` (section B1) |
 | 4 | 75 min | rebuild | Write your own block manager (section C) |
 | — | lunch | | |
 | 5 | 40 min | theory | Continuous batching and preemption (section A2) |
 | 6 | 90 min | code | `scheduler.py` (section B2) |
-| 7 | 25 min | skim | `paged_attention.py`, `engine.py`, `model/runner.py` (section B3) |
+| 7 | 15 min | skim | `paged_attention.py`, `engine.py`, `model/runner.py` (section B3) |
 | 8 | 30 min | trace | The scheduler trace on paper (section D) |
 | 9 | 40 min | practice | The questions out loud (section E); write your fumbles at the bottom |
 

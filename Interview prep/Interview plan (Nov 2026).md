@@ -16,22 +16,22 @@ here. The welfare platform (resume 3 only) is out of scope.
 
 ## Revised schedule (2026-11-08): two days were missed, so the rest is compressed
 
-The day sections below keep their old numbering. This table says which section to study on which date. For Nov 8–10,
+**Day numbering restarts on Nov 8: Day 1 = Nov 8, Day 11 = Nov 18.** The older day sections further down keep their old numbers. This table says which section to study on which date. For Nov 8–10,
 use the detailed day notes instead: they have exact functions, line numbers, maths, reading and a rebuild exercise.
 
-| date | study | where |
-|---|---|---|
-| Sun Nov 8 | mini-vLLM I: paging, scheduler | [[Day 02 - mini-vLLM I]] |
-| Mon Nov 9 | mini-vLLM II: prefix cache, Triton, benchmarks | [[Day 03 - mini-vLLM II]] |
-| Tue Nov 10 | Speculative decoding | [[Day 04 - Speculative decoding]] |
-| Wed Nov 11 | CUDA kernels, plus a 60-min Mock 1 in the evening | section Day 5 |
-| Thu Nov 12 | Seminar and speech basics (morning, 3 h: blocks 1–2 and 4), then CosyVoice (afternoon; drop its S blocks) | sections Day 6 and Day 7 |
-| Fri Nov 13 | CS728 and LeNet-5 | section Day 8 |
-| Sat Nov 14 | Photo-Seek I and II in one day (deep C blocks and P only; drop all S blocks) | sections Day 9 and Day 10 |
-| Sun Nov 15 | Emotion steering (2 h) and BountyBrain, plus a 60-min Mock 2 | sections Day 10 (emotion) and Day 11 |
-| Mon Nov 16 | DECS and Micro Exchange | section Day 12 |
-| Tue Nov 17 | Raft, plus a 60-min Mock 3 | section Day 13 |
-| Wed Nov 18 | Full-resume mocks (resumes 4 and 5), weak topics, cheat sheet | section Day 14 |
+| new day | date | study | where |
+|---|---|---|---|
+| **1** | Sun Nov 8 | mini-vLLM I: paging, scheduler | [[Day 01 - mini-vLLM I]] |
+| **2** | Mon Nov 9 | mini-vLLM II: prefix cache, Triton, benchmarks | [[Day 02 - mini-vLLM II]] |
+| **3** | Tue Nov 10 | Speculative decoding | [[Day 03 - Speculative decoding]] |
+| **4** | Wed Nov 11 | CUDA kernels, plus a 60-min Mock 1 in the evening | old section Day 5 |
+| **5** | Thu Nov 12 | Seminar and speech basics (morning, 3 h: blocks 1–2 and 4), then CosyVoice (afternoon; drop its S blocks) | old sections Day 6 and Day 7 |
+| **6** | Fri Nov 13 | CS728 and LeNet-5 | old section Day 8 |
+| **7** | Sat Nov 14 | Photo-Seek I and II in one day (deep C blocks and P only; drop all S blocks) | old sections Day 9 and Day 10 |
+| **8** | Sun Nov 15 | Emotion steering (2 h) and BountyBrain, plus a 60-min Mock 2 | old sections Day 10 (emotion) and Day 11 |
+| **9** | Mon Nov 16 | DECS and Micro Exchange | old section Day 12 |
+| **10** | Tue Nov 17 | Raft, plus a 60-min Mock 3 | old section Day 13 |
+| **11** | Wed Nov 18 | Full-resume mocks (resumes 4 and 5), weak topics, cheat sheet | old section Day 14 |
 
 Each project day now has a **rebuild block**: rewrite the project's core mechanism yourself in about 100 lines
 (60–90 min). This replaces rebuilding the whole project, which there is no time for.
@@ -71,7 +71,7 @@ Each project day now has a **rebuild block**: rewrite the project's core mechani
 
 ## Day 1 (Nov 5): LLM inference basics (afternoon only, about 3.5 h)
 
-Lesson and self-check: [[Day 01 - LLM inference basics]].
+Lesson and self-check: [[Prereq - LLM inference basics]].
 
 - [ ] **T, 60 min.** Forward pass, KV cache size formula, prefill (compute-bound) vs decode (memory-bound), the roofline and the H200's ridge point. Use the chat lesson, plus Horace He's *Making Deep Learning Go Brrrr*.
 - [ ] **C, 60 min.** `vLLMmini/src/mini_vllm/model/llama.py` (about 200 lines). Trace one token through one layer and write down the tensor shapes (hidden 2048, 32 query and 8 KV heads, head_dim 64).

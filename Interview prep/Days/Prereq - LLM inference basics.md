@@ -1,12 +1,10 @@
 ---
-type: study-day
-day: 1
-date: 2026-11-05
+type: prerequisite
 tags: [interview, day]
 ---
-# Day 1 (Nov 5): LLM inference basics
+# Prerequisite: LLM inference basics (done at the start of Day 1)
 
-Part of [[Interview plan (Nov 2026)]]. About 3.5 h. Every number here comes from your own repos, so you can quote them.
+Part of [[Interview plan (Nov 2026)]]. Read sections 1–6 and answer the self-check at the start of [[Day 01 - mini-vLLM I]] (about 60 min). Then do the `llama.py` block on Day 1 too, in place of the README skim. Every number here comes from your own repos, so you can quote them.
 
 ## Blocks
 

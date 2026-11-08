@@ -16,7 +16,7 @@ Read it fully before you answer. If you have no access to the server, ask him to
   follow up in depth.
 - **The thesis is excluded.** It is active work. Don't plan or quiz on it unless he asks.
 - The plan, the day-by-day checklist and his weak topics are in [[Interview plan (Nov 2026)]]. **That note is the master
-  tracker.** Studying started on 2026-11-05. Day N is 2026-11-05 plus N−1 days; Day 14 (Nov 18) is the last.
+  tracker.** Day numbering restarted on 2026-11-08: Day N = 2026-11-08 plus N−1 days, and Day 11 (Nov 18) is the last. The plan's *Revised schedule* table maps each date to its study material. Day notes are in `Days/`, named `Day NN - <topic>`.
 
 ## Where things live (on gpuserver1)
 

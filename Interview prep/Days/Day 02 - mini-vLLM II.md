@@ -1,12 +1,12 @@
 ---
 type: study-day
-day: 3
+day: 2
 date: 2026-11-09
 tags: [interview, day, mini-vllm]
 ---
-# Day 3 (Mon Nov 9): mini-vLLM II: radix prefix cache, Triton kernel, benchmarks
+# Day 2 (Mon Nov 9): mini-vLLM II: radix prefix cache, Triton kernel, benchmarks
 
-Part of [[Interview plan (Nov 2026)]]. Repo `vLLMmini` (branch `main`). About 7 h. Builds on [[Day 02 - mini-vLLM I]].
+Part of [[Interview plan (Nov 2026)]]. Repo `vLLMmini` (branch `main`). About 7 h. Builds on [[Day 01 - mini-vLLM I]].
 
 **Resume bullet it defends:** "Implemented a radix-tree prefix cache to reuse shared KV states across requests,
 accelerating repeated prompt inference by up to **7.4×** through efficient prefix matching and cache reuse."
