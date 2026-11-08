@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 470" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14">
+  <rect x="1" y="1" width="978" height="468" rx="14" fill="#fbfbfd" stroke="#d8dbe3"/>
+  <text x="30" y="38" font-size="20" font-weight="700" fill="#1f2430">Prefill and decode do the same maths with very different shapes</text>
+  <text x="30" y="60" fill="#5b6170">One weight matrix W (2048 × 2048, 8 MB in bf16). Both phases must read W from memory once per forward pass.</text>
+
+  <!-- prefill -->
+  <text x="40" y="98" font-weight="700" fill="#2f6fde" font-size="16">Prefill: the whole prompt at once</text>
+  <rect x="40" y="114" width="70" height="200" fill="#e8eefc" stroke="#2f6fde"/>
+  <text x="75" y="220" text-anchor="middle" fill="#2f6fde" font-size="12" transform="rotate(-90 75 220)">N prompt tokens</text>
+  <text x="75" y="334" text-anchor="middle" fill="#5b6170" font-size="12">[N, 2048]</text>
+  <text x="128" y="220" font-size="22" fill="#1f2430">×</text>
+  <rect x="152" y="134" width="160" height="160" fill="#f0f1f5" stroke="#5b6170"/>
+  <text x="232" y="220" text-anchor="middle" fill="#1f2430">W</text>
+  <text x="232" y="314" text-anchor="middle" fill="#5b6170" font-size="12">[2048, 2048]</text>
+  <text x="330" y="220" font-size="22" fill="#1f2430">=</text>
+  <rect x="356" y="114" width="70" height="200" fill="#e8eefc" stroke="#2f6fde"/>
+  <text x="391" y="334" text-anchor="middle" fill="#5b6170" font-size="12">[N, 2048]</text>
+  <text x="40" y="366" fill="#1f2430">matrix × matrix: each weight byte is reused N times</text>
+  <text x="40" y="388" fill="#1f2430">FLOPs per byte ≈ <tspan font-weight="700">N</tspan> → <tspan font-weight="700" fill="#2f6fde">compute-bound</tspan> (once N is large)</text>
+  <text x="40" y="410" fill="#5b6170">Sets TTFT (time to first token)</text>
+
+  <line x1="490" y1="90" x2="490" y2="420" stroke="#d8dbe3" stroke-width="2"/>
+
+  <!-- decode -->
+  <text x="520" y="98" font-weight="700" fill="#e07b28" font-size="16">Decode: one new token per sequence</text>
+  <rect x="520" y="204" width="70" height="14" fill="#fdf0e4" stroke="#e07b28"/>
+  <text x="555" y="238" text-anchor="middle" fill="#5b6170" font-size="12">[B, 2048]</text>
+  <text x="600" y="220" font-size="22" fill="#1f2430">×</text>
+  <rect x="626" y="134" width="160" height="160" fill="#f0f1f5" stroke="#5b6170"/>
+  <text x="706" y="220" text-anchor="middle" fill="#1f2430">W</text>
+  <text x="706" y="314" text-anchor="middle" fill="#5b6170" font-size="12">[2048, 2048]</text>
+  <text x="804" y="220" font-size="22" fill="#1f2430">=</text>
+  <rect x="830" y="204" width="70" height="14" fill="#fdf0e4" stroke="#e07b28"/>
+  <text x="865" y="238" text-anchor="middle" fill="#5b6170" font-size="12">[B, 2048]</text>
+  <text x="520" y="366" fill="#1f2430">matrix × vector (B thin rows): each byte reused only B times</text>
+  <text x="520" y="388" fill="#1f2430">FLOPs per byte ≈ <tspan font-weight="700">B</tspan> → <tspan font-weight="700" fill="#e07b28">memory-bandwidth-bound</tspan></text>
+  <text x="520" y="410" fill="#5b6170">Sets TPOT (time per output token). B = batch size.</text>
+
+  <rect x="30" y="428" width="920" height="30" rx="8" fill="#eef7f2" stroke="#2e9e6b"/>
+  <text x="46" y="448" fill="#1f2430"><tspan font-weight="700">Consequence:</tspan> in decode, adding rows to the thin input costs almost nothing extra — W is read anyway. That is why batching is nearly free.</text>
+</svg>

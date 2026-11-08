@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 470" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14">
+  <rect x="1" y="1" width="978" height="468" rx="14" fill="#fbfbfd" stroke="#d8dbe3"/>
+  <text x="30" y="34" font-size="20" font-weight="700" fill="#1f2430">Static vs continuous batching (4 batch slots, time in decode steps)</text>
+  <text x="30" y="56" fill="#5b6170">R1–R4 want 3, 10, 5 and 7 tokens. R5 and R6 arrive at step 1 and want 4 tokens each.</text>
+
+  <!-- step axis: x = 150 + 40*step -->
+  <g fill="#5b6170" font-size="11" text-anchor="middle">
+    <text x="170" y="84">1</text><text x="210" y="84">2</text><text x="250" y="84">3</text><text x="290" y="84">4</text><text x="330" y="84">5</text><text x="370" y="84">6</text><text x="410" y="84">7</text><text x="450" y="84">8</text><text x="490" y="84">9</text><text x="530" y="84">10</text><text x="570" y="84">11</text><text x="610" y="84">12</text><text x="650" y="84">13</text><text x="690" y="84">14</text>
+  </g>
+
+  <!-- STATIC -->
+  <text x="30" y="110" font-weight="700" fill="#d64545">Static</text>
+  <g font-size="12" fill="#5b6170"><text x="110" y="114">slot 1</text><text x="110" y="142">slot 2</text><text x="110" y="170">slot 3</text><text x="110" y="198">slot 4</text></g>
+  <!-- R1: 3 tokens + idle 7 -->
+  <rect x="150" y="98" width="120" height="22" rx="4" fill="#2f6fde"/><text x="160" y="114" fill="#fff" font-size="12">R1</text>
+  <rect x="270" y="98" width="280" height="22" rx="4" fill="#e4e6ec" stroke="#b5bac6" stroke-dasharray="3 3"/><text x="280" y="114" fill="#5b6170" font-size="12">done, but holds its slot and memory</text>
+  <rect x="150" y="126" width="400" height="22" rx="4" fill="#e07b28"/><text x="160" y="142" fill="#fff" font-size="12">R2</text>
+  <rect x="150" y="154" width="200" height="22" rx="4" fill="#2e9e6b"/><text x="160" y="170" fill="#fff" font-size="12">R3</text>
+  <rect x="350" y="154" width="200" height="22" rx="4" fill="#e4e6ec" stroke="#b5bac6" stroke-dasharray="3 3"/>
+  <rect x="150" y="182" width="280" height="22" rx="4" fill="#7b55c9"/><text x="160" y="198" fill="#fff" font-size="12">R4</text>
+  <rect x="430" y="182" width="120" height="22" rx="4" fill="#e4e6ec" stroke="#b5bac6" stroke-dasharray="3 3"/>
+  <!-- R5 R6 next batch -->
+  <rect x="550" y="98" width="160" height="22" rx="4" fill="#c2410c"/><text x="560" y="114" fill="#fff" font-size="12">R5</text>
+  <rect x="550" y="126" width="160" height="22" rx="4" fill="#0e7490"/><text x="560" y="142" fill="#fff" font-size="12">R6</text>
+  <line x1="190" y1="214" x2="550" y2="214" stroke="#d64545" stroke-width="2"/>
+  <text x="200" y="232" fill="#d64545" font-size="12">R5, R6 wait in the queue from step 1 to step 10 → first token only at step 11</text>
+
+  <line x1="30" y1="250" x2="950" y2="250" stroke="#d8dbe3"/>
+
+  <!-- CONTINUOUS -->
+  <text x="30" y="280" font-weight="700" fill="#2e9e6b">Continuous</text>
+  <g font-size="12" fill="#5b6170"><text x="110" y="284">slot 1</text><text x="110" y="312">slot 2</text><text x="110" y="340">slot 3</text><text x="110" y="368">slot 4</text></g>
+  <rect x="150" y="268" width="120" height="22" rx="4" fill="#2f6fde"/><text x="160" y="284" fill="#fff" font-size="12">R1</text>
+  <rect x="270" y="268" width="160" height="22" rx="4" fill="#c2410c"/><text x="280" y="284" fill="#fff" font-size="12">R5 joins at step 4</text>
+  <rect x="150" y="296" width="400" height="22" rx="4" fill="#e07b28"/><text x="160" y="312" fill="#fff" font-size="12">R2</text>
+  <rect x="150" y="324" width="200" height="22" rx="4" fill="#2e9e6b"/><text x="160" y="340" fill="#fff" font-size="12">R3</text>
+  <rect x="350" y="324" width="160" height="22" rx="4" fill="#0e7490"/><text x="360" y="340" fill="#fff" font-size="12">R6 joins at step 6</text>
+  <rect x="150" y="352" width="280" height="22" rx="4" fill="#7b55c9"/><text x="160" y="368" fill="#fff" font-size="12">R4</text>
+  <text x="580" y="290" fill="#1f2430" font-size="13">All six finish by step 10, not 14.</text>
+  <text x="580" y="310" fill="#1f2430" font-size="13">R5 waits 3 steps instead of 10.</text>
+  <text x="580" y="330" fill="#5b6170" font-size="12">A joining request first needs a prefill, which</text>
+  <text x="580" y="346" fill="#5b6170" font-size="12">shares that step with everyone's decode, so the</text>
+  <text x="580" y="362" fill="#5b6170" font-size="12">running requests' TPOT can get worse.</text>
+
+  <rect x="30" y="392" width="920" height="62" rx="8" fill="#eef7f2" stroke="#2e9e6b"/>
+  <text x="46" y="414" fill="#1f2430"><tspan font-weight="700">Your result (Phase 6, H200, five paired rounds):</tspan> TTFT p50 2448 → 179 ms (13.7×), throughput 631.5 → 2415.0 tok/s (3.82×).</text>
+  <text x="46" y="436" fill="#1f2430">The 3.82× is the whole system (continuous batching + paging + the fused decode kernel), measured against the HF static-batching baseline.</text>
+</svg>

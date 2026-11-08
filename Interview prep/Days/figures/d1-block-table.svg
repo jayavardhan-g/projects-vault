@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 470" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5b6170"/></marker></defs>
+<rect x="1" y="1" width="978" height="468" rx="14" fill="#fbfbfd" stroke="#d8dbe3"/>
+<text x="30" y="34" font-size="20" font-weight="700" fill="#1f2430">The block table: a page table for one request's KV</text>
+<text x="30" y="56" fill="#5b6170">Request with 10 tokens, block size B = 4, block table = [17, 4, 23] (the example from your README, Phase 1).</text>
+<text x="30" y="96" font-weight="700" fill="#1f2430">Logical (what the request sees)</text>
+<rect x="60" y="108" width="28" height="30" rx="4" fill="#e8eefc" stroke="#2f6fde"/><text x="74" y="128" text-anchor="middle" fill="#1f2430" font-size="13">0</text>
+<rect x="92" y="108" width="28" height="30" rx="4" fill="#e8eefc" stroke="#2f6fde"/><text x="106" y="128" text-anchor="middle" fill="#1f2430" font-size="13">1</text>
+<rect x="124" y="108" width="28" height="30" rx="4" fill="#e8eefc" stroke="#2f6fde"/><text x="138" y="128" text-anchor="middle" fill="#1f2430" font-size="13">2</text>
+<rect x="156" y="108" width="28" height="30" rx="4" fill="#e8eefc" stroke="#2f6fde"/><text x="170" y="128" text-anchor="middle" fill="#1f2430" font-size="13">3</text>
+<rect x="210" y="108" width="28" height="30" rx="4" fill="#e8eefc" stroke="#2f6fde"/><text x="224" y="128" text-anchor="middle" fill="#1f2430" font-size="13">4</text>
+<rect x="242" y="108" width="28" height="30" rx="4" fill="#e8eefc" stroke="#2f6fde"/><text x="256" y="128" text-anchor="middle" fill="#1f2430" font-size="13">5</text>
+<rect x="274" y="108" width="28" height="30" rx="4" fill="#e8eefc" stroke="#2f6fde"/><text x="288" y="128" text-anchor="middle" fill="#1f2430" font-size="13">6</text>
+<rect x="306" y="108" width="28" height="30" rx="4" fill="#e8eefc" stroke="#2f6fde"/><text x="320" y="128" text-anchor="middle" fill="#1f2430" font-size="13">7</text>
+<rect x="360" y="108" width="28" height="30" rx="4" fill="#e8eefc" stroke="#2f6fde"/><text x="374" y="128" text-anchor="middle" fill="#1f2430" font-size="13">8</text>
+<rect x="392" y="108" width="28" height="30" rx="4" fill="#2f6fde" stroke="#2f6fde"/><text x="406" y="128" text-anchor="middle" fill="#fff" font-size="13">9</text>
+<rect x="424" y="108" width="28" height="30" rx="4" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="456" y="108" width="28" height="30" rx="4" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<text x="122" y="158" text-anchor="middle" fill="#5b6170" font-size="12">logical block 0</text>
+<text x="272" y="158" text-anchor="middle" fill="#5b6170" font-size="12">logical block 1</text>
+<text x="422" y="158" text-anchor="middle" fill="#5b6170" font-size="12">logical block 2</text>
+<text x="560" y="96" font-weight="700" fill="#1f2430">Block table</text>
+<rect x="560" y="108" width="60" height="30" fill="#fff" stroke="#5b6170"/><text x="590" y="128" text-anchor="middle" fill="#5b6170" font-size="13">[0]</text>
+<rect x="620" y="108" width="70" height="30" fill="#fdf0e4" stroke="#e07b28"/><text x="655" y="128" text-anchor="middle" fill="#e07b28" font-weight="700">#17</text>
+<rect x="560" y="142" width="60" height="30" fill="#fff" stroke="#5b6170"/><text x="590" y="162" text-anchor="middle" fill="#5b6170" font-size="13">[1]</text>
+<rect x="620" y="142" width="70" height="30" fill="#fdf0e4" stroke="#e07b28"/><text x="655" y="162" text-anchor="middle" fill="#e07b28" font-weight="700">#4</text>
+<rect x="560" y="176" width="60" height="30" fill="#fff" stroke="#5b6170"/><text x="590" y="196" text-anchor="middle" fill="#5b6170" font-size="13">[2]</text>
+<rect x="620" y="176" width="70" height="30" fill="#fdf0e4" stroke="#e07b28"/><text x="655" y="196" text-anchor="middle" fill="#e07b28" font-weight="700">#23</text>
+<text x="30" y="280" font-weight="700" fill="#1f2430" font-size="13">Physical pool: blocks #0 to #24, 4 slots each, shared by all requests</text>
+<rect x="30.0" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="47.0" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">0</text>
+<rect x="67.5" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="84.5" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">1</text>
+<rect x="105.0" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="122.0" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">2</text>
+<rect x="142.5" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="159.5" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">3</text>
+<rect x="180.0" y="226" width="34" height="34" rx="4" fill="#fdf0e4" stroke="#e07b28" stroke-width="2"/>
+<text x="197.0" y="248" text-anchor="middle" fill="#e07b28" font-size="11" font-weight="700">4</text>
+<rect x="217.5" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="234.5" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">5</text>
+<rect x="255.0" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="272.0" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">6</text>
+<rect x="292.5" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="309.5" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">7</text>
+<rect x="330.0" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="347.0" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">8</text>
+<rect x="367.5" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="384.5" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">9</text>
+<rect x="405.0" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="422.0" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">10</text>
+<rect x="442.5" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="459.5" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">11</text>
+<rect x="480.0" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="497.0" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">12</text>
+<rect x="517.5" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="534.5" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">13</text>
+<rect x="555.0" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="572.0" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">14</text>
+<rect x="592.5" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="609.5" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">15</text>
+<rect x="630.0" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="647.0" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">16</text>
+<rect x="667.5" y="226" width="34" height="34" rx="4" fill="#fdf0e4" stroke="#e07b28" stroke-width="2"/>
+<text x="684.5" y="248" text-anchor="middle" fill="#e07b28" font-size="11" font-weight="700">17</text>
+<rect x="705.0" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="722.0" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">18</text>
+<rect x="742.5" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="759.5" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">19</text>
+<rect x="780.0" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="797.0" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">20</text>
+<rect x="817.5" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="834.5" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">21</text>
+<rect x="855.0" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="872.0" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">22</text>
+<rect x="892.5" y="226" width="34" height="34" rx="4" fill="#fdf0e4" stroke="#e07b28" stroke-width="2"/>
+<text x="909.5" y="248" text-anchor="middle" fill="#e07b28" font-size="11" font-weight="700">23</text>
+<rect x="930.0" y="226" width="34" height="34" rx="4" fill="#fff" stroke="#c9cdd6" stroke-width="1"/>
+<text x="947.0" y="248" text-anchor="middle" fill="#9aa0ad" font-size="11" font-weight="400">24</text>
+<path d="M122,164 C122,196 684.5,196 684.5,224" fill="none" stroke="#e07b28" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M272,164 C272,196 197.0,196 197.0,224" fill="none" stroke="#e07b28" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M422,164 C422,196 909.5,196 909.5,224" fill="none" stroke="#e07b28" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="30" y="292" width="920" height="166" rx="10" fill="#fff" stroke="#d8dbe3"/>
+<text x="50" y="318" font-weight="700" fill="#1f2430" font-size="15">Where does token t = 9 live?   (BlockTable.slot_index / slot_mapping)</text>
+<text x="60" y="346" fill="#1f2430">logical block</text><text x="250" y="346" fill="#2f6fde" font-family="monospace">t // B</text><text x="470" y="346" fill="#1f2430" font-family="monospace" font-weight="700">9 // 4 = 2</text>
+<text x="60" y="371" fill="#1f2430">offset in block</text><text x="250" y="371" fill="#2f6fde" font-family="monospace">t % B</text><text x="470" y="371" fill="#1f2430" font-family="monospace" font-weight="700">9 % 4 = 1</text>
+<text x="60" y="396" fill="#1f2430">physical block</text><text x="250" y="396" fill="#2f6fde" font-family="monospace">table[2]</text><text x="470" y="396" fill="#1f2430" font-family="monospace" font-weight="700">23</text>
+<text x="60" y="421" fill="#1f2430">flat slot</text><text x="250" y="421" fill="#2f6fde" font-family="monospace">block_id × B + offset</text><text x="470" y="421" fill="#1f2430" font-family="monospace" font-weight="700">23 × 4 + 1 = 93</text>
+<text x="60" y="450" fill="#5b6170" font-size="12">Blocks needed for n tokens = ceil(n / B) = (n + B − 1) // B → 10 tokens need 3 blocks; the 11th and 12th slots of block #23 are the only waste.</text>
+<text x="640" y="342" fill="#1f2430" font-size="13" font-weight="700">Why one flat slot number? (reconstructed)</text>
+<text x="640" y="362" fill="#5b6170" font-size="12">The cache is one big tensor of</text>
+<text x="640" y="378" fill="#5b6170" font-size="12">num_blocks × B slots. A single integer</text>
+<text x="640" y="394" fill="#5b6170" font-size="12">per token lets one scatter write all</text>
+<text x="640" y="410" fill="#5b6170" font-size="12">new K/V at once. Check kv_cache.py k_flat.</text>
+</svg>

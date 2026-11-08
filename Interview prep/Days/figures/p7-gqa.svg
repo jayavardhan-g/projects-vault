@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 300" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14">
+  <rect x="1" y="1" width="978" height="298" rx="14" fill="#fbfbfd" stroke="#d8dbe3"/>
+  <text x="30" y="34" font-size="20" font-weight="700" fill="#1f2430">Grouped-query attention (GQA) in Llama-3.2-1B: 32 query heads share 8 KV heads</text>
+  <text x="30" y="56" fill="#5b6170">Query head h reads KV head h // 4. Only KV heads are cached, so the cache is 4× smaller than with 32 KV heads.</text>
+  <g font-size="11" fill="#fff" text-anchor="middle">
+    <!-- 32 q heads: x = 40 + i*28, group width 112 -->
+    <g fill="#2f6fde">
+      <rect x="40" y="80" width="24" height="40" rx="3"/><rect x="68" y="80" width="24" height="40" rx="3"/><rect x="96" y="80" width="24" height="40" rx="3"/><rect x="124" y="80" width="24" height="40" rx="3"/>
+      <rect x="152" y="80" width="24" height="40" rx="3"/><rect x="180" y="80" width="24" height="40" rx="3"/><rect x="208" y="80" width="24" height="40" rx="3"/><rect x="236" y="80" width="24" height="40" rx="3"/>
+      <rect x="264" y="80" width="24" height="40" rx="3"/><rect x="292" y="80" width="24" height="40" rx="3"/><rect x="320" y="80" width="24" height="40" rx="3"/><rect x="348" y="80" width="24" height="40" rx="3"/>
+      <rect x="376" y="80" width="24" height="40" rx="3"/><rect x="404" y="80" width="24" height="40" rx="3"/><rect x="432" y="80" width="24" height="40" rx="3"/><rect x="460" y="80" width="24" height="40" rx="3"/>
+      <rect x="488" y="80" width="24" height="40" rx="3"/><rect x="516" y="80" width="24" height="40" rx="3"/><rect x="544" y="80" width="24" height="40" rx="3"/><rect x="572" y="80" width="24" height="40" rx="3"/>
+      <rect x="600" y="80" width="24" height="40" rx="3"/><rect x="628" y="80" width="24" height="40" rx="3"/><rect x="656" y="80" width="24" height="40" rx="3"/><rect x="684" y="80" width="24" height="40" rx="3"/>
+      <rect x="712" y="80" width="24" height="40" rx="3"/><rect x="740" y="80" width="24" height="40" rx="3"/><rect x="768" y="80" width="24" height="40" rx="3"/><rect x="796" y="80" width="24" height="40" rx="3"/>
+      <rect x="824" y="80" width="24" height="40" rx="3"/><rect x="852" y="80" width="24" height="40" rx="3"/><rect x="880" y="80" width="24" height="40" rx="3"/><rect x="908" y="80" width="24" height="40" rx="3"/>
+    </g>
+    <text x="52" y="105">Q0</text><text x="80" y="105">Q1</text><text x="108" y="105">Q2</text><text x="136" y="105">Q3</text>
+    <text x="164" y="105">Q4</text><text x="920" y="105">31</text>
+  </g>
+  <g stroke="#5b6170" stroke-width="1.2" fill="none">
+    <path d="M52,120 L94,186"/><path d="M80,120 L94,186"/><path d="M108,120 L94,186"/><path d="M136,120 L94,186"/>
+    <path d="M164,120 L206,186"/><path d="M192,120 L206,186"/><path d="M220,120 L206,186"/><path d="M248,120 L206,186"/>
+    <path d="M276,120 L318,186"/><path d="M304,120 L318,186"/><path d="M332,120 L318,186"/><path d="M360,120 L318,186"/>
+    <path d="M388,120 L430,186"/><path d="M416,120 L430,186"/><path d="M444,120 L430,186"/><path d="M472,120 L430,186"/>
+    <path d="M500,120 L542,186"/><path d="M528,120 L542,186"/><path d="M556,120 L542,186"/><path d="M584,120 L542,186"/>
+    <path d="M612,120 L654,186"/><path d="M640,120 L654,186"/><path d="M668,120 L654,186"/><path d="M696,120 L654,186"/>
+    <path d="M724,120 L766,186"/><path d="M752,120 L766,186"/><path d="M780,120 L766,186"/><path d="M808,120 L766,186"/>
+    <path d="M836,120 L878,186"/><path d="M864,120 L878,186"/><path d="M892,120 L878,186"/><path d="M920,120 L878,186"/>
+  </g>
+  <g font-size="12" text-anchor="middle">
+    <rect x="58" y="186" width="72" height="44" rx="5" fill="#fdf0e4" stroke="#e07b28"/><text x="94" y="204" fill="#e07b28" font-weight="700">KV 0</text><text x="94" y="221" fill="#5b6170">K, V cached</text>
+    <rect x="170" y="186" width="72" height="44" rx="5" fill="#fdf0e4" stroke="#e07b28"/><text x="206" y="212" fill="#e07b28" font-weight="700">KV 1</text>
+    <rect x="282" y="186" width="72" height="44" rx="5" fill="#fdf0e4" stroke="#e07b28"/><text x="318" y="212" fill="#e07b28" font-weight="700">KV 2</text>
+    <rect x="394" y="186" width="72" height="44" rx="5" fill="#fdf0e4" stroke="#e07b28"/><text x="430" y="212" fill="#e07b28" font-weight="700">KV 3</text>
+    <rect x="506" y="186" width="72" height="44" rx="5" fill="#fdf0e4" stroke="#e07b28"/><text x="542" y="212" fill="#e07b28" font-weight="700">KV 4</text>
+    <rect x="618" y="186" width="72" height="44" rx="5" fill="#fdf0e4" stroke="#e07b28"/><text x="654" y="212" fill="#e07b28" font-weight="700">KV 5</text>
+    <rect x="730" y="186" width="72" height="44" rx="5" fill="#fdf0e4" stroke="#e07b28"/><text x="766" y="212" fill="#e07b28" font-weight="700">KV 6</text>
+    <rect x="842" y="186" width="72" height="44" rx="5" fill="#fdf0e4" stroke="#e07b28"/><text x="878" y="212" fill="#e07b28" font-weight="700">KV 7</text>
+  </g>
+  <text x="30" y="262" fill="#1f2430"><tspan font-weight="700">Spectrum:</tspan> MHA = 32 KV heads (128 KiB/token) · <tspan font-weight="700">GQA 4:1 = 8 KV heads (32 KiB/token)</tspan> · MQA = 1 KV head (4 KiB/token).</text>
+  <text x="30" y="284" fill="#5b6170">Fewer KV heads = less cache and less memory read per decode step, at a small quality cost. GQA is the middle ground most current models use.</text>
+</svg>

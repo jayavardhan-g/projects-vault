@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 450" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14">
+  <rect x="1" y="1" width="978" height="448" rx="14" fill="#fbfbfd" stroke="#d8dbe3"/>
+  <text x="30" y="34" font-size="20" font-weight="700" fill="#1f2430">Your measurement: below ~2k tokens, prefill time barely depends on tokens</text>
+  <text x="30" y="56" fill="#5b6170">mini-vLLM, Llama-3.2-1B, H200 (README "The cache saves 91% of the tokens and 0% of the time"). Log–log axes.</text>
+
+  <!-- plot: x = 80 + 90*(log2(n)-7), y = 330 - 120*(log10(ms)-1) -->
+  <rect x="80" y="80" width="540" height="250" fill="#fff" stroke="#d8dbe3"/>
+  <rect x="80" y="80" width="315" height="250" fill="#f1ecfb" opacity="0.8"/>
+  <text x="92" y="100" fill="#7b55c9" font-weight="700">OVERHEAD-BOUND</text>
+  <text x="92" y="118" fill="#5b6170" font-size="12">fixed ≈15 ms: Python, kernel launches,</text>
+  <text x="92" y="134" fill="#5b6170" font-size="12">16 layers of small ops</text>
+  <text x="410" y="100" fill="#2f6fde" font-weight="700">COMPUTE-BOUND</text>
+  <text x="410" y="118" fill="#5b6170" font-size="12">time grows with tokens</text>
+  <g stroke="#e4e6ec">
+    <line x1="80" y1="210" x2="620" y2="210"/><line x1="80" y1="90" x2="620" y2="90"/>
+    <line x1="170" y1="80" x2="170" y2="330"/><line x1="260" y1="80" x2="260" y2="330"/><line x1="350" y1="80" x2="350" y2="330"/><line x1="440" y1="80" x2="440" y2="330"/><line x1="530" y1="80" x2="530" y2="330"/>
+  </g>
+  <!-- no cache -->
+  <polyline points="80,306.8 260,307.2 350,296.3 440,246.4 530,181.2 620,111.2" fill="none" stroke="#2f6fde" stroke-width="3"/>
+  <g fill="#2f6fde"><circle cx="80" cy="306.8" r="5"/><circle cx="260" cy="307.2" r="5"/><circle cx="350" cy="296.3" r="5"/><circle cx="440" cy="246.4" r="5"/><circle cx="530" cy="181.2" r="5"/><circle cx="620" cy="111.2" r="5"/></g>
+  <!-- 90% cached -->
+  <polyline points="260,307.2 350,305.5 440,302.4 530,276.0 620,215.6" fill="none" stroke="#2e9e6b" stroke-width="3" stroke-dasharray="7 4"/>
+  <g fill="#2e9e6b"><circle cx="350" cy="305.5" r="4.5"/><circle cx="440" cy="302.4" r="4.5"/><circle cx="530" cy="276.0" r="4.5"/><circle cx="620" cy="215.6" r="4.5"/></g>
+  <g font-size="12" fill="#1f2430">
+    <text x="452" y="242">49.8</text><text x="488" y="176">173.9</text><text x="566" y="108">665.6 ms</text>
+    <text x="566" y="234" fill="#2e9e6b">89.8 ms</text>
+    <text x="96" y="296">15.6</text><text x="246" y="296">15.5</text><text x="338" y="286">19.1</text>
+  </g>
+  <!-- speedup brackets -->
+  <line x1="632" y1="111.2" x2="632" y2="215.6" stroke="#1f2430"/>
+  <text x="640" y="168" fill="#1f2430" font-weight="700">7.41×</text>
+  <text x="640" y="186" fill="#5b6170" font-size="12">at 8192</text>
+  <!-- axes -->
+  <g fill="#5b6170" font-size="12" text-anchor="middle">
+    <text x="80" y="348">128</text><text x="170" y="348">256</text><text x="260" y="348">512</text><text x="350" y="348">1024</text><text x="440" y="348">2048</text><text x="530" y="348">4096</text><text x="620" y="348">8192</text>
+  </g>
+  <text x="350" y="368" text-anchor="middle" fill="#1f2430" font-size="13">prompt tokens to prefill</text>
+  <g fill="#5b6170" font-size="12" text-anchor="end"><text x="74" y="334">10</text><text x="74" y="214">100</text><text x="74" y="94">1000</text></g>
+  <text x="30" y="205" fill="#1f2430" font-size="13" text-anchor="middle" transform="rotate(-90 30 205)">prefill time, ms</text>
+  <!-- legend & takeaways -->
+  <g font-size="13">
+    <line x1="700" y1="92" x2="730" y2="92" stroke="#2f6fde" stroke-width="3"/><text x="738" y="97" fill="#1f2430">no prefix cache</text>
+    <line x1="700" y1="116" x2="730" y2="116" stroke="#2e9e6b" stroke-width="3" stroke-dasharray="7 4"/><text x="738" y="121" fill="#1f2430">90% of prefix cached</text>
+    <text x="700" y="160" fill="#1f2430" font-weight="700">Speedup from a 90% hit</text>
+    <text x="700" y="182" fill="#1f2430" font-family="monospace">  512  1.00×</text>
+    <text x="700" y="200" fill="#1f2430" font-family="monospace"> 1024  1.19×</text>
+    <text x="700" y="218" fill="#1f2430" font-family="monospace"> 2048  2.92×</text>
+    <text x="700" y="236" fill="#1f2430" font-family="monospace"> 4096  6.16×</text>
+    <text x="700" y="254" fill="#1f2430" font-family="monospace"> 8192  7.41×</text>
+    <text x="700" y="290" fill="#1f2430">Multi-turn chats peak at ~1.2k</text>
+    <text x="700" y="308" fill="#1f2430">tokens: inside the flat region, so a</text>
+    <text x="700" y="326" fill="#1f2430">91% hit rate gave 1.00× end to end.</text>
+  </g>
+  <rect x="30" y="388" width="920" height="46" rx="8" fill="#f1ecfb" stroke="#7b55c9"/>
+  <text x="46" y="408" fill="#1f2430"><tspan font-weight="700">Lesson to say out loud:</tspan> skipping work only saves time if that work was on the critical path. Below the crossover,</text>
+  <text x="46" y="426" fill="#1f2430">the time is fixed overhead, not tokens. Quote a cache hit rate together with the context length it was measured at.</text>
+</svg>

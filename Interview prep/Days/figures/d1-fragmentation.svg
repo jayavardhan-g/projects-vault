@@ -1,0 +1,174 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 640" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14">
+<rect x="1" y="1" width="978" height="638" rx="14" fill="#fbfbfd" stroke="#d8dbe3"/>
+<text x="30" y="34" font-size="20" font-weight="700" fill="#1f2430">Where KV memory is wasted: three ways to allocate it</text>
+<text x="30" y="56" fill="#5b6170">Three requests hold 6, 11 and 2 tokens. One square = one token slot of KV. Red dashed = reserved but empty (waste).</text>
+<text x="30" y="88" font-weight="700" fill="#1f2430" font-size="15">1 · Reserve max_len = 16 per request (early servers)</text>
+<text x="30" y="106" fill="#5b6170" font-size="12">every request gets the worst case up front</text>
+<text x="40" y="134" fill="#2f6fde" font-weight="700">A</text><text x="60" y="134" fill="#5b6170" font-size="12">6 tokens</text>
+<rect x="150" y="118" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="172" y="118" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="194" y="118" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="216" y="118" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="238" y="118" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="260" y="118" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="282" y="118" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="304" y="118" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="326" y="118" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="348" y="118" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="370" y="118" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="392" y="118" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="414" y="118" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="436" y="118" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="458" y="118" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="480" y="118" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<text x="40" y="162" fill="#e07b28" font-weight="700">B</text><text x="60" y="162" fill="#5b6170" font-size="12">11 tokens</text>
+<rect x="150" y="146" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="172" y="146" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="194" y="146" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="216" y="146" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="238" y="146" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="260" y="146" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="282" y="146" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="304" y="146" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="326" y="146" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="348" y="146" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="370" y="146" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="392" y="146" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="414" y="146" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="436" y="146" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="458" y="146" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="480" y="146" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<text x="40" y="190" fill="#2e9e6b" font-weight="700">C</text><text x="60" y="190" fill="#5b6170" font-size="12">2 tokens</text>
+<rect x="150" y="174" width="20" height="22" rx="3" fill="#2e9e6b"/>
+<rect x="172" y="174" width="20" height="22" rx="3" fill="#2e9e6b"/>
+<rect x="194" y="174" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="216" y="174" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="238" y="174" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="260" y="174" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="282" y="174" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="304" y="174" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="326" y="174" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="348" y="174" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="370" y="174" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="392" y="174" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="414" y="174" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="436" y="174" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="458" y="174" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="480" y="174" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<text x="530" y="148" fill="#d64545" font-weight="700" font-size="15">29 of 48 slots wasted (60%)</text>
+<text x="530" y="170" fill="#1f2430" font-size="13">waste grows with max_len − actual length</text>
+<text x="530" y="188" fill="#5b6170" font-size="12">and a 4th request may not fit at all</text>
+<text x="30" y="220" font-weight="700" fill="#1f2430" font-size="15">2 · Pad to the longest in the batch (your Phase 0 HF baseline)</text>
+<text x="30" y="238" fill="#5b6170" font-size="12">every row is as long as the longest member (11)</text>
+<text x="40" y="266" fill="#2f6fde" font-weight="700">A</text><text x="60" y="266" fill="#5b6170" font-size="12">6 tokens</text>
+<rect x="150" y="250" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="172" y="250" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="194" y="250" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="216" y="250" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="238" y="250" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="260" y="250" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="282" y="250" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="304" y="250" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="326" y="250" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="348" y="250" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="370" y="250" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<text x="40" y="294" fill="#e07b28" font-weight="700">B</text><text x="60" y="294" fill="#5b6170" font-size="12">11 tokens</text>
+<rect x="150" y="278" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="172" y="278" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="194" y="278" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="216" y="278" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="238" y="278" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="260" y="278" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="282" y="278" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="304" y="278" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="326" y="278" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="348" y="278" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="370" y="278" width="20" height="22" rx="3" fill="#e07b28"/>
+<text x="40" y="322" fill="#2e9e6b" font-weight="700">C</text><text x="60" y="322" fill="#5b6170" font-size="12">2 tokens</text>
+<rect x="150" y="306" width="20" height="22" rx="3" fill="#2e9e6b"/>
+<rect x="172" y="306" width="20" height="22" rx="3" fill="#2e9e6b"/>
+<rect x="194" y="306" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="216" y="306" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="238" y="306" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="260" y="306" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="282" y="306" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="304" y="306" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="326" y="306" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="348" y="306" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="370" y="306" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<text x="530" y="280" fill="#d64545" font-weight="700" font-size="15">14 of 33 slots wasted (42%)</text>
+<text x="530" y="302" fill="#1f2430" font-size="13">waste grows with length variance in the batch</text>
+<text x="530" y="320" fill="#5b6170" font-size="12">your measured: 16.8% on the independent workload</text>
+<text x="30" y="352" font-weight="700" fill="#1f2430" font-size="15">3 · Paged, block size 4 (your Phase 1)</text>
+<text x="30" y="370" fill="#5b6170" font-size="12">take one 4-slot block at a time; only the last block of each request can be partly empty</text>
+<text x="40" y="398" fill="#2f6fde" font-weight="700">A</text><text x="60" y="398" fill="#5b6170" font-size="12">6 tokens</text>
+<rect x="150" y="382" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="172" y="382" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="194" y="382" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="216" y="382" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="246" y="382" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="268" y="382" width="20" height="22" rx="3" fill="#2f6fde"/>
+<rect x="290" y="382" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="312" y="382" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<text x="40" y="426" fill="#e07b28" font-weight="700">B</text><text x="60" y="426" fill="#5b6170" font-size="12">11 tokens</text>
+<rect x="150" y="410" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="172" y="410" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="194" y="410" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="216" y="410" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="246" y="410" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="268" y="410" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="290" y="410" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="312" y="410" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="342" y="410" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="364" y="410" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="386" y="410" width="20" height="22" rx="3" fill="#e07b28"/>
+<rect x="408" y="410" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<text x="40" y="454" fill="#2e9e6b" font-weight="700">C</text><text x="60" y="454" fill="#5b6170" font-size="12">2 tokens</text>
+<rect x="150" y="438" width="20" height="22" rx="3" fill="#2e9e6b"/>
+<rect x="172" y="438" width="20" height="22" rx="3" fill="#2e9e6b"/>
+<rect x="194" y="438" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<rect x="216" y="438" width="20" height="22" rx="3" fill="#f7d4d4" stroke="#d64545" stroke-dasharray="2 2"/>
+<text x="530" y="412" fill="#2e9e6b" font-weight="700" font-size="15">5 of 24 slots wasted (21%)</text>
+<text x="530" y="434" fill="#1f2430" font-size="13">at most block_size − 1 = 3 per request, always</text>
+<text x="530" y="452" fill="#5b6170" font-size="12">your measured: 16.8% → 3.9% (the 4.3×)</text>
+<text x="30" y="480" font-weight="700" fill="#1f2430" font-size="15">Where those 6 blocks physically sit: anywhere in one shared pool</text>
+<rect x="40" y="494" width="70" height="40" rx="5" fill="#fff" stroke="#b5bac6"/>
+<text x="75" y="512" text-anchor="middle" fill="#9aa0ad" font-size="13">free</text>
+<text x="75" y="528" text-anchor="middle" fill="#5b6170" font-size="11">block #0</text>
+<rect x="116" y="494" width="70" height="40" rx="5" fill="#fdf0e4" stroke="#e07b28" stroke-width="2"/>
+<text x="151" y="512" text-anchor="middle" fill="#e07b28" font-weight="700" font-size="12">B, logical 0</text>
+<text x="151" y="528" text-anchor="middle" fill="#5b6170" font-size="11">block #1</text>
+<rect x="192" y="494" width="70" height="40" rx="5" fill="#fff" stroke="#b5bac6"/>
+<text x="227" y="512" text-anchor="middle" fill="#9aa0ad" font-size="13">free</text>
+<text x="227" y="528" text-anchor="middle" fill="#5b6170" font-size="11">block #2</text>
+<rect x="268" y="494" width="70" height="40" rx="5" fill="#e8eefc" stroke="#2f6fde" stroke-width="2"/>
+<text x="303" y="512" text-anchor="middle" fill="#2f6fde" font-weight="700" font-size="12">A, logical 0</text>
+<text x="303" y="528" text-anchor="middle" fill="#5b6170" font-size="11">block #3</text>
+<rect x="344" y="494" width="70" height="40" rx="5" fill="#fdf0e4" stroke="#e07b28" stroke-width="2"/>
+<text x="379" y="512" text-anchor="middle" fill="#e07b28" font-weight="700" font-size="12">B, logical 1</text>
+<text x="379" y="528" text-anchor="middle" fill="#5b6170" font-size="11">block #4</text>
+<rect x="420" y="494" width="70" height="40" rx="5" fill="#fff" stroke="#b5bac6"/>
+<text x="455" y="512" text-anchor="middle" fill="#9aa0ad" font-size="13">free</text>
+<text x="455" y="528" text-anchor="middle" fill="#5b6170" font-size="11">block #5</text>
+<rect x="496" y="494" width="70" height="40" rx="5" fill="#e3f4ea" stroke="#2e9e6b" stroke-width="2"/>
+<text x="531" y="512" text-anchor="middle" fill="#2e9e6b" font-weight="700" font-size="12">C, logical 0</text>
+<text x="531" y="528" text-anchor="middle" fill="#5b6170" font-size="11">block #6</text>
+<rect x="572" y="494" width="70" height="40" rx="5" fill="#fff" stroke="#b5bac6"/>
+<text x="607" y="512" text-anchor="middle" fill="#9aa0ad" font-size="13">free</text>
+<text x="607" y="528" text-anchor="middle" fill="#5b6170" font-size="11">block #7</text>
+<rect x="648" y="494" width="70" height="40" rx="5" fill="#fff" stroke="#b5bac6"/>
+<text x="683" y="512" text-anchor="middle" fill="#9aa0ad" font-size="13">free</text>
+<text x="683" y="528" text-anchor="middle" fill="#5b6170" font-size="11">block #8</text>
+<rect x="724" y="494" width="70" height="40" rx="5" fill="#e8eefc" stroke="#2f6fde" stroke-width="2"/>
+<text x="759" y="512" text-anchor="middle" fill="#2f6fde" font-weight="700" font-size="12">A, logical 1</text>
+<text x="759" y="528" text-anchor="middle" fill="#5b6170" font-size="11">block #9</text>
+<rect x="800" y="494" width="70" height="40" rx="5" fill="#fdf0e4" stroke="#e07b28" stroke-width="2"/>
+<text x="835" y="512" text-anchor="middle" fill="#e07b28" font-weight="700" font-size="12">B, logical 2</text>
+<text x="835" y="528" text-anchor="middle" fill="#5b6170" font-size="11">block #10</text>
+<rect x="876" y="494" width="70" height="40" rx="5" fill="#fff" stroke="#b5bac6"/>
+<text x="911" y="512" text-anchor="middle" fill="#9aa0ad" font-size="13">free</text>
+<text x="911" y="528" text-anchor="middle" fill="#5b6170" font-size="11">block #11</text>
+<text x="40" y="556" fill="#1f2430" font-size="13">Block tables:  <tspan fill="#2f6fde" font-weight="700">A → [3, 9]</tspan>   <tspan fill="#e07b28" font-weight="700">B → [1, 4, 10]</tspan>   <tspan fill="#2e9e6b" font-weight="700">C → [6]</tspan>    Free list: [0, 2, 5, 7, 8, 11]</text>
+<text x="40" y="578" fill="#5b6170" font-size="12">Any free block fits any request, so there is no external fragmentation: no gap is ever "too small to use". The price is one table lookup per token.</text>
+<text x="40" y="616" fill="#5b6170" font-size="12">Paging wins only when lengths vary. With equal lengths, option 2 wastes nothing and paging still wastes part of each last block (your shared_prefix: 0.8% → 2.8%).</text>
+</svg>
