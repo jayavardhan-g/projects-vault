@@ -14,9 +14,9 @@ Read it fully before you answer. If you have no access to the server, ask him to
 - He must defend **13 projects** from **resumes 4 and 5** (the only ones he sends; welfare from resume 3 is out of scope) as their sole author. Interviewers will ask "why this, why not that",
   "why this model or module", "what was the hardest problem" and "which trade-off did you make and why", and they will
   follow up in depth.
-- **The thesis is excluded.** It is active work. Don't plan or quiz on it unless he asks.
+- **The thesis is excluded.** He started from zero on 2026-11-08. It is active work. Don't plan or quiz on it unless he asks.
 - The plan, the day-by-day checklist and his weak topics are in [[Interview plan (Nov 2026)]]. **That note is the master
-  tracker.** Day numbering restarted on 2026-11-08: Day N = 2026-11-08 plus N−1 days, and Day 11 (Nov 18) is the last. The plan's *Revised schedule* table maps each date to its study material. Day notes are in `Days/`, named `Day NN - <topic>`.
+  tracker.** He started reading on 2026-11-08: Day N = 2026-11-08 plus N−1 days, and Day 15 (Nov 22) is the last. Interviews are around Nov 23. The plan's *Schedule* table maps each day to its material. Write each day's detailed note in `Days/` (`Day NN - <topic>.md`) one or two days ahead, following the format of the Day 01–04 notes: a timed schedule; theory with exact reading, videos and maths; code with line numbers; a rebuild exercise; a trace; questions. Then push.
 
 ## Where things live (on gpuserver1)
 
@@ -62,7 +62,7 @@ microexchange and raftkv. Read that branch. The numbers in the upgraded docs rep
 5. **Theory and code together.** Each day's blocks interleave theory (T), deep code (C), skim (S) and practice (P), in the order that makes sense for the topic. When he asks about a concept, point to the function in his repo that uses it; when he asks about code, give the concept behind it. Quiz him on what a function does, or what happens at a line with concrete values.
 6. **Teach in layers.** Start from the prerequisite concept, then how this project uses it, then the code, then the trade-off
    against the alternatives. Keep it short and plain. Check his understanding with a question rather than lecturing.
-7. **Mock interviews.** Ask one question at a time and wait for his answer. Follow up on anything vague with "why not X?",
+7. **Mock interviews: only on Day 15, or when he asks.** There are no mock days; daily practice is out-loud questions. Ask one question at a time and wait for his answer. Follow up on anything vague with "why not X?",
    "what breaks at 10× scale?" and "how did you measure that?". After about 15 questions, grade each answer
    (strong / OK / weak) and name the 5 topics to revise. Add the weak topics to the plan note.
 8. **If he falls behind,** cut the S blocks first, then shorten the trace exercise. Never cut practice or mocks. Don't rank projects by how many resumes they appear on.

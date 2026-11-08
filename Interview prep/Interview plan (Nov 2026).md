@@ -6,7 +6,7 @@ tags: [interview, plan]
 ---
 # Interview plan: 14 days, 13 projects (Nov 2026)
 
-**Goal.** Interviews start around 2026-11-19. By then you should be able to defend every project on **resumes 4 and 5**
+**Goal.** Interviews start around 2026-11-23 (15 study days, Nov 8–22). By then you should be able to defend every project on **resumes 4 and 5**
 (`/data/jayavardhan/projects/resumes/25M0807-4.pdf`, `-5.pdf`) in depth, as their sole author. That means the code, the
 prerequisites, the "why this and not that" choices, the hardest problems, and the numbers. The thesis is not covered
 here. The welfare platform (resume 3 only) is out of scope.
@@ -14,27 +14,32 @@ here. The welfare platform (resume 3 only) is out of scope.
 **This note is the master tracker.** Tick boxes as you go, and add weak topics at the bottom. Claude sessions follow
 [[Claude instructions - interview prep]].
 
-## Revised schedule (2026-11-08): two days were missed, so the rest is compressed
+## Schedule (from 2026-11-08): 15 days, no mock days
 
-**Day numbering restarts on Nov 8: Day 1 = Nov 8, Day 11 = Nov 18.** The older day sections further down keep their old numbers. This table says which section to study on which date. For Nov 8–10,
-use the detailed day notes instead: they have exact functions, line numbers, maths, reading and a rebuild exercise.
+Reading started on Nov 8, so **Day 1 = Nov 8 and Day 15 = Nov 22**. There are no separate mock days. Every day ends with
+30–40 minutes of questions answered out loud, and Day 15 has one 90-minute full-resume mock. The time this frees went
+to a second CUDA day and a full BountyBrain day. The older day sections further down keep their old numbers; the
+"source" column says which one to use until that day gets its own detailed note in `Days/`.
 
-| new day | date | study | where |
+| day | date | study | source |
 |---|---|---|---|
-| **1** | Sun Nov 8 | mini-vLLM I: paging, scheduler | [[Day 01 - mini-vLLM I]] |
-| **2** | Mon Nov 9 | mini-vLLM II: prefix cache, Triton, benchmarks | [[Day 02 - mini-vLLM II]] |
-| **3** | Tue Nov 10 | Speculative decoding | [[Day 03 - Speculative decoding]] |
-| **4** | Wed Nov 11 | CUDA kernels, plus a 60-min Mock 1 in the evening | old section Day 5 |
-| **5** | Thu Nov 12 | Seminar and speech basics (morning, 3 h: blocks 1–2 and 4), then CosyVoice (afternoon; drop its S blocks) | old sections Day 6 and Day 7 |
-| **6** | Fri Nov 13 | CS728 and LeNet-5 | old section Day 8 |
-| **7** | Sat Nov 14 | Photo-Seek I and II in one day (deep C blocks and P only; drop all S blocks) | old sections Day 9 and Day 10 |
-| **8** | Sun Nov 15 | Emotion steering (2 h) and BountyBrain, plus a 60-min Mock 2 | old sections Day 10 (emotion) and Day 11 |
-| **9** | Mon Nov 16 | DECS and Micro Exchange | old section Day 12 |
-| **10** | Tue Nov 17 | Raft, plus a 60-min Mock 3 | old section Day 13 |
-| **11** | Wed Nov 18 | Full-resume mocks (resumes 4 and 5), weak topics, cheat sheet | old section Day 14 |
+| **1** | Sun Nov 8 | Foundations, then mini-vLLM paging | [[Day 01 - mini-vLLM I]] |
+| **2** | Mon Nov 9 | mini-vLLM: continuous batching, radix prefix cache | [[Day 02 - mini-vLLM II]] |
+| **3** | Tue Nov 10 | mini-vLLM: Triton kernel, benchmarks, server, self-quiz | [[Day 03 - mini-vLLM III]] |
+| **4** | Wed Nov 11 | Speculative decoding | [[Day 04 - Speculative decoding]] |
+| **5** | Thu Nov 12 | CUDA I: GPU architecture, the matmul kernels (PA2) | old section Day 5 (the matmul blocks) |
+| **6** | Fri Nov 13 | CUDA II: MLP streams and checkpointing (PA3), FlashAttention | old section Day 5 (the rest) |
+| **7** | Sat Nov 14 | Seminar and speech basics | old section Day 6 |
+| **8** | Sun Nov 15 | CosyVoice | old section Day 7 |
+| **9** | Mon Nov 16 | CS728 and LeNet-5 | old section Day 8 |
+| **10** | Tue Nov 17 | Photo-Seek I: retrieval and router | old section Day 9 |
+| **11** | Wed Nov 18 | Photo-Seek II: faces; emotion steering | old section Day 10 |
+| **12** | Thu Nov 19 | BountyBrain (full day) | old section Day 11, without the mock |
+| **13** | Fri Nov 20 | DECS and Micro Exchange | old section Day 12 |
+| **14** | Sat Nov 21 | Raft | old section Day 13 |
+| **15** | Sun Nov 22 | Revision: redraw every diagram, weak topics, numbers cheat sheet, 5 behavioural stories, one 90-min full-resume mock | old section Day 14 |
 
-Each project day now has a **rebuild block**: rewrite the project's core mechanism yourself in about 100 lines
-(60–90 min). This replaces rebuilding the whole project, which there is no time for.
+Each project day has a **rebuild block**: rewrite the core mechanism yourself in about 100 lines (60–90 min).
 
 ## How a day works
 
@@ -50,6 +55,7 @@ Each project day now has a **rebuild block**: rewrite the project's core mechani
   Write down every answer you fumble.
 - Each day is about 6.5–7 hours. **If you are behind,** cut the S blocks first, then shorten the trace. Never cut P.
 - Start every day with 15 minutes recalling yesterday's numbers and diagram, from memory.
+- **Detailed day notes** (`Days/`) are written a day or two ahead, one project at a time.
 - **Prep packs** are in `Interview prep/Prep packs/`, one note per project. They are your question bank and map. Ready:
   [[Photo-Seek - prep]], [[CUDA kernels - prep]], [[Speculative decoding - prep]], [[Raft - prep]], [[Micro Exchange - prep]], [[DECS KV server - prep]], [[BountyBrain - prep]],
   [[Emotion steering - prep]], [[Seminar - prep]]. Each study day has its own note in `Interview prep/Days/`, with its lesson and your notes. Still to write, one at a time and just

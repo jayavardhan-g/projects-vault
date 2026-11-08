@@ -1,10 +1,10 @@
 ---
 type: study-day
-day: 3
-date: 2026-11-10
+day: 4
+date: 2026-11-11
 tags: [interview, day, speculative-decoding]
 ---
-# Day 3 (Tue Nov 10): speculative decoding
+# Day 4 (Wed Nov 11): speculative decoding
 
 Part of [[Interview plan (Nov 2026)]]. Repo `speculative_decoding` (branch `main`). About 7 h. Prep pack:
 [[Speculative decoding - prep]] (diagram, numbers sheet, 60 questions).
@@ -23,7 +23,7 @@ Part of [[Interview plan (Nov 2026)]]. Repo `speculative_decoding` (branch `main
 
 | # | Time | Kind | What |
 |---|---|---|---|
-| 0 | 15 min | recall | Day 2: online softmax, the 7.41× context story |
+| 0 | 15 min | recall | Days 1–3: online softmax, the 7.41× context story, the roofline |
 | 1 | 30 min | read | The prep pack's pitch and diagram; RESULTS.md headline table |
 | 2 | 75 min | theory + maths | The algorithm, the proof, the speedup formula (A1, A2) |
 | 3 | 45 min | code | `sampling.py`, `verify_and_correct` (B1) |

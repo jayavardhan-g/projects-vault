@@ -4,164 +4,115 @@ day: 1
 date: 2026-11-08
 tags: [interview, day, mini-vllm]
 ---
-# Day 1 (Sun Nov 8): mini-vLLM I: paged KV cache and continuous batching
+# Day 1 (Sun Nov 8): foundations, then mini-vLLM paging
 
-Part of [[Interview plan (Nov 2026)]]. Repo `vLLMmini` (branch `main`). About 7.5 h, including the prerequisite.
+Part of [[Interview plan (Nov 2026)]]. Repo `vLLMmini` (branch `main`). About 6.5 h. **This is your first day of
+reading**, so it starts from the foundations that everything later builds on.
 
-**Resume bullet it defends:** "Built a paged KV-cache memory manager and continuous-batching scheduler for LLM inference,
+**Resume bullet (part 1 of 2):** "Built a paged KV-cache memory manager and continuous-batching scheduler for LLM inference,
 reducing GPU memory fragmentation by **4.3×** and achieving **3.82×** throughput over the HuggingFace baseline."
+Today covers the *paged memory manager* and the **4.3×**. The scheduler and the 3.82× are tomorrow ([[Day 02 - mini-vLLM II]]).
 
 **By tonight you can:**
-- draw the architecture: request → scheduler → block tables → paged KV cache → runner;
-- compute KV memory and the number of blocks from first principles;
-- explain fragmentation, continuous batching and recompute preemption, with the code lines that implement them;
+- explain how one token flows through a transformer, and why decode is memory-bound;
+- compute KV memory, block counts and slot indices by hand;
+- explain fragmentation and paging, with the code lines that implement them;
 - rebuild the block manager yourself.
 
 ## Schedule
 
 | # | Time | Kind | What |
 |---|---|---|---|
-| 0 | 60 min | theory | **Prerequisite** [[Prereq - LLM inference basics]]: sections 1–6 and the self-check. KV formula, prefill vs decode, the roofline. *If you already did it on Nov 5, spend 15 min recalling it.* |
-| 0b | 30 min | code | `model/llama.py`: one token through one layer, writing down the tensor shapes (hidden 2048, 32 query and 8 KV heads, head_dim 64) |
-| 1 | 20 min | read | The README for the big picture: *Architecture* (line 14), *Model* (466), *The Phase 0 baseline* (554) |
-| 2 | 60 min | theory | PagedAttention (section A below) |
-| 3 | 75 min | code | `block_allocator.py`, `block_table.py`, `kv_cache.py` (section B1) |
-| 4 | 75 min | rebuild | Write your own block manager (section C) |
-| — | lunch | | |
-| 5 | 40 min | theory | Continuous batching and preemption (section A2) |
-| 6 | 90 min | code | `scheduler.py` (section B2) |
-| 7 | 15 min | skim | `paged_attention.py`, `engine.py`, `model/runner.py` (section B3) |
-| 8 | 30 min | trace | The scheduler trace on paper (section D) |
-| 9 | 40 min | practice | The questions out loud (section E); write your fumbles at the bottom |
+| 1 | 90 min | theory | Foundations: [[Prereq - LLM inference basics]] sections 1–6, plus the video below |
+| 2 | 45 min | code | `model/llama.py`: one token through one layer (B0) |
+| 3 | 15 min | practice | The prerequisite's self-check, out loud |
+| — | break | | |
+| 4 | 20 min | read | The README for the big picture: *Architecture* (line 14), *Model* (466), *The Phase 0 baseline* (554) |
+| 5 | 60 min | theory | PagedAttention (A) |
+| 6 | 75 min | code | `block_allocator.py`, `block_table.py`, `kv_cache.py` (B1) |
+| 7 | 75 min | rebuild | Your own block manager (C) |
+| 8 | 20 min | trace | Block tables by hand (D) |
+| 9 | 25 min | practice | The questions (E); write your fumbles at the bottom |
 
-## A. Theory
+**Foundations, block 1 (90 min).** Read [[Prereq - LLM inference basics]] sections 1–6, then:
+- **Video, about 30 min:** Umar Jamil, *"LLaMA explained: KV-Cache, Rotary Positional Embedding, RMS Norm, Grouped Query Attention, SwiGLU"*. Watch the KV-cache and grouped-query-attention parts. Llama-3.2-1B, your model, uses all of these.
+- **If attention itself is rusty**, read Jay Alammar's *"The Illustrated Transformer"* (blog) first, about 30 min.
+- **Optional, any evening:** Horace He, *"Making Deep Learning Go Brrrr From First Principles"*: compute- vs memory- vs overhead-bound work.
 
-### A1. PagedAttention (block 2, 60 min)
+## A. Theory: PagedAttention (block 5, 60 min)
 
 **Read:** Kwon et al., *Efficient Memory Management for LLM Serving with PagedAttention* (SOSP 2023): §1, §3 (the memory
-problem), §4.1–4.3 (PagedAttention, the KV manager, decoding with it). Skip §4.4 onward for now.
+problem), §4.1–4.3 (PagedAttention, the KV manager, decoding with it).
 
-**Watch (pick one, 30 min):**
+**Watch or read (30 min, pick one):**
 - YouTube: *"Fast LLM Serving with vLLM and PagedAttention"*, the Anyscale talk by the vLLM authors;
-- or read the vLLM launch blog post, *"vLLM: Easy, Fast, and Cheap LLM Serving with PagedAttention"* (blog.vllm.ai, June 2023).
-
-**Concepts to own:**
-- **Why contiguous KV wastes memory.** Without paging, each request reserves `max_len` slots up front. Waste = reserved − used: **internal fragmentation** (inside a reservation) plus **external fragmentation** (free gaps too small to use).
-- **Paging.** Split the cache into fixed blocks of `B` tokens. A per-request **block table** maps logical block *i* to a physical block id, like an OS page table. Memory grows one block at a time.
-- **Bounded waste.** At most `B − 1` empty slots per sequence, in the last block only. On average about `(B − 1)/2`.
-- **Refcounts.** Several requests can point at the same physical block (shared prefixes, tomorrow). A block is freed only when its refcount reaches 0.
-
-**Maths, worked for your model (Llama-3.2-1B, bf16, B = 16):**
-- KV bytes per token = 2 (K,V) × 16 layers × 8 KV heads × 64 head_dim × 2 bytes = **32,768 B = 32 KiB**.
-- Bytes per block = 16 × 32 KiB = **512 KiB** (all layers together).
-- Blocks from a budget: with 40 GB free, `floor(40·10⁹ / 524,288)` ≈ **76,000 blocks** ≈ 1.2M tokens.
-- Slot of token position `t` in a request: `block_id = table[t // B]`, `offset = t % B`, `slot = block_id·B + offset`.
-  This is `BlockTable.slot_mapping`.
-- **Your 4.3×:** padding waste on the `independent` workload went from 16.8% of allocated KV slots to 3.9% (README
-  *Fragmentation*, line 321). 16.8 / 3.9 ≈ 4.3. Know that it is *slightly worse* on uniform prompts, and why: with
-  equal lengths, contiguous allocation wastes nothing, while paging still wastes part of the last block.
-
-### A2. Continuous batching and preemption (block 5, 40 min)
-
-**Read:**
-- the Anyscale blog *"How continuous batching enables 23x throughput in LLM inference while reducing p50 latency"* (2023), about 20 min;
-- Orca (Yu et al., OSDI 2022) §3: *iteration-level scheduling*. Read only the idea and Figure 3 or 4, about 15 min.
+- the vLLM launch blog post, *"vLLM: Easy, Fast, and Cheap LLM Serving with PagedAttention"* (blog.vllm.ai, June 2023).
 
 **Concepts:**
-- **Static batching.** A batch runs until its longest request finishes. Short requests wait, and new ones queue.
-  That is why your HF baseline's TTFT p50 was **2448 ms**.
-- **Continuous (iteration-level) batching.** The scheduler runs **every step**. Finished requests leave and waiting
-  ones join at the next step. Your TTFT p50 fell to **179 ms**.
-- **Token budget.** Each step's tokens (prefill chunks + one per decode) must stay ≤ `max_num_batched_tokens`, and
-  the KV blocks needed must fit.
-- **Admission.** Admit a waiting request only if `ceil((prompt_len + 1)/B)` blocks are free, above a **watermark**
-  kept in reserve so running requests can still grow.
-- **Preemption.** When a running request needs a new block and none is free, evict a victim (the latest admitted). Two options:
-  - **swap**: copy its KV to CPU and back later. The cost is bytes ÷ PCIe bandwidth.
-  - **recompute**: drop its blocks and re-prefill later. The cost is one prefill of prompt + generated tokens.
+- **Contiguous KV wastes memory.** Without paging, each request reserves `max_len` slots. Waste = reserved − used: **internal** fragmentation (inside a reservation) plus **external** fragmentation (free gaps too small to use).
+- **Paging.** Fixed blocks of `B` tokens. A per-request **block table** maps logical block *i* to a physical block id, like an OS page table. Memory grows one block at a time.
+- **Bounded waste.** At most `B − 1` empty slots per sequence, in the last block only; about `(B − 1)/2` on average.
+- **Refcounts.** Several requests may point at one physical block (shared prefixes, on Day 2). It is freed only at refcount 0.
 
-  You chose **recompute** (README *Preemption is by recompute*, line 742). On a 1B model, prefill is cheap, it needs no CPU
-  buffer management, and vLLM also defaults to recompute.
+**Maths for your model (Llama-3.2-1B, bf16, B = 16):**
+- KV bytes per token = 2 × 16 layers × 8 KV heads × 64 head_dim × 2 B = **32 KiB**.
+- Bytes per block = 16 × 32 KiB = **512 KiB** (all layers).
+- Blocks from a budget: 40 GB free → `floor(40·10⁹ / 524,288)` ≈ **76,000 blocks** ≈ 1.2M tokens.
+- Slot of position `t`: `block_id = table[t // B]`, `offset = t % B`, `slot = block_id·B + offset` (`BlockTable.slot_mapping`).
+- **The 4.3×:** padding waste on the `independent` workload fell from **16.8%** of allocated KV slots to **3.9%** (README *Fragmentation*, line 321). It is slightly *worse* on uniform prompts: with equal lengths, contiguous allocation wastes nothing, while paging still wastes part of the last block.
 
 ## B. Code
 
-### B1. The memory manager (block 3, 75 min, deep)
+### B0. The model (block 2, 45 min)
+
+`model/llama.py`: follow one token through embedding → one decoder layer (RMSNorm → Q/K/V projections → RoPE →
+attention with 32 query and 8 KV heads → output projection → SwiGLU MLP) → logits. Write down every tensor shape (hidden
+2048, head_dim 64). Where does the code write K and V into the cache?
+
+### B1. The memory manager (block 6, 75 min, deep)
 
 | File, line | Read for |
 |---|---|
 | `block_allocator.py` 37 `BlockAllocator` | the free list and refcount array |
 | — 70 `allocate`, 80 `allocate_many` | why `allocate_many` is all-or-nothing (no partial allocation leaks) |
 | — 96 `incref`, 111 `free`, 121 `free_many` | a block returns to the free list only at refcount 0 |
-| — 144 `check_invariants` | what "consistent" means: every block is free XOR has refcount > 0 |
+| — 144 `check_invariants` | every block is free XOR has refcount > 0 |
 | `block_table.py` 75 `blocks_needed_for` | ceiling division |
 | — 106 `append_tokens` | when a new block is taken |
-| — 128 `locate`, 137 `slot_index`, 147 `slot_mapping` | the formula from A1 |
+| — 128 `locate`, 137 `slot_index`, 147 `slot_mapping` | the formula from A |
 | — 66 `num_wasted_slots` | the fragmentation metric behind 16.8% → 3.9% |
-| — 86 `adopt_blocks` | (it matters tomorrow for the prefix cache) |
-| `kv_cache.py` 34 `KVCacheConfig`: 80 `bytes_per_token`, 85 `bytes_per_block`, 88 `num_blocks_for_budget` | match them against your maths in A1 |
-| — 98 `blocks_for_free_memory`, 116 `PagedKVCache.__init__`, 166 `k_flat` | the tensor shape of the cache, and why "flat" |
+| `kv_cache.py` 34 `KVCacheConfig`: 80 `bytes_per_token`, 85 `bytes_per_block`, 88 `num_blocks_for_budget` | check them against your maths |
+| — 98 `blocks_for_free_memory`, 116 `PagedKVCache.__init__`, 166 `k_flat` | the cache tensor's shape, and why "flat" |
 
-Then read the README's *Phase 1: paged memory manager* (line 602).
+Then read README *Phase 1: paged memory manager* (line 602) and *Fragmentation* (321).
 
-### B2. The scheduler (block 6, 90 min, deep)
-
-`scheduler.py`: read in this order.
-1. 87 `Request`, 80 `RequestStatus`, 190 `SchedulerConfig`: the state and the knobs.
-2. 262 `add_request`, 257 `max_blocks_needed`: when is a request *too large* (55 `RequestTooLargeError`)?
-3. **296 `schedule`**: the main loop. Running requests first, then waiting ones.
-4. 322 `_schedule_running`: decode steps, growing block tables, triggering preemption.
-5. 365 `_schedule_waiting`: admission under the token budget and the watermark. 509 `_blocks_to_admit`.
-6. 588 `_evict_for`, 616 `_pick_victim`, 626 `_preempt`: recompute preemption.
-7. 649 `update`, 688 `_finish`, 704 `abort`: after the model step.
-
-**Skip for today:** 443 `_match_cached_prefix`, 466 `_first_uncached_chunk`, 523 `_adopt_cached_prefix`,
-544 `_publish_blocks` (the prefix cache, tomorrow).
-
-Then read the README's *Phase 3: continuous batching* (697) and *Preemption is by recompute* (742).
-
-### B3. Skim (block 7, 25 min)
-
-- `paged_attention.py`: 36 `write_kv_to_cache`, 68 `gather_kv`, 172 `paged_attention` (the naive reference: gather the blocks into contiguous tensors, then do normal attention).
-- `engine.py`: 111 `step` (one scheduler + model iteration).
-- `model/runner.py`: 81 `_run_step`.
-
-README *Phase 2* (642), and *The bug this phase actually found* (685).
-
-## C. Rebuild it yourself (block 4, 75 min)
+## C. Rebuild it yourself (block 7, 75 min)
 
 Without looking at the code, write `toy_paging.py` (about 100 lines of pure Python):
 1. `BlockAllocator(num_blocks)` with `allocate()`, `allocate_many(n)` (all or nothing), `incref(b)`, `free(b)`; raise when out of blocks.
 2. `BlockTable(block_size, allocator)` with `append_tokens(n)`, `slot_mapping()` and `num_wasted_slots()`.
-3. A loop: 3 requests of different lengths, each adding 1 token per step. Print the wasted slots each step,
-   and compare against contiguous allocation of `max_len`.
+3. 3 requests of different lengths, each adding 1 token per step. Print the wasted slots each step, and compare against contiguous allocation of `max_len`.
 
-**Check:** point `tests/test_block_allocator.py` and `tests/test_block_table.py` at your module (change the import)
-and run `pytest -q` on your laptop (CPU only). Each failing test is a concept you missed.
+**Check:** point `tests/test_block_allocator.py` and `tests/test_block_table.py` at your module (change the import) and
+run `pytest -q` on your laptop (CPU only). Each failing test is a concept you missed.
 
-## D. Trace on paper (block 8, 30 min)
+## D. Trace by hand (block 8, 20 min)
 
-Use small numbers so you can do it by hand: block size **4**, a pool of **8 blocks**, watermark 1 block, and requests
-A (prompt 5), B (prompt 9), C (prompt 3), each generating 4 tokens. For 5 steps, write:
-- which requests are prefill or decode;
-- every block table;
-- the free list.
-
-At which step does someone get preempted, and who? Check your answers against `_schedule_waiting` and `_pick_victim`.
+Block size 4, pool of 8 blocks. Request A has 5 tokens, B has 9, C has 3. Each then appends 4 tokens, one at a time. Write down:
+- every block table after each append;
+- the free list;
+- the slot of token 7 of request B;
+- the total wasted slots at the end, compared with contiguous allocation at `max_len = 16`.
 
 ## E. Questions (block 9, out loud)
 
-1. Walk me through what happens to a request from arrival to its last token.
-2. Why is paging needed at all? Why not allocate KV for `max_len` up front?
-3. How did you measure fragmentation, and why is paging slightly *worse* on uniform prompts?
-4. Block size 16: what changes at 1 and at 256? (*Small: tiny waste, but a bigger block table and less efficient kernels. Large: more waste per sequence.*)
-5. Static vs continuous batching: why does TTFT fall 13.7×?
-6. What is the token budget, and why do you need it as well as a block limit?
-7. Recompute vs swap preemption: which did you choose, and when would you switch?
-8. What is the watermark for? What happens without it? (*Thrashing: admit, then immediately preempt.*)
-9. How does a block become free when two requests share it?
-10. Where does the 3.82× come from: memory, batching, or kernels? (*Mostly batching: more concurrent requests per step. The fused kernel is a separate 7.49× on attention alone.*)
-11. What breaks above about 16k tokens, and why? (*Prefill materialises the full score matrix.*)
-12. Hostile: "vLLM already exists. Why build this?"
+1. Why is decode memory-bound and prefill compute-bound? What is the roofline ridge point on an H200?
+2. Walk me through the KV-cache size of your model.
+3. Why is paging needed? Why not allocate KV for `max_len` up front?
+4. How did you measure fragmentation, and why is paging slightly worse on uniform prompts?
+5. Block size 16: what changes at 1 and at 256? (*Small: tiny waste, but a bigger table and less efficient kernels. Large: more waste per sequence.*)
+6. How does a block become free when two requests share it?
+7. What does `allocate_many` being all-or-nothing protect against?
 
 ## My notes and fumbles
 

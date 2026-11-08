@@ -4,59 +4,69 @@ day: 2
 date: 2026-11-09
 tags: [interview, day, mini-vllm]
 ---
-# Day 2 (Mon Nov 9): mini-vLLM II: radix prefix cache, Triton kernel, benchmarks
+# Day 2 (Mon Nov 9): mini-vLLM II: continuous batching and the radix prefix cache
 
 Part of [[Interview plan (Nov 2026)]]. Repo `vLLMmini` (branch `main`). About 7 h. Builds on [[Day 01 - mini-vLLM I]].
 
-**Resume bullet it defends:** "Implemented a radix-tree prefix cache to reuse shared KV states across requests,
-accelerating repeated prompt inference by up to **7.4×** through efficient prefix matching and cache reuse."
+**Resume bullets:**
+- "…and continuous-batching scheduler…achieving **3.82×** throughput over the HuggingFace baseline." (part 2)
+- "Implemented a radix-tree prefix cache to reuse shared KV states across requests, accelerating repeated prompt inference by up to **7.4×**…"
 
 **By tonight you can:**
-- explain the radix cache with refcounted LRU eviction, with the code;
-- derive online softmax and say why the fused kernel is 7.49× faster;
-- defend every benchmark number: how it was measured, what it hides, and why real vLLM is 6.2× faster.
+- explain the scheduler loop, admission, the token budget and recompute preemption, with the code;
+- explain the radix cache and its refcounted LRU eviction, with the code;
+- say exactly what "up to 7.4×" means;
+- rebuild a toy radix cache.
 
 ## Schedule
 
 | # | Time | Kind | What |
 |---|---|---|---|
-| 0 | 15 min | recall | Yesterday: the block-table formula, the scheduler loop, recompute preemption |
-| 1 | 45 min | theory | Radix trees and RadixAttention (A1) |
-| 2 | 75 min | code | `prefix_cache.py` plus the scheduler's prefix helpers (B1) |
-| 3 | 60 min | rebuild | A toy radix prefix cache (C1) |
+| 0 | 15 min | recall | Yesterday: KV formula, the slot formula, why paging |
+| 1 | 40 min | theory | Continuous batching and preemption (A1) |
+| 2 | 90 min | code | `scheduler.py`, minus its prefix-cache helpers (B1) |
+| 3 | 30 min | trace | The scheduler trace (D1) |
 | — | lunch | | |
-| 4 | 50 min | theory | GPU basics for Triton, online softmax, FlashDecoding (A2) |
-| 5 | 60 min | code | `paged_attention_triton.py` (B2) |
-| 6 | 20 min | rebuild | Online softmax in NumPy (C2) |
-| 7 | 25 min | theory | Benchmarking a server honestly (A3) |
-| 8 | 50 min | code | `benchmarks/serving.py`, and skim `server.py`, `metrics.py`, `workloads.py` (B3) |
-| 9 | 20 min | trace | The shared-prompt trace (D) |
-| 10 | 40 min | practice | The questions (E) |
+| 4 | 45 min | theory | Radix trees and RadixAttention (A2) |
+| 5 | 75 min | code | `prefix_cache.py` plus the scheduler's prefix helpers (B2) |
+| 6 | 60 min | rebuild | A toy radix prefix cache (C) |
+| 7 | 20 min | trace | The shared-prompt trace (D2) |
+| 8 | 35 min | practice | The questions (E) |
 
 ## A. Theory
 
-### A1. Prefix caching (block 1, 45 min)
+### A1. Continuous batching and preemption (40 min)
+
+**Read:**
+- the Anyscale blog *"How continuous batching enables 23x throughput in LLM inference while reducing p50 latency"* (2023), about 20 min;
+- Orca (Yu et al., OSDI 2022) §3, *iteration-level scheduling*. Only the idea and its main figure, about 15 min.
+
+**Concepts:**
+- **Static batching.** A batch runs until its longest request ends, so new requests queue. That is your HF baseline's TTFT p50 of **2448 ms**.
+- **Continuous batching.** The scheduler runs **every step**: finished requests leave, waiting ones join. TTFT p50 fell to **179 ms**, and throughput rose **3.82×** (2415 vs 631 tok/s), mostly from more requests in flight per step.
+- **Token budget.** Each step's tokens (prefill + one per decode) must stay ≤ `max_num_batched_tokens`, and the blocks must fit.
+- **Admission.** Admit a request only if `ceil((prompt_len + 1)/B)` blocks are free above a **watermark**, a reserve kept so running requests can still grow. Without it you get thrashing: admit, then immediately preempt.
+- **Preemption.** When a running request needs a block and none is free, evict a victim (the latest admitted).
+  - **Swap** copies its KV to the CPU; the cost is bytes ÷ PCIe bandwidth.
+  - **Recompute** drops its blocks and re-prefills later.
+
+  You chose **recompute** (README line 742). Prefill is cheap on a 1B model, there's no CPU buffer to manage, and vLLM defaults to it too.
+
+### A2. Prefix caching (45 min)
 
 **Read:**
 - the LMSYS blog *"Fast and Expressive LLM Inference with RadixAttention and SGLang"* (Jan 2024), about 20 min;
-- the SGLang paper (Zheng et al., 2024) §3: RadixAttention, the eviction policy and its figure, about 25 min.
+- the SGLang paper (Zheng et al., 2024) §3: RadixAttention, eviction and its figure, about 25 min.
 
 **Concepts:**
-- **Trie / radix tree.** Each path from the root spells a token prefix. Here a node holds **one full block** of `B`
-  token ids plus its physical block id, so matching proceeds block by block.
-- **Only full blocks are shared.** A half-filled last block is still being written, and sharing it would need copy-on-write.
-  So a request reuses `floor(matched_tokens / B)` blocks and recomputes the rest.
-- **Refcounted LRU.** A cached block can be evicted only if no running request uses it (refcount 0) and it is a
-  **leaf**; evicting an inner node would orphan its children. Among those, evict the least recently used.
-- **Hit rate is not time saved.** Your README headline: *"The cache saves 91% of the tokens and 0% of the time"* (line 286).
+- **Radix tree.** Each root-to-node path is a token prefix. Here a node holds **one full block** of `B` token ids plus its physical block id, so matching goes block by block.
+- **Only full blocks are shared.** A half-filled last block is still being written, and sharing it would need copy-on-write. A request reuses `floor(matched / B)` blocks and recomputes the rest.
+- **Refcounted LRU.** Evict only **leaves** with refcount 0, least recently used first. Evicting an inner node would orphan its children.
+- **Hit rate is not time saved.** README *"The cache saves 91% of the tokens and 0% of the time"* (line 286).
 
-**Maths: why 0% below 2k and 7.41× at 8k.** Prefill time is roughly `T(n) ≈ a + b·n + c·n²`:
-- `a` is fixed overhead: launches and Python;
-- `b·n` comes from the MLP and projections;
-- `c·n²` comes from attention.
-
-When n is small, `a` dominates, so skipping 90% of the tokens saves almost nothing. When n is large, the n² term
-dominates, so it saves a lot. Your measurements (README around line 305):
+**Maths: why 0% below 2k and 7.41× at 8k.** Prefill time is roughly `T(n) ≈ a + b·n + c·n²`: fixed overhead `a`,
+linear MLP and projection cost `b·n`, and quadratic attention cost `c·n²`. For small n, `a` dominates, so skipping
+tokens saves almost nothing. For large n, `n²` dominates. Your measurements (README around line 305):
 
 | context | no cache | 90% cached | speedup |
 |---|---|---|---|
@@ -64,112 +74,79 @@ dominates, so it saves a lot. Your measurements (README around line 305):
 | 2048 | 49.8 ms | 17.0 ms | 2.92× |
 | 8192 | 665.5 ms | 89.8 ms | **7.41×** |
 
-The "up to 7.4×" on your resume is the 8k row. Always say the context length when you quote it.
-
-### A2. GPU basics for Triton, and online softmax (block 4, 50 min)
-
-**Read or watch:**
-- the Triton docs tutorials *"Vector Addition"* and *"Fused Softmax"* (triton-lang.org), about 25 min. Learn `program_id`, `tl.arange`, masked `tl.load`/`tl.store`, and that one program handles one tile;
-- the *Flash-Decoding for long-context inference* blog post (Tri Dao et al., Oct 2023), about 10 min;
-- optional video: Umar Jamil, *"Flash Attention derived and coded from first principles with Triton"*. Watch only the online-softmax derivation (about 30 min of a long video).
-
-**Online softmax maths** (the heart of your kernel, and of FlashAttention on the CUDA day). Process the scores in
-chunks, keeping a running max `m`, a running denominator `ℓ` and a running output `acc`:
-
-```
-for each chunk of scores s_j (with values v_j):
-    m_new = max(m, max_j s_j)
-    ℓ     = ℓ · e^(m − m_new) + Σ_j e^(s_j − m_new)
-    acc   = acc · e^(m − m_new) + Σ_j e^(s_j − m_new) · v_j
-    m     = m_new
-output = acc / ℓ
-```
-
-This equals softmax(s)·V exactly, without ever storing all the scores. Subtracting the max keeps `e^x` from overflowing.
-
-**Why the fused kernel is 7.49× faster than the naive path:**
-- **Naive:** `gather_kv` copies every request's scattered blocks into a new contiguous tensor (read + write all of KV), then runs attention (read KV again).
-- **Fused:** each program walks the block table and reads K and V **in place** from the paged cache, with online softmax. Decode is memory-bound, so cutting bytes moved cuts time.
-- The 7.49× is a *paired median* on attention alone (README *Phase 5*, line 385, and *Why the reported speedup is a paired median*, 408).
-- **Decode only, on purpose** (421): prefill stays on the naive path. That is one reason real vLLM is faster.
-
-### A3. Benchmarking a server (block 7, 25 min)
-
-- **TTFT** = queueing + prefill. **TPOT** = time between output tokens. **Throughput** = output tokens per second over the whole run.
-- **Closed-loop vs open-loop load.** Closed: N clients, each waits for its reply before sending again. Open: requests arrive on a schedule (for example Poisson), whether or not the server keeps up.
-- **Paired rounds.** The GPU is shared with other users, so its speed drifts. Alternate baseline and yours in pairs, take the ratio inside each pair, and report the median ratio. Drift then cancels out.
-- **Your confounds** (README *Phase 6*, line 224, onward):
-  - an arrival-time bug once flattered the baseline;
-  - the 4.4× → 3.82× correction;
-  - why varied lengths score lower than uniform ones (249).
+"Up to 7.4×" is the 8k row. Always say the context length when you quote it.
 
 ## B. Code
 
-### B1. The prefix cache (block 2, 75 min, deep)
+### B1. The scheduler (90 min, deep)
+
+`scheduler.py`, in this order:
+1. 87 `Request`, 80 `RequestStatus`, 190 `SchedulerConfig`: the state and the knobs.
+2. 262 `add_request`, 257 `max_blocks_needed`, 55 `RequestTooLargeError`.
+3. **296 `schedule`**: the main loop. Running requests first, then waiting ones.
+4. 322 `_schedule_running`: decode steps, growing block tables, triggering preemption.
+5. 365 `_schedule_waiting`: admission under the token budget and the watermark. 509 `_blocks_to_admit`.
+6. 588 `_evict_for`, 616 `_pick_victim`, 626 `_preempt`: recompute preemption.
+7. 649 `update`, 688 `_finish`, 704 `abort`.
+
+Then README *Phase 3: continuous batching* (697) and *Preemption is by recompute* (742).
+
+### B2. The prefix cache (75 min, deep)
 
 | File, line | Read for |
 |---|---|
 | `prefix_cache.py` 53 `RadixNode` (63 `is_root`, 67 `is_leaf`, 70 `touch`) | what a node stores; LRU timestamps |
 | — 75 `PrefixMatch`, 136 `_blocks_of` | splitting tokens into full blocks |
 | — **144 `match`** | walking the tree block by block |
-| — 191 `acquire` | increasing refcounts on the matched path |
-| — **210 `insert`** | publishing a finished request's blocks |
-| — 247 `_evictable_leaves`, **265 `evict`**, 290 `_remove` | refcount-0 leaves, LRU order |
-| — 312 `check_invariants` | the rules the cache must always satisfy |
+| — 191 `acquire` | refcounts on the matched path |
+| — **210 `insert`** | publishing blocks |
+| — 247 `_evictable_leaves`, **265 `evict`**, 290 `_remove` | refcount-0 leaves in LRU order |
+| — 312 `check_invariants` | the rules that must always hold |
 | `scheduler.py` 443 `_match_cached_prefix`, 466 `_first_uncached_chunk`, 523 `_adopt_cached_prefix`, 544 `_publish_blocks` | how admission uses the cache |
+| `block_table.py` 86 `adopt_blocks` | taking over cached blocks |
 
-README: *Phase 4: radix prefix cache* (763) through 984. The key sections:
+README *Phase 4: radix prefix cache* (763–984). The key sections:
 - *Blocks are published while the request is still running* (775);
 - *Two requests cannot share a prefix neither of them has computed* (809);
-- *The correctness bug: admission mutated requests it then refused* (879). This is a great "hardest bug" story.
+- **The correctness bug: admission mutated requests it then refused** (879). This is your best "hardest bug" story; know it cold.
 
-### B2. The fused kernel (block 5, 60 min, deep)
+## C. Rebuild it yourself (60 min)
 
-`paged_attention_triton.py`:
-- 64 `_paged_attention_decode_kernel`. Find: the grid (which program handles which sequence and head); the loop over the block table; the masked loads; the online-softmax update from A2; the GQA head mapping.
-- 150 `DecodeMetadata`, 164 `build_decode_metadata`: what is packed for the kernel.
-- 196 `can_use_decode_kernel`, 207 `paged_attention_decode`: when it falls back.
-
-README *The tests were checked by breaking the kernel* (437), and *Divergence from the naive path is 12 requests in 32, and it is fine* (452). Know why: bf16 rounding differs, so greedy tokens can flip on near-ties.
-
-### B3. Benchmarks and server (block 8, 50 min)
-
-- Deep: `benchmarks/serving.py`: 86 `run_hf`, 168 `run_ours`, **229 `paired_rounds`**, 263 `run_mode`.
-- Skim: `server.py` (FastAPI, SSE streaming), `metrics.py`, `workloads.py`.
-- README *Real vLLM: it is 6.2× faster than this* (338). Three reasons: no fused or chunked prefill, no CUDA graphs, a Python scheduler loop.
-- README *The first request paid 17 seconds for everyone else* (137). This is a good story too.
-
-## C. Rebuild it yourself
-
-**C1. Toy radix cache (60 min).** In about 80 lines, build `match(tokens) -> blocks`, `insert(tokens, blocks)`, `release(blocks)`
-and `evict(n)`, with refcounts and LRU over leaves only. Test it:
+In about 80 lines, build a toy radix cache with `match(tokens) -> blocks`, `insert(tokens, blocks)`, `release(blocks)` and
+`evict(n)`, using refcounts and LRU over leaves only. Test it:
 - two requests that share 2 blocks of system prompt;
 - evicting while one of them still runs must not touch the shared blocks.
 
-**C2. Online softmax in NumPy (20 min).** Random `s` (length 1000) and `V` (1000×64). Compute in chunks of 16 with the update
-rule, and assert it matches `softmax(s) @ V` within 1e-6. Then remove the max subtraction and watch it overflow with scores near 1000.
+Then compare your version with `prefix_cache.py`.
 
-## D. Trace (block 9, 20 min)
+## D. Traces
 
-Block size 4. The system prompt is 10 tokens (2 full blocks + 2 tokens).
+**D1. Scheduler (30 min).** Block size 4, a pool of 8 blocks, a watermark of 1 block. Requests A (prompt 5), B (prompt 9),
+C (prompt 3), each generating 4 tokens. For 5 steps, write down:
+- which requests are prefill and which are decode;
+- every block table;
+- the free list.
+
+When does preemption happen, and who is the victim? Check against `_schedule_waiting` and `_pick_victim`.
+
+**D2. Shared prompt (20 min).** Block size 4, and a 10-token system prompt (2 full blocks + 2 tokens).
 1. Turn 1 = system + 6 user tokens: what does `insert` publish?
 2. Turn 2 = turn 1 + reply + 5 new tokens: what does `match` return, how many tokens are recomputed, and which refcounts change?
-3. Now evict 3 blocks while turn 2 is running: which blocks can go?
+3. You evict 3 blocks while turn 2 runs: which ones can go?
 
 ## E. Questions
 
-1. How does the radix cache find a shared prefix? Why per block, not per token?
-2. Your hit rate is 91% by turn 4. Why doesn't that make things faster? When does it?
-3. What exactly is "up to 7.4×"? (*The prefill of an 8k context with 90% cached, vs uncached.*)
-4. How is eviction safe while requests are running? Why leaves only?
-5. Tell me about the hardest bug in the prefix cache. (*Admission mutated requests it then refused, README 879.*)
-6. Explain online softmax. Why is it exact?
-7. Why is your fused kernel 7.49× faster? Is decode compute- or memory-bound?
-8. Why Triton and not CUDA C++? (*Faster to iterate, automatic tiling within a program, good enough for a decode kernel. CUDA gives control over shared memory and warps.*)
-9. Why does the fused path disagree with the naive path on 12 of 32 requests, and why is that OK?
-10. How did you make benchmark numbers trustworthy on a shared GPU?
-11. Real vLLM is 6.2× faster. What would you build next, in order? (*Chunked and fused prefill, CUDA graphs, then a C++ or async scheduler.*)
-12. Hostile: "A 90% hit rate and 0% time saved. Isn't the cache useless?"
+1. Walk me through a request from arrival to its last token.
+2. Static vs continuous batching: why does TTFT fall 13.7×? Where does the 3.82× come from?
+3. What is the token budget, and why is it needed as well as a block limit?
+4. Recompute vs swap: which did you choose, and when would you switch?
+5. What is the watermark for?
+6. How does the radix cache find a shared prefix? Why per block, not per token?
+7. A 91% hit rate by turn 4. Why isn't it faster, and when is it?
+8. What exactly is "up to 7.4×"?
+9. How is eviction safe while requests run? Why leaves only?
+10. Tell me about the hardest bug in this project. (*The admission mutation, README 879.*)
+11. Hostile: "vLLM already exists. Why build this?"
 
 ## My notes and fumbles
 
