@@ -87,9 +87,9 @@
 <text x="60" y="396" fill="#1f2430">physical block</text><text x="250" y="396" fill="#2f6fde" font-family="monospace">table[2]</text><text x="470" y="396" fill="#1f2430" font-family="monospace" font-weight="700">23</text>
 <text x="60" y="421" fill="#1f2430">flat slot</text><text x="250" y="421" fill="#2f6fde" font-family="monospace">block_id × B + offset</text><text x="470" y="421" fill="#1f2430" font-family="monospace" font-weight="700">23 × 4 + 1 = 93</text>
 <text x="60" y="450" fill="#5b6170" font-size="12">Blocks needed for n tokens = ceil(n / B) = (n + B − 1) // B → 10 tokens need 3 blocks; the 11th and 12th slots of block #23 are the only waste.</text>
-<text x="640" y="342" fill="#1f2430" font-size="13" font-weight="700">Why one flat slot number? (reconstructed)</text>
-<text x="640" y="362" fill="#5b6170" font-size="12">The cache is one big tensor of</text>
-<text x="640" y="378" fill="#5b6170" font-size="12">num_blocks × B slots. A single integer</text>
-<text x="640" y="394" fill="#5b6170" font-size="12">per token lets one scatter write all</text>
-<text x="640" y="410" fill="#5b6170" font-size="12">new K/V at once. Check kv_cache.py k_flat.</text>
+<text x="640" y="342" fill="#1f2430" font-size="13" font-weight="700">Why one flat slot number?</text>
+<text x="640" y="362" fill="#5b6170" font-size="12">Per layer, K is [num_blocks, B, 8, 64].</text>
+<text x="640" y="378" fill="#5b6170" font-size="12">k_flat views it as [num_blocks × B, 8, 64],</text>
+<text x="640" y="394" fill="#5b6170" font-size="12">so a slot is just a row: one scatter</text>
+<text x="640" y="410" fill="#5b6170" font-size="12">k_flat[slots] = key writes every token.</text>
 </svg>

@@ -76,15 +76,15 @@ The KV cache of a request grows by 32 KiB with every token, and you do not know 
 
 ### A2. The fix: borrow virtual memory from the OS
 
-| Operating system | mini-vLLM | In your code |
-|---|---|---|
-| process | request / sequence | — |
-| virtual page | logical block (`B` consecutive tokens) | index into the block table |
-| physical frame | physical block in one pre-allocated pool | an integer id from `BlockAllocator` |
-| page table | block table, one per request | `BlockTable` |
-| free-frame list | free list | `BlockAllocator` free list |
-| shared pages + refcount (e.g. after `fork`) | shared prefix blocks + refcount (Day 2) | `incref`, `free` |
-| page fault → allocate a frame | last block full → allocate one more block | `append_tokens` |
+| Operating system                            | mini-vLLM                                 | In your code                        |
+| ------------------------------------------- | ----------------------------------------- | ----------------------------------- |
+| process                                     | request / sequence                        | —                                   |
+| virtual page                                | logical block (`B` consecutive tokens)    | index into the block table          |
+| physical frame                              | physical block in one pre-allocated pool  | an integer id from `BlockAllocator` |
+| page table                                  | block table, one per request              | `BlockTable`                        |
+| free-frame list                             | free list                                 | `BlockAllocator` free list          |
+| shared pages + refcount (e.g. after `fork`) | shared prefix blocks + refcount (Day 2)   | `incref`, `free`                    |
+| page fault → allocate a frame               | last block full → allocate one more block | `append_tokens`                     |
 
 ![[d1-block-table.svg]]
 
@@ -125,19 +125,42 @@ Use the figure from the prerequisite as your map, and fill in the right-hand col
 
 ![[p1-one-token-one-layer.svg]]
 
-| Step | Shape (from the figure) | Line in `llama.py` (fill in) |
-|---|---|---|
-| embedding | `[T, 2048]` | |
-| q/k/v projections | Q `[T, 32, 64]`, K/V `[T, 8, 64]` | |
-| RoPE (and `resolve_rope_config`) | unchanged | |
-| **K, V written to the paged cache** | at `slot_mapping` | |
-| attention over the cache | `[T, 32, 64]` → `[T, 2048]` | |
-| MLP | `[T, 8192]` → `[T, 2048]` | |
-| logits | `[T, 128256]` | |
+| Step                                | Shape (from the figure)           | Line in `llama.py` (fill in) |
+| ----------------------------------- | --------------------------------- | ---------------------------- |
+| embedding                           | `[T, 2048]`                       |                              |
+| q/k/v projections                   | Q `[T, 32, 64]`, K/V `[T, 8, 64]` |                              |
+| RoPE (and `resolve_rope_config`)    | unchanged                         |                              |
+| **K, V written to the paged cache** | at `slot_mapping`                 |                              |
+| attention over the cache            | `[T, 32, 64]` → `[T, 2048]`       |                              |
+| MLP                                 | `[T, 8192]` → `[T, 2048]`         |                              |
+| logits                              | `[T, 128256]`                     |                              |
+|                                     |                                   |                              |
 
 > [!info] Two things in this file worth an interview story
 > - **Tokens are flattened and ragged**, `[total_tokens]` rather than `[batch, seq_len]`, so there is no padding anywhere (README *Phase 2*).
 > - **The RoPE bug:** `config.rope_theta` does not exist in transformers 5.x, so a `getattr` default silently gave **10000 instead of 500000**. Short prompts still read fluently; only a comparison against HF's rotary module caught it (74.8% of cos/sin values wrong). `resolve_rope_config` now raises instead of defaulting (README *The bug this phase actually found*).
+
+> [!success]- Answer key for the table (checked against `vLLMmini` `main` @ `3679394`; fill yours in first)
+> | Step | Shape | Where |
+> |---|---|---|
+> | embedding | `[T, 2048]` | `llama.py:264` `self.embed_tokens(input_ids)`; `input_ids` must be flat `[total_tokens]` (check at 259) |
+> | RoPE cos/sin, once per pass | `[T, 64]` | `llama.py:265`; theta from `resolve_rope_config` (68–94), llama3 frequency scaling in `_apply_llama3_scaling` (124–142) |
+> | the 16-layer loop | — | `llama.py:275` |
+> | RMSNorm (in float32, to match HF) | `[T, 2048]` | `llama.py:281`; class at 47–65 |
+> | q/k/v projections | Q `[T, 32, 64]`, K/V `[T, 8, 64]` | `llama.py:283–285`: `q_proj(x).view(T, 32, 64)`, `k_proj`/`v_proj(x).view(T, 8, 64)` |
+> | RoPE applied | unchanged | `llama.py:286` → `apply_rope` (157–167) |
+> | **K, V written to the paged cache** | at `slot_mapping` | **`llama.py:290`** `write_kv_to_cache(cache, index, slot_mapping, k, v)` → `paged_attention.py:36–65`: `k_flat[slots] = key` |
+> | attention over the cache | `[T, 32, 64]` | `llama.py:292–297`: fused Triton kernel for pure-decode steps, else the naive `paged_attention` |
+> | heads back together | `[T, 2048]` | `llama.py:298` `reshape(T, 32 * 64)` |
+> | o_proj + residual | `[T, 2048]` | `llama.py:299` |
+> | SwiGLU MLP + residual | `[T, 8192]` → `[T, 2048]` | `llama.py:301–306`: `down_proj(silu(gate_proj(x)) * up_proj(x))` |
+> | logits | `[num_selected, 128256]` | `llama.py:308–311`: final norm, keep only `logits_indices` (usually the last token of each sequence), then `lm_head` |
+>
+> **Points the figure skips:**
+> - K and V are written **before** attention (comment at 288–289), so a sequence attends to its own new tokens.
+> - Logits are computed only for `logits_indices`. The 128256-wide projection for every prefill token would be wasted work (docstring 252–255).
+> - The decode metadata for the Triton kernel is built **once per forward pass, not once per layer** (267–273). Doing it 16 times would bring back the per-step overhead the kernel removes.
+> - **GQA (32 Q heads, 8 KV heads):** the naive path copies each KV head 4 times with `repeat_interleave` (`paged_attention.py:104–119`, called at 220–221). `repeat` would be wrong: it tiles the heads, so query head 1 would pair with KV head 1 instead of 0. The Triton kernel copies nothing: it computes `kv_head = q_head // num_kv_groups` (`paged_attention_triton.py:85`) and reads the shared head directly.
 
 ### B1. The memory manager (block 6, 75 min, deep)
 
@@ -151,18 +174,18 @@ flowchart LR
   BT -->|slot ids index into| KV
 ```
 
-| File, line | Read for |
-|---|---|
-| `block_allocator.py` 37 `BlockAllocator` | the free list and refcount array |
-| — 70 `allocate`, 80 `allocate_many` | why `allocate_many` is all-or-nothing (no partial allocation leaks) |
-| — 96 `incref`, 111 `free`, 121 `free_many` | a block returns to the free list only at refcount 0 |
-| — 144 `check_invariants` | every block is free XOR has refcount > 0 |
-| `block_table.py` 75 `blocks_needed_for` | ceiling division |
-| — 106 `append_tokens` | when a new block is taken |
-| — 128 `locate`, 137 `slot_index`, 147 `slot_mapping` | the formula from A |
-| — 66 `num_wasted_slots` | the fragmentation metric behind 16.8% → 3.9% |
-| `kv_cache.py` 34 `KVCacheConfig`: 80 `bytes_per_token`, 85 `bytes_per_block`, 88 `num_blocks_for_budget` | check them against your maths |
-| — 98 `blocks_for_free_memory`, 116 `PagedKVCache.__init__`, 166 `k_flat` | the cache tensor's shape, and why "flat" |
+| File, line                                                                                               | Read for                                                            |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `block_allocator.py` 37 `BlockAllocator`                                                                 | the free list and refcount array                                    |
+| — 70 `allocate`, 80 `allocate_many`                                                                      | why `allocate_many` is all-or-nothing (no partial allocation leaks) |
+| — 96 `incref`, 111 `free`, 121 `free_many`                                                               | a block returns to the free list only at refcount 0                 |
+| — 144 `check_invariants`                                                                                 | every block is free XOR has refcount > 0                            |
+| `block_table.py` 75 `blocks_needed_for`                                                                  | ceiling division                                                    |
+| — 106 `append_tokens`                                                                                    | when a new block is taken                                           |
+| — 128 `locate`, 137 `slot_index`, 147 `slot_mapping`                                                     | the formula from A                                                  |
+| — 66 `num_wasted_slots`                                                                                  | the fragmentation metric behind 16.8% → 3.9%                        |
+| `kv_cache.py` 34 `KVCacheConfig`: 80 `bytes_per_token`, 85 `bytes_per_block`, 88 `num_blocks_for_budget` | check them against your maths                                       |
+| — 98 `blocks_for_free_memory`, 116 `PagedKVCache.__init__`, 166 `k_flat`                                 | the cache tensor's shape, and why "flat"                            |
 
 Then read README *Phase 1: paged memory manager* (line 602) and *Fragmentation* (321).
 
@@ -173,35 +196,50 @@ Then read README *Phase 1: paged memory manager* (line 602) and *Fragmentation* 
 > 4. What is the shape of the cache tensor, and what does `k_flat` reshape it to? Why does one integer per token (the slot) make the write simpler?
 > 5. Why were refcounts built in Phase 1, before anything shared blocks? (README: retrofitting later would mean auditing every call site for use-after-free.)
 
+> [!success]- Answers (checked against the code)
+> 1. **LIFO.** `_free_blocks = list(reversed(range(n)))` (`block_allocator.py:47`) and `allocate` uses `pop()` (76), so a fresh pool hands out 0, 1, 2, … in order. `free` appends (118), so **the most recently freed block is reused first**. The comment at 45–46 says why: it keeps a working set hot instead of cycling through the whole pool.
+> 2. It raises `OutOfBlocksError` **before taking anything** (`block_allocator.py:89–93`), so nothing changes. The docstring (83–85) says why: a partial allocation that then raised would leak every block already taken, and the caller would not know what to undo. `append_tokens` builds on this (`block_table.py:106–124`): `allocate_many` either succeeds or raises before `_num_tokens` changes, so a failed append leaves the sequence exactly as it was and **is safe to retry after the scheduler frees memory**. `free_many` (121–132) does the same for frees: it checks every id before freeing any.
+> 3. `blocks_needed_for` (`block_table.py:75–84`): `blocks_after = ceil((num_tokens + new) / block_size)`, written as `(total + bs − 1) // bs`, minus the blocks already held. A new block is taken exactly when a token lands on a multiple of the block size: with bs = 4, going from 4 to 5 tokens needs a 2nd block, but going from 3 to 4 does not.
+> 4. One pair of tensors **per layer**, each `[num_blocks, block_size, num_kv_heads, head_dim]` = `[N, 16, 8, 64]` (`kv_cache.py:131–139`). `k_flat` (166–176) is a **view, not a copy**, of shape `[num_blocks × block_size, 8, 64]`. Slot `block_id × block_size + offset` is then a plain row index, so writing a whole step's K is one scatter, `k_flat[slots] = key` (`paged_attention.py:64`), and the Phase 5 kernel uses the same addressing. Separate per-layer tensors keep each layer's K and V contiguous, which a flat slot index assumes (module docstring, `kv_cache.py:13–16`).
+> 5. Phase 4's prefix cache makes two sequences point at the same physical blocks. A block must not go back to the pool while anyone still uses it, and adding refcounts later would mean re-checking every call site for use-after-free, the hardest bug class to find by testing (`block_allocator.py:8–14`). `incref` refuses a free block (104–107) and `free` refuses a double free (114–115).
+
 ## C. Rebuild it yourself (block 7, 75 min)
 
 Without looking at the code, write `toy_paging.py` (about 100 lines of pure Python):
-1. `BlockAllocator(num_blocks)` with `allocate()`, `allocate_many(n)` (all or nothing), `incref(b)`, `free(b)`; raise when out of blocks.
-2. `BlockTable(block_size, allocator)` with `append_tokens(n)`, `slot_mapping()` and `num_wasted_slots()`.
+1. `BlockAllocator(num_blocks)` with `allocate()`, `allocate_many(n)` (all or nothing), `incref(b)`, `free(b)`, `free_many(ids)`, `ref_count(b)`, `check_invariants()`, and the properties `num_blocks`, `num_free_blocks`, `num_allocated_blocks`. Raise `OutOfBlocksError` when out of blocks.
+2. `BlockTable(allocator, block_size)` (**allocator first**, as the tests call it) with `append_tokens(n)`, `blocks_needed_for(n)`, `locate(p)`, `slot_index(p)`, `slot_mapping()`, `free()`, and the properties `num_tokens`, `num_blocks`, `block_ids`, `capacity`, `num_wasted_slots`.
 3. 3 requests of different lengths, each adding 1 token per step. Print the wasted slots each step, and compare against contiguous allocation of `max_len`.
 
 **Check:** point `tests/test_block_allocator.py` and `tests/test_block_table.py` at your module (change the import) and
-run `pytest -q` on your laptop (CPU only). Each failing test is a concept you missed.
+run `pytest -q` on your laptop (CPU only). Each failing test is a concept you missed. The code is in `/mnt/study/placement_projects/vLLMmini/`; the tests import `from mini_vllm.block_allocator import BlockAllocator, OutOfBlocksError` and `from mini_vllm.block_table import BlockTable`, so change those two lines. The tests use exactly the names in steps 1 and 2.
 
 > [!hint]- Stuck? A skeleton (open only if needed)
 > ```python
-> class OutOfBlocks(Exception): ...
+> class OutOfBlocksError(RuntimeError): ...
 >
 > class BlockAllocator:
->     def __init__(self, num_blocks):
->         self.free_list = list(range(num_blocks))   # which order do you pop from?
->         self.ref = [0] * num_blocks
->     def allocate(self): ...          # pop one, set ref to 1, raise OutOfBlocks if empty
->     def allocate_many(self, n): ...  # check len(free_list) >= n FIRST, then pop n
->     def incref(self, b): ...         # only valid if ref[b] > 0
->     def free(self, b): ...           # ref -= 1; push back only when it reaches 0
+>     def __init__(self, num_blocks):          # ValueError if num_blocks <= 0
+>         self._ref = [0] * num_blocks
+>         self._free = list(reversed(range(num_blocks)))   # pop() then gives 0, 1, 2, ...
+>     num_blocks / num_free_blocks / num_allocated_blocks  # @property each
+>     def ref_count(self, b): ...
+>     def allocate(self): ...          # pop, ref = 1, OutOfBlocksError if empty
+>     def allocate_many(self, n): ...  # check n <= len(free) FIRST, then allocate n times
+>     def incref(self, b): ...         # ValueError if ref[b] == 0 (free block)
+>     def free(self, b): ...           # ValueError on double free; append to free at 0
+>     def free_many(self, ids): ...    # validate ALL ids, then free each
+>     def check_invariants(self): ...  # in free list <=> ref == 0, no duplicates
 >
 > class BlockTable:
->     def __init__(self, block_size, allocator):
->         self.bs, self.alloc, self.blocks, self.n = block_size, allocator, [], 0
->     def append_tokens(self, k): ...  # need = ceil((n + k) / bs) - len(blocks)
->     def slot_mapping(self): ...      # [blocks[t // bs] * bs + t % bs for t in range(n)]
->     def num_wasted_slots(self): ...  # len(blocks) * bs - n
+>     def __init__(self, allocator, block_size):
+>         self._alloc, self._bs, self._ids, self._n = allocator, block_size, [], 0
+>     num_tokens / num_blocks / block_ids / capacity / num_wasted_slots  # @property each
+>     def blocks_needed_for(self, k): ...  # ceil((n + k) / bs) - len(ids), at least 0
+>     def append_tokens(self, k): ...      # allocate_many FIRST, then update n
+>     def locate(self, p): ...             # divmod(p, bs) -> (ids[blk], off); IndexError if out of range
+>     def slot_index(self, p): ...         # ids[p // bs] * bs + p % bs
+>     def slot_mapping(self): ...          # [slot_index(p) for p in range(n)]
+>     def free(self): ...                  # free_many(ids); safe to call twice
 > ```
 
 ## D. Trace by hand (block 8, 20 min)
@@ -214,7 +252,7 @@ Block size 4, pool of 8 blocks. Request A has 5 tokens, B has 9, C has 3. Each t
 
 Do it on paper first. Then check it in the lab's *Paging simulator* tab (press **Step**), and only then open the answer.
 
-> [!success]- Worked answer (assumes the free list hands out the lowest id first, and A, B, C append in that order each step)
+> [!success]- Worked answer (A, B, C append in that order each step; block ids match the real allocator, whose fresh free list hands out 0, 1, 2, …)
 > **Admission.** A needs ⌈5/4⌉ = 2 blocks, B ⌈9/4⌉ = 3, C ⌈3/4⌉ = 1.
 > A = [0, 1], B = [2, 3, 4], C = [5]. Free list = [6, 7].
 >
@@ -226,7 +264,7 @@ Do it on paper first. Then check it in the lab's *Paging simulator* tab (press *
 > | 3 | 8, [0, 1] (full) | 12, [2, 3, 4] (full) | 6, [5, 6] | [7] |
 > | 4 | 9, [0, 1, **7**] | **needs a 4th block: none left** | 7, [5, 6] | [] |
 >
-> **The trap in this exercise:** the three requests finally need 3 + 4 + 2 = 9 blocks, but the pool has 8. At step 4, B cannot grow. A real engine must now **preempt** a request (free its blocks and recompute it later) — that is Day 2's scheduler. Paging bounds waste; it does not create memory.
+> **The trap in this exercise:** the three requests finally need 3 + 4 + 2 = 9 blocks, but the pool has 8. At step 4, B cannot grow: in your code `append_tokens(1)` raises `OutOfBlocksError` and B's table and token count stay exactly as they were. A real engine must now **preempt** a request (free its blocks and recompute it later) — that is Day 2's scheduler. Paging bounds waste; it does not create memory.
 >
 > **Slot of token 7 of B** (0-indexed position 7): block = table[7 // 4] = table[1] = 3, offset = 7 % 4 = 3, slot = 3 × 4 + 3 = **15**. (If you meant the 7th token, position 6: offset 2, slot **14**.)
 >

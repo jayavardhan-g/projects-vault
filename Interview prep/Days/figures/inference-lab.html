@@ -155,7 +155,7 @@ details.card .ans p{margin:0;max-width:78ch}
   <!-- ============ PAGING ============ -->
   <section class="view" id="v-paging" hidden>
     <h2>Step through a paged block manager</h2>
-    <p class="lede">Loaded with the Day 1 hand trace (block size 4, pool of 8, requests of 5, 9 and 3 tokens, each appending 4). Do the trace on paper first, then step here to check. The free list hands out the lowest id first; your <code>block_allocator.py</code> may pop in a different order, which changes the ids but not the counts.</p>
+    <p class="lede">Loaded with the Day 1 hand trace (block size 4, pool of 8, requests of 5, 9 and 3 tokens, each appending 4). Do the trace on paper first, then step here to check. The free list works like your <code>block_allocator.py</code>: it starts as <code>reversed(range(N))</code> and <code>allocate()</code> pops from the end, so a fresh pool hands out 0, 1, 2, … and the most recently freed block is reused first (try <em>Finish A</em>, then <em>Step</em>).</p>
     <div class="bench">
       <div class="panel">
         <div class="chips" id="pgPresets" role="group" aria-label="Scenarios"></div>
@@ -302,12 +302,13 @@ const pp=$('#pgPresets');
 scen.forEach((p,i)=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=p.n;b.setAttribute('aria-pressed',i===0);
   b.onclick=()=>{$('#pgBS').value=p.bs;$('#pgN').value=p.N;$('#pgMax').value=p.max;$('#pgApp').value=p.app;$('#pgReqs').value=p.reqs;pp.querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed',c===b));reset()};pp.appendChild(b)});
 function log(msg,cls){S.log.push({msg,cls})}
-function allocMany(n){ if(S.free.length<n) return null; S.free.sort((a,b)=>a-b); const got=S.free.splice(0,n); got.forEach(b=>S.ref[b]=1); return got;}
+// Mirrors block_allocator.py: free list starts as reversed(range(N)) and allocate() pops from the end (LIFO), so a fresh pool hands out 0,1,2,... and the most recently freed block is reused first.
+function allocMany(n){ if(S.free.length<n) return null; const got=[]; for(let i=0;i<n;i++){const b=S.free.pop(); S.ref[b]=1; got.push(b);} return got;}
 function freeBlk(b){ S.ref[b]--; if(S.ref[b]===0){S.free.push(b);return true} return false;}
 function reset(){
   const bs=Math.max(1,+$('#pgBS').value), N=Math.max(1,+$('#pgN').value);
   const lens=$('#pgReqs').value.split(',').map(s=>parseInt(s,10)).filter(n=>n>0).slice(0,8);
-  S={bs,N,max:Math.max(1,+$('#pgMax').value),app:Math.max(0,+$('#pgApp').value),free:[...Array(N).keys()],ref:Array(N).fill(0),reqs:[],step:0,log:[]};
+  S={bs,N,max:Math.max(1,+$('#pgMax').value),app:Math.max(0,+$('#pgApp').value),free:[...Array(N).keys()].reverse(),ref:Array(N).fill(0),reqs:[],step:0,log:[]};
   lens.forEach((len,i)=>{const need=Math.ceil(len/bs); const got=allocMany(need);
     const r={name:NAMES[i],color:COLORS[i%COLORS.length],len,prompt:len,table:got||[],state:got?'running':'waiting',left:S.app};
     S.reqs.push(r);
@@ -359,7 +360,7 @@ function render(){
     pool.appendChild(d);
   }
   const live=S.reqs.filter(r=>r.state!=='finished');
-  $('#pgTables').innerHTML=`<div class="t"><b>Step ${S.step}</b><span>free list: [${S.free.slice().sort((a,b)=>a-b).join(', ')}]</span></div>`+
+  $('#pgTables').innerHTML=`<div class="t"><b>Step ${S.step}</b><span>free list, next out first: [${S.free.slice().reverse().join(', ')}]</span></div>`+
     S.reqs.map(r=>{const waste=r.state==='waiting'||r.state==='finished'?0:r.table.length*bs-r.len;
       return `<div class="t"><b style="color:var(${r.color})">${r.name}</b><span>${r.len} tok</span><span>table [${r.table.join(', ')}]</span><span>waste ${waste}</span><span style="color:var(--muted)">${r.state}</span></div>`}).join('');
   // comparison: paged vs max_len vs pad-to-longest over live (non-finished, admitted or waiting) requests
