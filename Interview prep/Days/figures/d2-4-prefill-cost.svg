@@ -1,0 +1,24 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 390' width='800' height='390' font-family='Inter, Helvetica, Arial, sans-serif'><title>Prefill cost with and without cache</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='800' height='390' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='400' y='26' text-anchor='middle' font-size='15' font-weight='700' fill='#1f2328'>Prefill time with and without the prefix cache (90% of the prompt cached)</text>
+<text x='400' y='46' text-anchor='middle' font-size='12' font-weight='400' fill='#57606a'>bars: measured (README). The cache skips work, but a fixed ~15 ms per prefill remains.</text>
+<rect x='110' y='324.2' width='60' height='5.8' rx='4' fill='#8c959f' opacity='0.85'/>
+<text x='140' y='318.24285714285713' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>15.5 ms</text>
+<text x='140' y='346' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>no cache</text>
+<rect x='180' y='324.2' width='60' height='5.8' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='210' y='318.24285714285713' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>15.5 ms</text>
+<text x='210' y='346' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>90% cached</text>
+<text x='175' y='366' text-anchor='middle' font-size='13' font-weight='700' fill='#1f2328'>512 tokens: 1.00×</text>
+<rect x='340' y='311.5' width='60' height='18.5' rx='4' fill='#8c959f' opacity='0.85'/>
+<text x='370' y='305.5028571428571' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>49.8 ms</text>
+<text x='370' y='346' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>no cache</text>
+<rect x='410' y='323.7' width='60' height='6.3' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='440' y='317.6857142857143' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>17.0 ms</text>
+<text x='440' y='346' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>90% cached</text>
+<text x='405' y='366' text-anchor='middle' font-size='13' font-weight='700' fill='#1f2328'>2,048 tokens: 2.93×</text>
+<rect x='570' y='82.8' width='60' height='247.2' rx='4' fill='#8c959f' opacity='0.85'/>
+<text x='600' y='76.81428571428572' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>665.5 ms</text>
+<text x='600' y='346' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>no cache</text>
+<rect x='640' y='296.6' width='60' height='33.4' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='670' y='290.6457142857143' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>89.8 ms</text>
+<text x='670' y='346' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>90% cached</text>
+<text x='635' y='366' text-anchor='middle' font-size='13' font-weight='700' fill='#1f2328'>8,192 tokens: 7.41×</text>
+<line x1='90' y1='330' x2='780' y2='330' stroke='#57606a'/></svg>

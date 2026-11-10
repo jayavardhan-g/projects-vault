@@ -1,0 +1,91 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 790 320' width='790' height='320' font-family='Inter, Helvetica, Arial, sans-serif'><title>Scheduler example</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='790' height='320' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='400' y='26' text-anchor='middle' font-size='15' font-weight='700' fill='#1f2328'>The scheduler example: 5 blocks of 4 slots, watermark 1 block</text>
+<text x='400' y='46' text-anchor='middle' font-size='12' font-weight='400' fill='#57606a'>a column per step (state after the step); colour = which request holds the block; grey = free</text>
+<text x='110' y='114' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>block 0</text>
+<text x='110' y='148' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>block 1</text>
+<text x='110' y='182' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>block 2</text>
+<text x='110' y='216' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>block 3</text>
+<text x='110' y='250' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>block 4</text>
+<text x='155.0' y='92' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 1</text>
+<rect x='123' y='100' width='64' height='30' rx='4' fill='#0969da' opacity='0.85'/>
+<text x='155.0' y='120' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>P</text>
+<rect x='123' y='134' width='64' height='30' rx='4' fill='#0969da' opacity='0.85'/>
+<text x='155.0' y='154' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>P</text>
+<rect x='123' y='168' width='64' height='30' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='155.0' y='188' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>Q</text>
+<rect x='123' y='202' width='64' height='30' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='155.0' y='222' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>Q</text>
+<rect x='123' y='236' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<text x='225.0' y='92' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 2</text>
+<rect x='193' y='100' width='64' height='30' rx='4' fill='#0969da' opacity='0.85'/>
+<text x='225.0' y='120' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>P</text>
+<rect x='193' y='134' width='64' height='30' rx='4' fill='#0969da' opacity='0.85'/>
+<text x='225.0' y='154' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>P</text>
+<rect x='193' y='168' width='64' height='30' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='225.0' y='188' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>Q</text>
+<rect x='193' y='202' width='64' height='30' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='225.0' y='222' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>Q</text>
+<rect x='193' y='236' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<text x='295.0' y='92' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 3</text>
+<rect x='263' y='100' width='64' height='30' rx='4' fill='#0969da' opacity='0.85'/>
+<text x='295.0' y='120' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>P</text>
+<rect x='263' y='134' width='64' height='30' rx='4' fill='#0969da' opacity='0.85'/>
+<text x='295.0' y='154' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>P</text>
+<rect x='263' y='168' width='64' height='30' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='295.0' y='188' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>Q</text>
+<rect x='263' y='202' width='64' height='30' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='295.0' y='222' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>Q</text>
+<rect x='263' y='236' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<text x='365.0' y='92' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 4</text>
+<rect x='333' y='100' width='64' height='30' rx='4' fill='#0969da' opacity='0.85'/>
+<text x='365.0' y='120' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>P</text>
+<rect x='333' y='134' width='64' height='30' rx='4' fill='#0969da' opacity='0.85'/>
+<text x='365.0' y='154' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>P</text>
+<rect x='333' y='168' width='64' height='30' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='365.0' y='188' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>Q</text>
+<rect x='333' y='202' width='64' height='30' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='365.0' y='222' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>Q</text>
+<rect x='333' y='236' width='64' height='30' rx='4' fill='#0969da' opacity='0.85'/>
+<text x='365.0' y='256' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>P</text>
+<text x='435.0' y='92' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 5</text>
+<rect x='403' y='100' width='64' height='30' rx='4' fill='#0969da' opacity='0.85'/>
+<text x='435.0' y='120' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>P</text>
+<rect x='403' y='134' width='64' height='30' rx='4' fill='#0969da' opacity='0.85'/>
+<text x='435.0' y='154' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>P</text>
+<rect x='403' y='168' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<rect x='403' y='202' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<rect x='403' y='236' width='64' height='30' rx='4' fill='#0969da' opacity='0.85'/>
+<text x='435.0' y='256' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>P</text>
+<text x='505.0' y='92' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 6</text>
+<rect x='473' y='100' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<rect x='473' y='134' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<rect x='473' y='168' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<rect x='473' y='202' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<rect x='473' y='236' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<text x='575.0' y='92' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 7</text>
+<rect x='543' y='100' width='64' height='30' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='575.0' y='120' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>Q</text>
+<rect x='543' y='134' width='64' height='30' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='575.0' y='154' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>Q</text>
+<rect x='543' y='168' width='64' height='30' rx='4' fill='#bf8700' opacity='0.85'/>
+<text x='575.0' y='188' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>R</text>
+<rect x='543' y='202' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<rect x='543' y='236' width='64' height='30' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='575.0' y='256' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>Q</text>
+<text x='645.0' y='92' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 8</text>
+<rect x='613' y='100' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<rect x='613' y='134' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<rect x='613' y='168' width='64' height='30' rx='4' fill='#bf8700' opacity='0.85'/>
+<text x='645.0' y='188' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>R</text>
+<rect x='613' y='202' width='64' height='30' rx='4' fill='#bf8700' opacity='0.85'/>
+<text x='645.0' y='222' text-anchor='middle' font-size='12' font-weight='700' fill='#ffffff'>R</text>
+<rect x='613' y='236' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<text x='715.0' y='92' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 9</text>
+<rect x='683' y='100' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<rect x='683' y='134' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<rect x='683' y='168' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<rect x='683' y='202' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<rect x='683' y='236' width='64' height='30' rx='4' fill='#eef1f4' opacity='1'/>
+<text x='155.0' y='290' text-anchor='middle' font-size='10' font-weight='600' fill='#cf222e'>R waits (watermark)</text>
+<text x='365.0' y='290' text-anchor='middle' font-size='10' font-weight='600' fill='#cf222e'>P takes block 4</text>
+<text x='435.0' y='306' text-anchor='middle' font-size='10' font-weight='600' fill='#cf222e'>Q preempted</text>
+<text x='575.0' y='290' text-anchor='middle' font-size='10' font-weight='600' fill='#cf222e'>Q re-prefills 9 tokens</text></svg>

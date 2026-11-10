@@ -1,0 +1,75 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 790 365' width='790' height='365' font-family='Inter, Helvetica, Arial, sans-serif'><title>Static vs continuous batching</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='790' height='365' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='420' y='26' text-anchor='middle' font-size='15' font-weight='700' fill='#1f2328'>Two batch slots, four requests that generate 2, 8, 3 and 5 tokens</text>
+<text x='420' y='46' text-anchor='middle' font-size='12' font-weight='400' fill='#57606a'>each cell = one decode step for one request; pale = slot held but idle (waiting for the batch to end)</text>
+<text x='172.0' y='74' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>1</text>
+<text x='216.0' y='74' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>2</text>
+<text x='260.0' y='74' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>3</text>
+<text x='304.0' y='74' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>4</text>
+<text x='348.0' y='74' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>5</text>
+<text x='392.0' y='74' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>6</text>
+<text x='436.0' y='74' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>7</text>
+<text x='480.0' y='74' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>8</text>
+<text x='524.0' y='74' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>9</text>
+<text x='568.0' y='74' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>10</text>
+<text x='612.0' y='74' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>11</text>
+<text x='656.0' y='74' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>12</text>
+<text x='700.0' y='74' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>13</text>
+<text x='140' y='102' text-anchor='end' font-size='12' font-weight='700' fill='#cf222e'>STATIC</text>
+<text x='140' y='132' text-anchor='end' font-size='12' font-weight='600' fill='#1f2328'>slot 1</text>
+<rect x='151' y='110' width='42' height='32' rx='4' fill='#0969da' opacity='0.85'/>
+<text x='158' y='131' text-anchor='start' font-size='12' font-weight='700' fill='#ffffff'>A</text>
+<rect x='195' y='110' width='42' height='32' rx='4' fill='#0969da' opacity='0.85'/>
+<rect x='239' y='110' width='42' height='32' rx='4' fill='#0969da' opacity='0.18'/>
+<rect x='283' y='110' width='42' height='32' rx='4' fill='#0969da' opacity='0.18'/>
+<rect x='327' y='110' width='42' height='32' rx='4' fill='#0969da' opacity='0.18'/>
+<rect x='371' y='110' width='42' height='32' rx='4' fill='#0969da' opacity='0.18'/>
+<rect x='415' y='110' width='42' height='32' rx='4' fill='#0969da' opacity='0.18'/>
+<rect x='459' y='110' width='42' height='32' rx='4' fill='#0969da' opacity='0.18'/>
+<rect x='503' y='110' width='42' height='32' rx='4' fill='#bf8700' opacity='0.85'/>
+<text x='510' y='131' text-anchor='start' font-size='12' font-weight='700' fill='#ffffff'>C</text>
+<rect x='547' y='110' width='42' height='32' rx='4' fill='#bf8700' opacity='0.85'/>
+<rect x='591' y='110' width='42' height='32' rx='4' fill='#bf8700' opacity='0.85'/>
+<rect x='635' y='110' width='42' height='32' rx='4' fill='#bf8700' opacity='0.18'/>
+<rect x='679' y='110' width='42' height='32' rx='4' fill='#bf8700' opacity='0.18'/>
+<text x='140' y='172' text-anchor='end' font-size='12' font-weight='600' fill='#1f2328'>slot 2</text>
+<rect x='151' y='150' width='42' height='32' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='158' y='171' text-anchor='start' font-size='12' font-weight='700' fill='#ffffff'>B</text>
+<rect x='195' y='150' width='42' height='32' rx='4' fill='#1a7f37' opacity='0.85'/>
+<rect x='239' y='150' width='42' height='32' rx='4' fill='#1a7f37' opacity='0.85'/>
+<rect x='283' y='150' width='42' height='32' rx='4' fill='#1a7f37' opacity='0.85'/>
+<rect x='327' y='150' width='42' height='32' rx='4' fill='#1a7f37' opacity='0.85'/>
+<rect x='371' y='150' width='42' height='32' rx='4' fill='#1a7f37' opacity='0.85'/>
+<rect x='415' y='150' width='42' height='32' rx='4' fill='#1a7f37' opacity='0.85'/>
+<rect x='459' y='150' width='42' height='32' rx='4' fill='#1a7f37' opacity='0.85'/>
+<rect x='503' y='150' width='42' height='32' rx='4' fill='#8250df' opacity='0.85'/>
+<text x='510' y='171' text-anchor='start' font-size='12' font-weight='700' fill='#ffffff'>D</text>
+<rect x='547' y='150' width='42' height='32' rx='4' fill='#8250df' opacity='0.85'/>
+<rect x='591' y='150' width='42' height='32' rx='4' fill='#8250df' opacity='0.85'/>
+<rect x='635' y='150' width='42' height='32' rx='4' fill='#8250df' opacity='0.85'/>
+<rect x='679' y='150' width='42' height='32' rx='4' fill='#8250df' opacity='0.85'/>
+<text x='150' y='205' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>13 steps; slot 1 sits idle for 6 of them waiting for B; C and D can't start until step 9. 18 of 26 slot-steps used (69%).</text>
+<text x='140' y='242' text-anchor='end' font-size='12' font-weight='700' fill='#1a7f37'>CONTINUOUS</text>
+<text x='140' y='272' text-anchor='end' font-size='12' font-weight='600' fill='#1f2328'>slot 1</text>
+<rect x='151' y='250' width='42' height='32' rx='4' fill='#0969da' opacity='0.85'/>
+<text x='158' y='271' text-anchor='start' font-size='12' font-weight='700' fill='#ffffff'>A</text>
+<rect x='195' y='250' width='42' height='32' rx='4' fill='#0969da' opacity='0.85'/>
+<rect x='239' y='250' width='42' height='32' rx='4' fill='#bf8700' opacity='0.85'/>
+<text x='246' y='271' text-anchor='start' font-size='12' font-weight='700' fill='#ffffff'>C</text>
+<rect x='283' y='250' width='42' height='32' rx='4' fill='#bf8700' opacity='0.85'/>
+<rect x='327' y='250' width='42' height='32' rx='4' fill='#bf8700' opacity='0.85'/>
+<rect x='371' y='250' width='42' height='32' rx='4' fill='#8250df' opacity='0.85'/>
+<text x='378' y='271' text-anchor='start' font-size='12' font-weight='700' fill='#ffffff'>D</text>
+<rect x='415' y='250' width='42' height='32' rx='4' fill='#8250df' opacity='0.85'/>
+<rect x='459' y='250' width='42' height='32' rx='4' fill='#8250df' opacity='0.85'/>
+<rect x='503' y='250' width='42' height='32' rx='4' fill='#8250df' opacity='0.85'/>
+<rect x='547' y='250' width='42' height='32' rx='4' fill='#8250df' opacity='0.85'/>
+<text x='140' y='312' text-anchor='end' font-size='12' font-weight='600' fill='#1f2328'>slot 2</text>
+<rect x='151' y='290' width='42' height='32' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='158' y='311' text-anchor='start' font-size='12' font-weight='700' fill='#ffffff'>B</text>
+<rect x='195' y='290' width='42' height='32' rx='4' fill='#1a7f37' opacity='0.85'/>
+<rect x='239' y='290' width='42' height='32' rx='4' fill='#1a7f37' opacity='0.85'/>
+<rect x='283' y='290' width='42' height='32' rx='4' fill='#1a7f37' opacity='0.85'/>
+<rect x='327' y='290' width='42' height='32' rx='4' fill='#1a7f37' opacity='0.85'/>
+<rect x='371' y='290' width='42' height='32' rx='4' fill='#1a7f37' opacity='0.85'/>
+<rect x='415' y='290' width='42' height='32' rx='4' fill='#1a7f37' opacity='0.85'/>
+<rect x='459' y='290' width='42' height='32' rx='4' fill='#1a7f37' opacity='0.85'/>
+<text x='150' y='345' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>10 steps: when A finishes, C takes its slot at once; then D. 18 of 20 slot-steps used (90%). D starts at step 6, not 9.</text></svg>
