@@ -8,6 +8,8 @@ tags: [interview, day, mini-vllm]
 
 Part of [[Interview plan (Nov 2026)]]. Repo `vLLMmini` (branch `main`). About 6.5 h. Builds on [[Day 02 - mini-vLLM II]].
 
+**Code walkthrough:** [[Day 03 - code walkthrough]]: one small figure per pipeline, the exact code to read in order, and what each piece does.
+
 **By tonight you can:**
 - derive online softmax and explain why the fused kernel is 7.49× faster;
 - defend every benchmark number: how it was measured, what it hides, and why real vLLM is 6.2× faster;

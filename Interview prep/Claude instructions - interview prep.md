@@ -37,6 +37,9 @@ microexchange and raftkv. Read that branch. The numbers in the upgraded docs rep
 
 ## State on 2026-11-04
 
+- **11-10: day notes for Days 5–15 are all written** (`Days/`), from the prep packs and the code. Each note's top section lists the resume claims to fix. Open items: copy the CS728/LeNet-5 code (Day 9 has no line numbers yet); find the CosyVoice WER CSVs or the presentation (they are not on the server); write the CosyVoice, CS728 and LeNet-5 prep packs the evening before their days. Revise a note only if the plan changes.
+- **11-10: a code walkthrough per day** is in `Days/Code/` (index: `Code walkthroughs.md`): hand-drawn Mermaid pipeline figures plus exact code excerpts, explained. The archify diagrams were reverted at the user's request; don't use archify for this prep. Extend a walkthrough when new code arrives (CS728, LeNet-5).
+
 - 11-05: Day 1 started. 11 prep packs (all except CS728, LeNet-5 and welfare) were launched as background agents. DECS CPU-saturation question resolved: the claim holds (see plan).
 - Upgrades: Photo-Seek, BountyBrain, microexchange and raftkv are done. DECS, mini-vLLM, speculative decoding, CUDA
   and emotion steering were **not** upgraded and won't be. **Start no new feature work.**

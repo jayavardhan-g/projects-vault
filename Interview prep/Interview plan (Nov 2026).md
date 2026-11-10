@@ -27,17 +27,17 @@ to a second CUDA day and a full BountyBrain day. The older day sections further 
 | **2** | Mon Nov 9 | mini-vLLM: continuous batching, radix prefix cache | [[Day 02 - mini-vLLM II]] |
 | **3** | Tue Nov 10 | mini-vLLM: Triton kernel, benchmarks, server, self-quiz | [[Day 03 - mini-vLLM III]] |
 | **4** | Wed Nov 11 | Speculative decoding | [[Day 04 - Speculative decoding]] |
-| **5** | Thu Nov 12 | CUDA I: GPU architecture, the matmul kernels (PA2) | old section Day 5 (the matmul blocks) |
-| **6** | Fri Nov 13 | CUDA II: MLP streams and checkpointing (PA3), FlashAttention | old section Day 5 (the rest) |
-| **7** | Sat Nov 14 | Seminar and speech basics | old section Day 6 |
-| **8** | Sun Nov 15 | CosyVoice | old section Day 7 |
-| **9** | Mon Nov 16 | CS728 and LeNet-5 | old section Day 8 |
-| **10** | Tue Nov 17 | Photo-Seek I: retrieval and router | old section Day 9 |
-| **11** | Wed Nov 18 | Photo-Seek II: faces; emotion steering | old section Day 10 |
-| **12** | Thu Nov 19 | BountyBrain (full day) | old section Day 11, without the mock |
-| **13** | Fri Nov 20 | DECS and Micro Exchange | old section Day 12 |
-| **14** | Sat Nov 21 | Raft | old section Day 13 |
-| **15** | Sun Nov 22 | Revision: redraw every diagram, weak topics, numbers cheat sheet, 5 behavioural stories, one 90-min full-resume mock | old section Day 14 |
+| **5** | Thu Nov 12 | CUDA I: GPU architecture, the matmul kernels (PA2) | [[Day 05 - CUDA I]] |
+| **6** | Fri Nov 13 | CUDA II: MLP streams and checkpointing (PA3), FlashAttention | [[Day 06 - CUDA II]] |
+| **7** | Sat Nov 14 | Seminar and speech basics | [[Day 07 - Seminar and speech basics]] |
+| **8** | Sun Nov 15 | CosyVoice | [[Day 08 - CosyVoice]] |
+| **9** | Mon Nov 16 | CS728 and LeNet-5 | [[Day 09 - CS728 and LeNet-5]] |
+| **10** | Tue Nov 17 | Photo-Seek I: retrieval and router | [[Day 10 - Photo-Seek I]] |
+| **11** | Wed Nov 18 | Photo-Seek II: faces; emotion steering | [[Day 11 - Photo-Seek II and emotion steering]] |
+| **12** | Thu Nov 19 | BountyBrain (full day) | [[Day 12 - BountyBrain]] |
+| **13** | Fri Nov 20 | DECS and Micro Exchange | [[Day 13 - DECS and Micro Exchange]] |
+| **14** | Sat Nov 21 | Raft | [[Day 14 - Raft]] |
+| **15** | Sun Nov 22 | Revision: redraw every diagram, weak topics, numbers cheat sheet, 5 behavioural stories, one 90-min full-resume mock | [[Day 15 - Revision and mock]] |
 
 Each project day has a **rebuild block**: rewrite the core mechanism yourself in about 100 lines (60–90 min).
 

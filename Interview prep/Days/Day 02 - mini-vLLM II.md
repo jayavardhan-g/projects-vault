@@ -8,6 +8,8 @@ tags: [interview, day, mini-vllm]
 
 Part of [[Interview plan (Nov 2026)]]. Repo `vLLMmini` (branch `main`). About 7 h. Builds on [[Day 01 - mini-vLLM I]].
 
+**Code walkthrough:** [[Day 02 - code walkthrough]]: one small figure per pipeline, the exact code to read in order, and what each piece does.
+
 **Resume bullets:**
 - "…and continuous-batching scheduler…achieving **3.82×** throughput over the HuggingFace baseline." (part 2)
 - "Implemented a radix-tree prefix cache to reuse shared KV states across requests, accelerating repeated prompt inference by up to **7.4×**…"

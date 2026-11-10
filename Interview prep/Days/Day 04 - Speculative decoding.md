@@ -9,6 +9,8 @@ tags: [interview, day, speculative-decoding]
 Part of [[Interview plan (Nov 2026)]]. Repo `speculative_decoding` (branch `main`). About 7 h. Prep pack:
 [[Speculative decoding - prep]] (diagram, numbers sheet, 60 questions).
 
+**Code walkthrough:** [[Day 04 - code walkthrough]]: one small figure per pipeline, the exact code to read in order, and what each piece does.
+
 **Resume bullets:**
 - "Accelerated LLM inference by **2.25×** using fixed-depth speculative decoding with Qwen2.5-0.5B drafting Qwen2.5-14B, reaching **2.60×** on code workloads while preserving the target distribution."
 - "Performed draft-model and depth ablations across three draft models and a range of depths…"

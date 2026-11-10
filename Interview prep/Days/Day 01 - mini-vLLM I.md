@@ -9,6 +9,8 @@ tags: [interview, day, mini-vllm]
 Part of [[Interview plan (Nov 2026)]]. Repo `vLLMmini` (branch `main`). About 6.5 h. **This is your first day of
 reading**, so it starts from the foundations that everything later builds on.
 
+**Code walkthrough:** [[Day 01 - code walkthrough]]: one small figure per pipeline, the exact code to read in order, and what each piece does.
+
 **Resume bullet (part 1 of 2):** "Built a paged KV-cache memory manager and continuous-batching scheduler for LLM inference,
 reducing GPU memory fragmentation by **4.3×** and achieving **3.82×** throughput over the HuggingFace baseline."
 Today covers the *paged memory manager* and the **4.3×**. The scheduler and the 3.82× are tomorrow ([[Day 02 - mini-vLLM II]]).

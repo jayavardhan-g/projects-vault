@@ -1,0 +1,258 @@
+---
+type: code-walkthrough
+day: 5
+tags: [interview, code, cuda]
+---
+# Day 5 code walkthrough: the matmul kernel chain (PA2)
+
+Companion to [[Day 05 - CUDA I]]. Repo `sysml`, `matmul/matmul_bench.cu` (one commit, `16870fb`).
+
+**The chain, and the one question behind each step:** *where does each operand come from, and how many times?*
+
+```mermaid
+flowchart LR
+  N1["1 naive :44<br/>lanes walk rows → strided"] -->|"10.9×"| N2["2 coalesced :60<br/>lanes walk columns"]
+  N2 -->|"tiling"| N3["3 tiled 1-to-1 :78<br/>shared tiles, 1 output/thread"]
+  N3 --> N4["4/5 strided vs contiguous :118 :173<br/>F×F outputs/thread"]
+  N4 -->|"register blocking"| N6["6 block2d R×R :232<br/>reuse in registers"]
+  CB["cuBLAS :436<br/>reference + ceiling"] -.->|"correctness check"| N6
+```
+
+Reading rule for every kernel: write down (1) which output `C[row][col]` thread (tx, ty) owns, (2) for one warp
+(32 consecutive `threadIdx.x`), whether its 32 loads hit 32 consecutive addresses (**coalesced**: one 128-byte
+transaction) or 32 scattered ones (**uncoalesced**: up to 32 transactions).
+
+---
+
+## 1. Naive vs coalesced: the same maths, a transposed mapping
+
+`matmul/matmul_bench.cu:44–54`
+```cpp
+__global__ void mm_naive(const float* A, const float* B, float* C, int N)
+{
+    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    int col = blockIdx.y * blockDim.y + threadIdx.y;
+    if (row >= N || col >= N) return;
+
+    float acc = 0.0f;
+    for (int k = 0; k < N; ++k)
+        acc = fmaf(A[(size_t)row * N + k], B[(size_t)k * N + col], acc);
+    C[(size_t)row * N + col] = acc;
+}
+```
+
+- `row` comes from `threadIdx.x`. So the 32 lanes of a warp have **32 consecutive rows** and the same `col`.
+- `A[row*N + k]`: lane addresses are **N floats apart**, so 32 separate transactions per load. `B[k*N + col]`: all lanes read the same address (a broadcast, cheap). `C` stores are also N apart.
+
+`matmul/matmul_bench.cu:60–70`
+```cpp
+__global__ void mm_coalesced(const float* A, const float* B, float* C, int N)
+{
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    if (row >= N || col >= N) return;
+
+    float acc = 0.0f;
+    for (int k = 0; k < N; ++k)
+        acc = fmaf(A[(size_t)row * N + k], B[(size_t)k * N + col], acc);
+    C[(size_t)row * N + col] = acc;
+}
+```
+
+- Only lines 62–63 changed: `col` now comes from `threadIdx.x`. Now `B[k*N + col]` is **32 consecutive floats** = one transaction, `A[row*N + k]` is a broadcast, and `C` stores coalesce. Same arithmetic, **10.9× faster**. That's the whole lesson of coalescing in one diff.
+- Both kernels still read `2N` floats from global memory per output: no reuse at all.
+
+---
+
+## 2. Shared-memory tiling: load once, use TILE times
+
+```mermaid
+flowchart LR
+  G[("global A, B")] -->|"each thread loads 1 elem of A-tile and B-tile"| SM["sA, sB in shared memory<br/>TILE × TILE"]
+  SM -->|"__syncthreads"| K["inner k loop: TILE FMAs<br/>reading shared, not global"]
+  K -->|"__syncthreads, next tile"| G
+```
+
+`matmul/matmul_bench.cu:77–101`
+```cpp
+template<int TILE>
+__global__ void mm_tiled_1to1(const float* A, const float* B, float* C, int N)
+{
+    __shared__ float sA[TILE][TILE];
+    __shared__ float sB[TILE][TILE];
+
+    const int tx = threadIdx.x, ty = threadIdx.y;
+    const int row = blockIdx.y * TILE + ty;
+    const int col = blockIdx.x * TILE + tx;
+
+    float acc = 0.0f;
+    for (int t = 0; t < (N + TILE - 1) / TILE; ++t) {
+        int aCol = t * TILE + tx;
+        int bRow = t * TILE + ty;
+        sA[ty][tx] = (row < N && aCol < N) ? A[(size_t)row * N + aCol] : 0.0f;
+        sB[ty][tx] = (bRow < N && col < N) ? B[(size_t)bRow * N + col] : 0.0f;
+        __syncthreads();
+
+        #pragma unroll
+        for (int k = 0; k < TILE; ++k)
+            acc = fmaf(sA[ty][k], sB[k][tx], acc);
+        __syncthreads();
+    }
+    if (row < N && col < N) C[(size_t)row * N + col] = acc;
+}
+```
+
+- The block computes one TILE × TILE patch of C. For each `t`, every thread loads **one** element of the A tile and **one** of the B tile (lines 91–92). Out-of-range elements become 0, so N needn't be a multiple of TILE.
+- **First `__syncthreads`:** nobody reads a tile until every thread has written its element.
+- **Second `__syncthreads`:** nobody overwrites the tile for the next `t` while a slower thread is still reading it. Remove it and you get a race that only shows up sometimes.
+- Global loads per output fall from `2N` to `2N/TILE`. But now **every FMA reads two floats from shared memory**, so shared-memory bandwidth becomes the limit. That's what register blocking attacks.
+
+---
+
+## 3. More outputs per thread: strided vs contiguous
+
+`matmul/matmul_bench.cu:134–158`
+```cpp
+for (int t = 0; t < (N + TILE - 1) / TILE; ++t) {
+    #pragma unroll
+    for (int s = 0; s < F; ++s) {
+        #pragma unroll
+        for (int u = 0; u < F; ++u) {
+            int r = ty + s * BLK;           // strided within the tile
+            int c = tx + u * BLK;
+            int aR = row0 + r,      aC = t * TILE + c;
+            int bR = t * TILE + r,  bC = col0 + c;
+            sA[r][c] = (aR < N && aC < N) ? A[(size_t)aR * N + aC] : 0.0f;
+            sB[r][c] = (bR < N && bC < N) ? B[(size_t)bR * N + bC] : 0.0f;
+        }
+    }
+    __syncthreads();
+
+    #pragma unroll
+    for (int k = 0; k < TILE; ++k) {
+        #pragma unroll
+        for (int i = 0; i < F; ++i) {
+            float a = sA[ty + i * BLK][k];
+            #pragma unroll
+            for (int j = 0; j < F; ++j)
+                acc[i][j] = fmaf(a, sB[k][tx + j * BLK], acc[i][j]);
+        }
+    }
+```
+
+- TILE = BLK × F: each thread owns **F × F outputs** (`acc[F][F]` lives in registers).
+- **Loading (lines 139–140):** lane `tx` loads column `tx + u·BLK`. For fixed `u`, the warp's lanes are adjacent, so loads are coalesced.
+- **Compute (lines 150–156):** one `a = sA[...][k]` feeds F FMAs (it's reused across `j`). Shared reads per FMA drop below 2.
+
+`matmul/matmul_bench.cu:194–195`
+```cpp
+int r = ty * F + s;             // contiguous run per thread
+int c = tx * F + u;
+```
+
+- The *contiguous* twin changes only these two lines: lane `tx` loads columns `tx·F + u`, so adjacent lanes are F floats apart and each warp load touches F times as many memory sectors. The arithmetic, shared footprint and occupancy are identical. It's a **controlled experiment** for the access pattern alone.
+
+---
+
+## 4. 2D register blocking: the final kernel
+
+```mermaid
+flowchart TB
+  T["thread (tx, ty) owns R×R outputs<br/>rows ty·R..+R, cols tx·R..+R"] --> LD["stage R×R elems of sA, sB"]
+  LD --> KL{"for k in 0..TILE"}
+  KL --> AV["av[i] = sA[ty·R+i][k]  (R loads)"]
+  KL --> BV["bv[j] = sB[k][tx·R+j]  (R loads)"]
+  AV --> FMA["R×R FMAs from registers"]
+  BV --> FMA
+  FMA --> KL
+```
+
+`matmul/matmul_bench.cu:237–240`
+```cpp
+const int tx = threadIdx.x, ty = threadIdx.y;
+const int rowBase = blockIdx.y * TILE + ty * R;
+const int colBase = blockIdx.x * TILE + tx * R;
+
+```
+
+`matmul/matmul_bench.cu:262–273`
+```cpp
+for (int k = 0; k < TILE; ++k) {
+    float av[R], bv[R];
+    #pragma unroll
+    for (int i = 0; i < R; ++i) av[i] = sA[ty * R + i][k];
+    #pragma unroll
+    for (int j = 0; j < R; ++j) bv[j] = sB[k][tx * R + j];
+    #pragma unroll
+    for (int i = 0; i < R; ++i)
+        #pragma unroll
+        for (int j = 0; j < R; ++j)
+            reg[i][j] = fmaf(av[i], bv[j], reg[i][j]);
+}
+```
+
+- Per `k`: load **R** values of A and **R** of B into registers, then do **R × R** FMAs. With R = 4 that's 8 shared loads for 16 FMAs, **0.5 loads per FMA**, against 2 for the 1-to-1 tile. That's the 3.0× over the 1-to-1 kernel.
+- `reg[R][R]` uses many registers per thread (62 for R = 4), so fewer threads fit per SM (50% occupancy). It's still faster, because each thread does much more useful work per byte moved. **Occupancy is not the goal; throughput is.**
+- Known cost (prep pack decision 7): its loader uses the *contiguous* pattern (`sc = tx·R + j`), so global loads are stride-R. That's one reason it stops at 48% of cuBLAS.
+
+**Check yourself:** `mm_block2d<64,4>`, block (bx = 2, by = 1), thread (tx = 3, ty = 5). Which output rows and columns does it own? (*Rows 64 + 20 … 64 + 23 = 84–87; columns 128 + 12 … 128 + 15 = 140–143.*)
+
+---
+
+## 5. The harness: reference, timing, check
+
+`matmul/matmul_bench.cu:432–440`
+```cpp
+// ── cuBLAS first: it becomes the correctness reference for the rest.
+// cuBLAS is column-major; computing B*A in its layout yields row-major A*B.
+const float alpha = 1.0f, beta = 0.0f;
+auto cublas_launch = [&] {
+    cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, N, N,
+                &alpha, dB, N, dA, N, &beta, dC, N);
+};
+Timing tb = time_kernel(cublas_launch, 2, iters, budget);
+CUDA_CHECK(cudaMemcpy(hRef, dC, bytes, cudaMemcpyDeviceToHost));
+```
+
+- cuBLAS is column-major. A row-major matrix read as column-major is its transpose, so asking cuBLAS for `B·A` returns `(Bᵀ·Aᵀ)ᵀ = A·B` laid out row-major. No copies needed.
+- cuBLAS runs **first**, and its output `hRef` becomes the reference every kernel is checked against.
+
+`matmul/matmul_bench.cu:321–344`
+```cpp
+// One timed iteration first, so a slow kernel doesn't commit to ten of them.
+CUDA_CHECK(cudaEventRecord(beg));
+launch();
+CUDA_CHECK(cudaEventRecord(end));
+CUDA_CHECK(cudaEventSynchronize(end));
+float first = 0.f;
+CUDA_CHECK(cudaEventElapsedTime(&first, beg, end));
+
+int extra = 0;
+double total = first;
+if (first / 1000.0 * iters < budget_s) {
+    extra = iters - 1;
+    CUDA_CHECK(cudaEventRecord(beg));
+    for (int i = 0; i < extra; ++i) launch();
+    CUDA_CHECK(cudaEventRecord(end));
+    CUDA_CHECK(cudaEventSynchronize(end));
+    float rest = 0.f;
+    CUDA_CHECK(cudaEventElapsedTime(&rest, beg, end));
+    total += rest;
+}
+
+CUDA_CHECK(cudaEventDestroy(beg));
+CUDA_CHECK(cudaEventDestroy(end));
+return { total / (1 + extra), 1 + extra };
+```
+
+- CUDA events time on the GPU's own clock. **One timed run first**; ten more only if they fit the 30 s budget. So slow kernels at N = 32768 have `iters = 1` (the CSV's `iters` column). A 140 s run has negligible noise, but say "n = 1" if asked.
+
+`matmul/matmul_bench.cu:445–448`
+```cpp
+auto record = [&](const char* name, Timing t) {
+    CUDA_CHECK(cudaMemcpy(hC, dC, bytes, cudaMemcpyDeviceToHost));
+    double err = max_rel_err((int)std::min(elems, (size_t)4000000), hRef, hC);
+    fprintf(out, "%s,%d,%.4f,%.4f,%d,%.3e,\n", name, N, t.ms, tflops(N, t.ms), t.iters, err);
+```
+
+- `std::min(elems, 4000000)`: only the **first 4M elements** are compared. That's the whole matrix up to N = 2048, and only the first ~122 rows at N = 32768. Know this before you say "bit-exact".
