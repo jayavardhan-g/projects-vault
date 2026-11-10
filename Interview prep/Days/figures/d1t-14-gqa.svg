@@ -1,0 +1,117 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 820 296' width='820' height='296' font-family='Inter, Helvetica, Arial, sans-serif'><title>Grouped-query attention</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='820' height='296' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='410' y='26' text-anchor='middle' font-size='15' font-weight='700' fill='#1f2328'>Grouped-query attention in Llama-3.2-1B: 32 query heads share 8 KV heads</text>
+<text x='410' y='46' text-anchor='middle' font-size='12' fill='#57606a'>query head h reads KV head h // 4. The KV cache stores only the 8 KV heads: 4× less memory than 32.</text>
+<rect x='20.0' y='70' width='21' height='34' rx='4' fill='#0969da' opacity='0.75'/>
+<text x='30.5' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q0</text>
+<line x1='30.5' y1='104' x2='69' y2='170' stroke='#0969da' stroke-width='1.5' opacity='0.6'/>
+<rect x='44.5' y='70' width='21' height='34' rx='4' fill='#0969da' opacity='0.75'/>
+<text x='55.0' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q1</text>
+<line x1='55.0' y1='104' x2='69' y2='170' stroke='#0969da' stroke-width='1.5' opacity='0.6'/>
+<rect x='69.0' y='70' width='21' height='34' rx='4' fill='#0969da' opacity='0.75'/>
+<text x='79.5' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q2</text>
+<line x1='79.5' y1='104' x2='69' y2='170' stroke='#0969da' stroke-width='1.5' opacity='0.6'/>
+<rect x='93.5' y='70' width='21' height='34' rx='4' fill='#0969da' opacity='0.75'/>
+<text x='104.0' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q3</text>
+<line x1='104.0' y1='104' x2='69' y2='170' stroke='#0969da' stroke-width='1.5' opacity='0.6'/>
+<rect x='118.0' y='70' width='21' height='34' rx='4' fill='#1a7f37' opacity='0.75'/>
+<text x='128.5' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q4</text>
+<line x1='128.5' y1='104' x2='167' y2='170' stroke='#1a7f37' stroke-width='1.5' opacity='0.6'/>
+<rect x='142.5' y='70' width='21' height='34' rx='4' fill='#1a7f37' opacity='0.75'/>
+<text x='153.0' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q5</text>
+<line x1='153.0' y1='104' x2='167' y2='170' stroke='#1a7f37' stroke-width='1.5' opacity='0.6'/>
+<rect x='167.0' y='70' width='21' height='34' rx='4' fill='#1a7f37' opacity='0.75'/>
+<text x='177.5' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q6</text>
+<line x1='177.5' y1='104' x2='167' y2='170' stroke='#1a7f37' stroke-width='1.5' opacity='0.6'/>
+<rect x='191.5' y='70' width='21' height='34' rx='4' fill='#1a7f37' opacity='0.75'/>
+<text x='202.0' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q7</text>
+<line x1='202.0' y1='104' x2='167' y2='170' stroke='#1a7f37' stroke-width='1.5' opacity='0.6'/>
+<rect x='216.0' y='70' width='21' height='34' rx='4' fill='#bf8700' opacity='0.75'/>
+<text x='226.5' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q8</text>
+<line x1='226.5' y1='104' x2='265' y2='170' stroke='#bf8700' stroke-width='1.5' opacity='0.6'/>
+<rect x='240.5' y='70' width='21' height='34' rx='4' fill='#bf8700' opacity='0.75'/>
+<text x='251.0' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q9</text>
+<line x1='251.0' y1='104' x2='265' y2='170' stroke='#bf8700' stroke-width='1.5' opacity='0.6'/>
+<rect x='265.0' y='70' width='21' height='34' rx='4' fill='#bf8700' opacity='0.75'/>
+<text x='275.5' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q10</text>
+<line x1='275.5' y1='104' x2='265' y2='170' stroke='#bf8700' stroke-width='1.5' opacity='0.6'/>
+<rect x='289.5' y='70' width='21' height='34' rx='4' fill='#bf8700' opacity='0.75'/>
+<text x='300.0' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q11</text>
+<line x1='300.0' y1='104' x2='265' y2='170' stroke='#bf8700' stroke-width='1.5' opacity='0.6'/>
+<rect x='314.0' y='70' width='21' height='34' rx='4' fill='#cf222e' opacity='0.75'/>
+<text x='324.5' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q12</text>
+<line x1='324.5' y1='104' x2='363' y2='170' stroke='#cf222e' stroke-width='1.5' opacity='0.6'/>
+<rect x='338.5' y='70' width='21' height='34' rx='4' fill='#cf222e' opacity='0.75'/>
+<text x='349.0' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q13</text>
+<line x1='349.0' y1='104' x2='363' y2='170' stroke='#cf222e' stroke-width='1.5' opacity='0.6'/>
+<rect x='363.0' y='70' width='21' height='34' rx='4' fill='#cf222e' opacity='0.75'/>
+<text x='373.5' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q14</text>
+<line x1='373.5' y1='104' x2='363' y2='170' stroke='#cf222e' stroke-width='1.5' opacity='0.6'/>
+<rect x='387.5' y='70' width='21' height='34' rx='4' fill='#cf222e' opacity='0.75'/>
+<text x='398.0' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q15</text>
+<line x1='398.0' y1='104' x2='363' y2='170' stroke='#cf222e' stroke-width='1.5' opacity='0.6'/>
+<rect x='412.0' y='70' width='21' height='34' rx='4' fill='#8250df' opacity='0.75'/>
+<text x='422.5' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q16</text>
+<line x1='422.5' y1='104' x2='461' y2='170' stroke='#8250df' stroke-width='1.5' opacity='0.6'/>
+<rect x='436.5' y='70' width='21' height='34' rx='4' fill='#8250df' opacity='0.75'/>
+<text x='447.0' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q17</text>
+<line x1='447.0' y1='104' x2='461' y2='170' stroke='#8250df' stroke-width='1.5' opacity='0.6'/>
+<rect x='461.0' y='70' width='21' height='34' rx='4' fill='#8250df' opacity='0.75'/>
+<text x='471.5' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q18</text>
+<line x1='471.5' y1='104' x2='461' y2='170' stroke='#8250df' stroke-width='1.5' opacity='0.6'/>
+<rect x='485.5' y='70' width='21' height='34' rx='4' fill='#8250df' opacity='0.75'/>
+<text x='496.0' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q19</text>
+<line x1='496.0' y1='104' x2='461' y2='170' stroke='#8250df' stroke-width='1.5' opacity='0.6'/>
+<rect x='510.0' y='70' width='21' height='34' rx='4' fill='#0a7ea4' opacity='0.75'/>
+<text x='520.5' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q20</text>
+<line x1='520.5' y1='104' x2='559' y2='170' stroke='#0a7ea4' stroke-width='1.5' opacity='0.6'/>
+<rect x='534.5' y='70' width='21' height='34' rx='4' fill='#0a7ea4' opacity='0.75'/>
+<text x='545.0' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q21</text>
+<line x1='545.0' y1='104' x2='559' y2='170' stroke='#0a7ea4' stroke-width='1.5' opacity='0.6'/>
+<rect x='559.0' y='70' width='21' height='34' rx='4' fill='#0a7ea4' opacity='0.75'/>
+<text x='569.5' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q22</text>
+<line x1='569.5' y1='104' x2='559' y2='170' stroke='#0a7ea4' stroke-width='1.5' opacity='0.6'/>
+<rect x='583.5' y='70' width='21' height='34' rx='4' fill='#0a7ea4' opacity='0.75'/>
+<text x='594.0' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q23</text>
+<line x1='594.0' y1='104' x2='559' y2='170' stroke='#0a7ea4' stroke-width='1.5' opacity='0.6'/>
+<rect x='608.0' y='70' width='21' height='34' rx='4' fill='#d1242f' opacity='0.75'/>
+<text x='618.5' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q24</text>
+<line x1='618.5' y1='104' x2='657' y2='170' stroke='#d1242f' stroke-width='1.5' opacity='0.6'/>
+<rect x='632.5' y='70' width='21' height='34' rx='4' fill='#d1242f' opacity='0.75'/>
+<text x='643.0' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q25</text>
+<line x1='643.0' y1='104' x2='657' y2='170' stroke='#d1242f' stroke-width='1.5' opacity='0.6'/>
+<rect x='657.0' y='70' width='21' height='34' rx='4' fill='#d1242f' opacity='0.75'/>
+<text x='667.5' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q26</text>
+<line x1='667.5' y1='104' x2='657' y2='170' stroke='#d1242f' stroke-width='1.5' opacity='0.6'/>
+<rect x='681.5' y='70' width='21' height='34' rx='4' fill='#d1242f' opacity='0.75'/>
+<text x='692.0' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q27</text>
+<line x1='692.0' y1='104' x2='657' y2='170' stroke='#d1242f' stroke-width='1.5' opacity='0.6'/>
+<rect x='706.0' y='70' width='21' height='34' rx='4' fill='#57606a' opacity='0.75'/>
+<text x='716.5' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q28</text>
+<line x1='716.5' y1='104' x2='755' y2='170' stroke='#57606a' stroke-width='1.5' opacity='0.6'/>
+<rect x='730.5' y='70' width='21' height='34' rx='4' fill='#57606a' opacity='0.75'/>
+<text x='741.0' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q29</text>
+<line x1='741.0' y1='104' x2='755' y2='170' stroke='#57606a' stroke-width='1.5' opacity='0.6'/>
+<rect x='755.0' y='70' width='21' height='34' rx='4' fill='#57606a' opacity='0.75'/>
+<text x='765.5' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q30</text>
+<line x1='765.5' y1='104' x2='755' y2='170' stroke='#57606a' stroke-width='1.5' opacity='0.6'/>
+<rect x='779.5' y='70' width='21' height='34' rx='4' fill='#57606a' opacity='0.75'/>
+<text x='790.0' y='92' text-anchor='middle' font-size='9' fill='#ffffff'>q31</text>
+<line x1='790.0' y1='104' x2='755' y2='170' stroke='#57606a' stroke-width='1.5' opacity='0.6'/>
+<rect x='50' y='170' width='38' height='40' rx='5' fill='#0969da'/>
+<text x='69' y='195' text-anchor='middle' font-size='11' font-weight='700' fill='#ffffff'>kv0</text>
+<rect x='148' y='170' width='38' height='40' rx='5' fill='#1a7f37'/>
+<text x='167' y='195' text-anchor='middle' font-size='11' font-weight='700' fill='#ffffff'>kv1</text>
+<rect x='246' y='170' width='38' height='40' rx='5' fill='#bf8700'/>
+<text x='265' y='195' text-anchor='middle' font-size='11' font-weight='700' fill='#ffffff'>kv2</text>
+<rect x='344' y='170' width='38' height='40' rx='5' fill='#cf222e'/>
+<text x='363' y='195' text-anchor='middle' font-size='11' font-weight='700' fill='#ffffff'>kv3</text>
+<rect x='442' y='170' width='38' height='40' rx='5' fill='#8250df'/>
+<text x='461' y='195' text-anchor='middle' font-size='11' font-weight='700' fill='#ffffff'>kv4</text>
+<rect x='540' y='170' width='38' height='40' rx='5' fill='#0a7ea4'/>
+<text x='559' y='195' text-anchor='middle' font-size='11' font-weight='700' fill='#ffffff'>kv5</text>
+<rect x='638' y='170' width='38' height='40' rx='5' fill='#d1242f'/>
+<text x='657' y='195' text-anchor='middle' font-size='11' font-weight='700' fill='#ffffff'>kv6</text>
+<rect x='736' y='170' width='38' height='40' rx='5' fill='#57606a'/>
+<text x='755' y='195' text-anchor='middle' font-size='11' font-weight='700' fill='#ffffff'>kv7</text>
+<text x='410' y='240' text-anchor='middle' font-size='12' fill='#1f2328'>KV cache per token: 2 × 16 layers × 8 KV heads × 64 × 2 bytes = 32 KiB  (with 32 KV heads it would be 128 KiB)</text>
+<text x='410' y='260' text-anchor='middle' font-size='12' fill='#57606a'>Toy model: 2 query heads share 1 KV head. The naive path copies each KV head with repeat_interleave;</text>
+<text x='410' y='277' text-anchor='middle' font-size='12' fill='#57606a'>the Triton kernel copies nothing and just reads KV head h // 4.</text></svg>

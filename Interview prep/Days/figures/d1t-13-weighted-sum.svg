@@ -1,0 +1,73 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 820 400' width='820' height='400' font-family='Inter, Helvetica, Arial, sans-serif'><title>Weighted average of V</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='820' height='400' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='410' y='26' text-anchor='middle' font-size='15' font-weight='700' fill='#1f2328'>The output for 'sat' (head 0) is a weighted average of the three V rows</text>
+<text x='100.0' y='64' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328'>V[the]</text>
+<rect x='20' y='90' width='38' height='38' rx='4' fill='rgb(255,150,115)' stroke='#ffffff' stroke-width='2'/>
+<text x='39.0' y='114.0' text-anchor='middle' font-size='12' fill='#1f2328'>2.48</text>
+<rect x='60' y='90' width='38' height='38' rx='4' fill='rgb(255,200,182)' stroke='#ffffff' stroke-width='2'/>
+<text x='79.0' y='114.0' text-anchor='middle' font-size='12' fill='#1f2328'>1.29</text>
+<rect x='100' y='90' width='38' height='38' rx='4' fill='rgb(255,135,95)' stroke='#ffffff' stroke-width='2'/>
+<text x='119.0' y='114.0' text-anchor='middle' font-size='12' fill='#1f2328'>2.85</text>
+<rect x='140' y='90' width='38' height='38' rx='4' fill='rgb(241,245,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='159.0' y='114.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.24</text>
+<text x='200' y='116' font-size='14' font-weight='700' fill='#cf222e'>× 0.053</text>
+<text x='360.0' y='64' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328'></text>
+<rect x='280' y='90' width='38' height='38' rx='4' fill='rgb(255,150,115)' stroke='#ffffff' stroke-width='2'/>
+<text x='299.0' y='114.0' text-anchor='middle' font-size='12' fill='#1f2328'>0.13</text>
+<rect x='320' y='90' width='38' height='38' rx='4' fill='rgb(255,200,182)' stroke='#ffffff' stroke-width='2'/>
+<text x='339.0' y='114.0' text-anchor='middle' font-size='12' fill='#1f2328'>0.07</text>
+<rect x='360' y='90' width='38' height='38' rx='4' fill='rgb(255,135,95)' stroke='#ffffff' stroke-width='2'/>
+<text x='379.0' y='114.0' text-anchor='middle' font-size='12' fill='#1f2328'>0.15</text>
+<rect x='400' y='90' width='38' height='38' rx='4' fill='rgb(241,245,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='419.0' y='114.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.01</text>
+<text x='460' y='116' font-size='22' font-weight='700' fill='#1f2328'>+</text>
+<text x='100.0' y='144' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328'>V[cat]</text>
+<rect x='20' y='170' width='38' height='38' rx='4' fill='rgb(255,213,199)' stroke='#ffffff' stroke-width='2'/>
+<text x='39.0' y='194.0' text-anchor='middle' font-size='12' fill='#1f2328'>1.78</text>
+<rect x='60' y='170' width='38' height='38' rx='4' fill='rgb(255,214,201)' stroke='#ffffff' stroke-width='2'/>
+<text x='79.0' y='194.0' text-anchor='middle' font-size='12' fill='#1f2328'>1.75</text>
+<rect x='100' y='170' width='38' height='38' rx='4' fill='rgb(255,135,95)' stroke='#ffffff' stroke-width='2'/>
+<text x='119.0' y='194.0' text-anchor='middle' font-size='12' fill='#1f2328'>5.18</text>
+<rect x='140' y='170' width='38' height='38' rx='4' fill='rgb(255,200,182)' stroke='#ffffff' stroke-width='2'/>
+<text x='159.0' y='194.0' text-anchor='middle' font-size='12' fill='#1f2328'>2.35</text>
+<text x='200' y='196' font-size='14' font-weight='700' fill='#cf222e'>× 0.021</text>
+<text x='360.0' y='144' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328'></text>
+<rect x='280' y='170' width='38' height='38' rx='4' fill='rgb(255,213,199)' stroke='#ffffff' stroke-width='2'/>
+<text x='299.0' y='194.0' text-anchor='middle' font-size='12' fill='#1f2328'>0.04</text>
+<rect x='320' y='170' width='38' height='38' rx='4' fill='rgb(255,214,201)' stroke='#ffffff' stroke-width='2'/>
+<text x='339.0' y='194.0' text-anchor='middle' font-size='12' fill='#1f2328'>0.04</text>
+<rect x='360' y='170' width='38' height='38' rx='4' fill='rgb(255,135,95)' stroke='#ffffff' stroke-width='2'/>
+<text x='379.0' y='194.0' text-anchor='middle' font-size='12' fill='#1f2328'>0.11</text>
+<rect x='400' y='170' width='38' height='38' rx='4' fill='rgb(255,200,182)' stroke='#ffffff' stroke-width='2'/>
+<text x='419.0' y='194.0' text-anchor='middle' font-size='12' fill='#1f2328'>0.05</text>
+<text x='460' y='196' font-size='22' font-weight='700' fill='#1f2328'>+</text>
+<text x='100.0' y='224' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328'>V[sat]</text>
+<rect x='20' y='250' width='38' height='38' rx='4' fill='rgb(247,250,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='39.0' y='274.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.17</text>
+<rect x='60' y='250' width='38' height='38' rx='4' fill='rgb(225,234,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='79.0' y='274.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.73</text>
+<rect x='100' y='250' width='38' height='38' rx='4' fill='rgb(95,145,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='119.0' y='274.0' text-anchor='middle' font-size='12' fill='#1f2328'>-3.91</text>
+<rect x='140' y='250' width='38' height='38' rx='4' fill='rgb(107,153,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='159.0' y='274.0' text-anchor='middle' font-size='12' fill='#1f2328'>-3.59</text>
+<text x='200' y='276' font-size='14' font-weight='700' fill='#cf222e'>× 0.926</text>
+<text x='360.0' y='224' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328'></text>
+<rect x='280' y='250' width='38' height='38' rx='4' fill='rgb(247,250,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='299.0' y='274.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.16</text>
+<rect x='320' y='250' width='38' height='38' rx='4' fill='rgb(225,234,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='339.0' y='274.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.67</text>
+<rect x='360' y='250' width='38' height='38' rx='4' fill='rgb(95,145,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='379.0' y='274.0' text-anchor='middle' font-size='12' fill='#1f2328'>-3.62</text>
+<rect x='400' y='250' width='38' height='38' rx='4' fill='rgb(107,153,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='419.0' y='274.0' text-anchor='middle' font-size='12' fill='#1f2328'>-3.32</text>
+<line x1='280' y1='296' x2='440' y2='296' stroke='#1f2328' stroke-width='2'/>
+<text x='360.0' y='314' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328'>out[sat], head 0</text>
+<text x='360.0' y='330' text-anchor='middle' font-size='12' fill='#57606a'>sum of the three scaled rows</text>
+<rect x='280' y='340' width='38' height='38' rx='4' fill='rgb(255,254,254)' stroke='#ffffff' stroke-width='2'/>
+<text x='299.0' y='364.0' text-anchor='middle' font-size='12' fill='#1f2328'>0.01</text>
+<rect x='320' y='340' width='38' height='38' rx='4' fill='rgb(227,236,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='339.0' y='364.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.57</text>
+<rect x='360' y='340' width='38' height='38' rx='4' fill='rgb(95,145,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='379.0' y='364.0' text-anchor='middle' font-size='12' fill='#1f2328'>-3.36</text>
+<rect x='400' y='340' width='38' height='38' rx='4' fill='rgb(98,147,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='419.0' y='364.0' text-anchor='middle' font-size='12' fill='#1f2328'>-3.29</text>
+<text x='560' y='360' font-size='12' fill='#57606a'>'sat' puts 93% of its weight on itself,</text>
+<text x='560' y='378' font-size='12' fill='#57606a'>so its output is close to V[sat].</text></svg>

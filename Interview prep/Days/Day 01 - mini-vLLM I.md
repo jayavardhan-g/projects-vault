@@ -500,6 +500,8 @@ belong to nobody yet or to other requests. Attention in 1.8 then reads these row
 
 #### 1.8 Attention, request by request
 
+> [!tip] New to attention? [[#5. Deep dive: attention from scratch, on our three tokens|§5 builds attention from scratch]]: Q, K, V, the score table, why ÷√d, the causal mask, softmax step by step, the weighted average, heads and GQA, and the code line by line.
+
 The batch mixes a prefill (A) with a decode (B), so the fused Triton kernel can't be used (it handles pure decode steps only, Day 3). The naive path runs:
 
 `src/mini_vllm/paged_attention.py:214–222`
@@ -1916,6 +1918,350 @@ why the code can afford float32 here.
 3. **Versus LayerNorm:** no mean subtraction and no bias; cheaper, keeps the direction, works as well.
 4. **Scale invariance:** multiplying a token's vector by any positive number doesn't change the output.
 5. **Placement:** pre-norm. Normalise a copy going **into** each block; the residual stream is never normalised in place. In code: float32, `mean(-1, keepdim=True)`, `rsqrt`, × weight.
+
+---
+
+### 5. Deep dive: attention from scratch, on our three tokens
+
+Step 1.8 is attention, the one place where tokens exchange information. This section builds it from zero. Order:
+
+1. what attention is for;
+2. Query, Key and Value: three roles for one token;
+3. the dot product as "how well do these match?";
+4. the score table for our 3 tokens;
+5. why divide by √d;
+6. the causal mask;
+7. softmax, step by step;
+8. the weighted average of V;
+9. several heads, and grouped-query attention (GQA);
+10. prefill vs decode;
+11. the code, line by line;
+12. common questions;
+13. a check, and the five things to remember.
+
+> [!important] The one sentence to hold on to
+> For every token, attention **scores** all earlier tokens by how well its Query matches their Keys, turns the scores
+> into **weights** with softmax, and returns the **weighted average** of their Values.
+
+#### 5.1 What attention is for
+
+Before attention, each token's vector only knows about **itself**: "sat" knows it's the word *sat*, but not who sat.
+To predict what comes next, "sat" needs information from "cat". Attention is the mechanism that lets each token
+**look back** at the earlier tokens and **pull in** what it needs.
+
+Every other part of a layer (RMSNorm, the MLP) works on each token separately. Attention is the **only** step where
+information moves between tokens.
+
+#### 5.2 Query, Key and Value: three roles for one token
+
+Each token is projected into three vectors (step 1.5):
+
+| vector | role | analogy (a library) |
+|---|---|---|
+| **Query** $q$ | "what am I looking for?" | the question you bring |
+| **Key** $k$ | "what do I contain?", used to be *found* | the label on a book's spine |
+| **Value** $v$ | "what do I hand over if chosen?" | the book's contents |
+
+For "sat": its **query** asks something like "who did this?"; the **key** of "cat" says "I'm a noun, an animal"; the
+**value** of "cat" carries the information that gets copied into "sat" if the match is good.
+
+Keys decide **who gets attention**; values decide **what is passed on**. They're separate because what makes a token
+easy to find isn't the same as what it should contribute.
+
+#### 5.3 The dot product: how well do two vectors match?
+
+$$q \cdot k = \sum_j q_j\,k_j$$
+
+On tiny 2-D vectors:
+- $(1, 0) \cdot (1, 0) = 1$: same direction → **high** score;
+- $(1, 0) \cdot (0, 1) = 0$: perpendicular → **no** match;
+- $(1, 0) \cdot (-1, 0) = -1$: opposite → **negative** score.
+
+So a query scores each key by how much they point the same way. (After RoPE, that "way" also depends on the distance
+between the tokens: section 3.)
+
+#### 5.4 The score table for our 3 tokens
+
+Take **head 0**. Each query row is compared with each key row. For query "sat" and key "the":
+- $q_{\text{sat}} = [1.121, 0.690, -0.827, -1.985]$ (after RoPE);
+- $k_{\text{the}} = [0.816, 0.235, 0.532, 0.505]$;
+- $q \cdot k = 1.121(0.816) + 0.690(0.235) + (-0.827)(0.532) + (-1.985)(0.505) = 0.915 + 0.162 - 0.440 - 1.002 = -0.367$.
+
+Doing this for all 3 × 3 pairs (then dividing by 2, see 5.5) gives the score table:
+
+| query ↓ / key → | the | cat | sat |
+|---|---|---|---|
+| **the** | −0.30 | −0.30 | −4.59 |
+| **cat** | 0.98 | 0.55 | 1.03 |
+| **sat** | −0.18 | −1.11 | **2.67** |
+
+Row = the token that's looking; column = the token being looked at. "sat" matches itself best (2.67).
+
+#### 5.5 Why divide by √d?
+
+The scores are divided by $\sqrt{d}$, where $d$ is the head size: $\sqrt{4} = 2$ in the toy, $\sqrt{64} = 8$ in the
+real model. Why?
+
+**A dot product grows with the number of features.** With random vectors whose features are around ±1, the typical
+size of $q \cdot k$ is about $\sqrt{d}$. Measured on random vectors:
+
+| head size d | typical q·k | after ÷ √d |
+|---|---|---|
+| 4 | 1.96 | 0.98 |
+| 64 | 8.16 | 1.02 |
+| 2048 | 45.18 | 1.00 |
+
+**Big scores break softmax.** Softmax of $[1, 2, 3]$ is $[0.09, 0.24, 0.67]$: a soft preference. Softmax of the same
+scores ×8, $[8, 16, 24]$, is $[0.00, 0.0003, 0.9997]$: nearly all weight on one token, with almost no gradient left for
+the others to learn from. Dividing by √d keeps scores around ±1 whatever the head size, so softmax stays "soft".
+
+#### 5.6 The causal mask: no peeking at the future
+
+A language model predicts the **next** token. While processing "cat", it must not use "sat", because when it
+generates text, "sat" doesn't exist yet. So each token may look only at itself and **earlier** tokens:
+
+| query ↓ / key → | the | cat | sat |
+|---|---|---|---|
+| **the** | ✓ | ✗ | ✗ |
+| **cat** | ✓ | ✓ | ✗ |
+| **sat** | ✓ | ✓ | ✓ |
+
+The ✗ cells are set to **−∞** before softmax. Since $e^{-\infty} = 0$, they end up with weight exactly 0.
+
+Why −∞ and not 0? A score of 0 still gives a weight of $e^0 = 1$ before normalising; it would still get attention.
+Only −∞ removes a token completely.
+
+#### 5.7 Softmax, step by step
+
+Softmax turns a row of scores into weights that are all positive and sum to 1:
+
+$$\text{softmax}(s)_j = \frac{e^{s_j}}{\sum_k e^{s_k}}$$
+
+On the "sat" row of head 0, $s = [-0.18, -1.11, 2.67]$:
+1. **Subtract the max** (2.67): $[-2.85, -3.78, 0.00]$. This doesn't change the result, because the same $e^{-2.67}$ factor appears in the top and the bottom and cancels. But it keeps $e^{s}$ from overflowing when scores are large.
+2. **Exponentiate:** $[e^{-2.85}, e^{-3.78}, e^{0}] = [0.058, 0.023, 1.000]$.
+3. **Sum:** $0.058 + 0.023 + 1.000 = 1.080$.
+4. **Divide:** $[0.058, 0.023, 1.000] / 1.080 = [\mathbf{0.053},\ \mathbf{0.021},\ \mathbf{0.926}]$.
+
+![[d1t-12-softmax.svg]]
+
+The whole weight table for head 0 (each row sums to 1; masked cells are 0):
+
+| query ↓ / key → | the | cat | sat |
+|---|---|---|---|
+| **the** | 1.00 | 0 | 0 |
+| **cat** | 0.60 | 0.40 | 0 |
+| **sat** | 0.05 | 0.02 | 0.93 |
+
+"the" can only see itself, so its weight is 1.00 on itself.
+
+#### 5.8 The weighted average of V
+
+The output for each token is its weights times the V rows:
+
+$$\text{out}_i = \sum_j w_{ij}\,v_j$$
+
+For "sat": $0.053 \cdot v_{\text{the}} + 0.021 \cdot v_{\text{cat}} + 0.926 \cdot v_{\text{sat}}$. Feature by feature:
+
+| feature | 0.053 × V[the] | 0.021 × V[cat] | 0.926 × V[sat] | out[sat] |
+|---|---|---|---|---|
+| 0 | 0.053 × 2.48 = 0.13 | 0.021 × 1.78 = 0.04 | 0.926 × −0.17 = −0.16 | **0.01** |
+| 1 | 0.053 × 1.29 = 0.07 | 0.021 × 1.75 = 0.04 | 0.926 × −0.73 = −0.67 | **−0.57** |
+| 2 | 0.053 × 2.85 = 0.15 | 0.021 × 5.18 = 0.11 | 0.926 × −3.91 = −3.62 | **−3.36** |
+| 3 | 0.053 × −0.24 = −0.01 | 0.021 × 2.35 = 0.05 | 0.926 × −3.59 = −3.32 | **−3.29** |
+
+![[d1t-13-weighted-sum.svg]]
+
+The output always lies "between" the value vectors, pulled towards those with the biggest weights.
+
+#### 5.9 Several heads, and grouped-query attention
+
+**Why several heads?** One set of weights can express only one kind of relationship at a time. With several heads,
+each with its own Q, K and V projections, one head can track "who did the action" while another tracks "the previous
+word". In the toy, head 1 weights "sat"'s row as $[0.27, 0.32, 0.41]$: a much more spread-out pattern than head 0's
+$[0.05, 0.02, 0.93]$. The heads' outputs are concatenated (step 1.9) and mixed by `o_proj`.
+
+**Grouped-query attention (GQA).** Llama-3.2-1B has **32 query heads** but only **8 KV heads**. Each KV head is shared
+by a group of 4 query heads: query head $h$ uses KV head $h // 4$.
+
+![[d1t-14-gqa.svg]]
+
+Why? The KV cache stores K and V for every past token, and it dominates serving memory (Day 1's whole topic). With 8
+KV heads instead of 32, the cache is **4× smaller**: 32 KiB per token instead of 128 KiB. That means 4× more tokens fit in
+GPU memory, so more requests fit in a batch. The quality cost is small, because the 32 queries can still ask different
+questions of the shared keys.
+
+#### 5.10 Prefill vs decode
+
+The same code handles two very different shapes:
+
+| | prefill (request A: 5 new tokens) | decode (request B: 1 new token, 13 in total) |
+|---|---|---|
+| queries | `[5, 32, 64]` | `[1, 32, 64]` |
+| keys and values | `[5, 32, 64]` | `[13, 32, 64]` |
+| scores | `[32, 5, 5]`: a 5 × 5 table per head | `[32, 1, 13]`: one row per head |
+| mask | triangular | all allowed |
+| cost | grows with $T^2$ | grows with $T$ |
+
+In decode, the new token is the **last** one, so every earlier token is in its past and nothing needs masking. That's
+why the mask code uses **absolute** positions (5.11).
+
+#### 5.11 The code, line by line
+
+**The loop over requests** (the naive path, used whenever the batch contains a prefill):
+
+`src/mini_vllm/paged_attention.py:212–226`
+```python
+outputs = []
+offset = 0
+for blocks, q_len, ctx_len in zip(block_tables, query_lens, context_lens):
+    q = query[offset : offset + q_len]
+    offset += q_len
+    if q_len == 0:
+        continue
+    k, v = gather_kv(cache, layer, blocks, ctx_len)
+    k = _repeat_kv_heads(k, num_q_heads)
+    v = _repeat_kv_heads(v, num_q_heads)
+    outputs.append(attention_scores(q, k, v, scale, compute_dtype))
+
+if not outputs:
+    return query.new_zeros((0, num_q_heads, query.shape[-1]))
+return torch.cat(outputs, dim=0)
+```
+
+- `query` holds every request's queries, concatenated: `[T, 32, 64]`. `offset` walks through it, request by request.
+- `gather_kv` collects **this** request's K and V from its scattered cache blocks: `[ctx_len, 8, 64]` (§2).
+- `_repeat_kv_heads` expands 8 KV heads to 32 (GQA).
+- `attention_scores` does the maths below; the results are concatenated back to `[T, 32, 64]`.
+
+**Expanding KV heads:**
+
+`src/mini_vllm/paged_attention.py:112–119`
+```python
+num_kv_heads = x.shape[1]
+if num_q_heads == num_kv_heads:
+    return x
+if num_q_heads % num_kv_heads != 0:
+    raise ValueError(
+        f"num_q_heads {num_q_heads} is not a multiple of num_kv_heads {num_kv_heads}"
+    )
+return x.repeat_interleave(num_q_heads // num_kv_heads, dim=1)
+```
+
+`repeat_interleave(4, dim=1)` turns KV heads `[0, 1, …, 7]` into `[0, 0, 0, 0, 1, 1, 1, 1, …, 7, 7, 7, 7]`, so position
+$h$ holds KV head $h // 4$. `repeat` would give `[0, 1, …, 7, 0, 1, …, 7, …]` and pair query head 1 with KV head 1:
+wrong (the docstring warns about exactly this).
+
+**The attention maths:**
+
+`src/mini_vllm/paged_attention.py:157–169`
+```python
+query_len, num_heads, head_dim = query.shape
+context_len = key.shape[0]
+
+q = query.transpose(0, 1).to(compute_dtype)          # [heads, q_len, dim]
+k = key.transpose(0, 1).to(compute_dtype)            # [heads, ctx_len, dim]
+v = value.transpose(0, 1).to(compute_dtype)
+
+scores = torch.matmul(q, k.transpose(1, 2)) * scale  # [heads, q_len, ctx_len]
+mask = causal_mask(query_len, context_len, query.device)
+scores = scores.masked_fill(~mask.unsqueeze(0), float("-inf"))
+weights = torch.softmax(scores, dim=-1)
+out = torch.matmul(weights, v)                       # [heads, q_len, dim]
+return out.transpose(0, 1).to(query.dtype)
+```
+
+| line | code | shape (request B, decode) | what it does |
+|---|---|---|---|
+| 160–162 | `.transpose(0, 1)` | q `[32, 1, 64]`, k, v `[32, 13, 64]` | put heads first, so each head is a separate matrix |
+| 164 | `q @ k.transpose(1, 2) * scale` | `[32, 1, 13]` | every query · every key, ÷ 8 (5.4, 5.5) |
+| 165–166 | `masked_fill(~mask, -inf)` | `[32, 1, 13]` | hide future keys (5.6) |
+| 167 | `softmax(dim=-1)` | `[32, 1, 13]` | each row → weights summing to 1 (5.7) |
+| 168 | `weights @ v` | `[32, 1, 64]` | weighted average of the values (5.8) |
+| 169 | `.transpose(0, 1)` | `[1, 32, 64]` | back to tokens first |
+
+Softmax runs in float32 (`compute_dtype`), because exponentials in bfloat16 lose too much precision.
+
+**The causal mask:**
+
+`src/mini_vllm/paged_attention.py:135–137`
+```python
+q_pos = torch.arange(context_len - query_len, context_len, device=device).unsqueeze(1)
+k_pos = torch.arange(context_len, device=device).unsqueeze(0)
+return k_pos <= q_pos
+```
+
+- `q_pos` = the absolute positions of the queries; `k_pos` = the positions of all keys; `k_pos <= q_pos` broadcasts to a `[query_len, context_len]` table of True/False.
+- Our 3-token prefill: `q_pos = [0, 1, 2]`, `k_pos = [0, 1, 2]` → the triangle of 5.6.
+- Request B's decode: `q_pos = [12]`, `k_pos = [0 … 12]` → all 13 True.
+
+Using `context_len − query_len + i` (absolute) rather than `i` is what makes decode correct: with the bare index `i = 0`,
+B's only query would see just key 0.
+
+#### 5.12 Questions people usually ask next
+
+##### "Why softmax? Why not just divide each score by the row total?"
+
+Scores can be negative, and dividing by a total of mixed signs makes no sense. $e^{s}$ is always positive and keeps the
+ordering (a higher score always gets a higher weight). It also makes the differences between scores matter
+multiplicatively, which helps the model focus.
+
+##### "Why separate K and V? Why not use the same vector for both?"
+
+What makes a token easy to *find* isn't the same as what it should *pass on*. A pronoun's key might say "I refer to
+something earlier", while its value carries the content of what it refers to. Separate projections let the model learn
+both.
+
+##### "What does the attention cost?"
+
+For a prefill of $T$ tokens, every token scores every earlier token: about $T^2/2$ dot products per head per layer.
+That's why long prompts are expensive, and why Day 2's prefix cache helps most at long contexts. For decode, one new
+token scores $T$ keys: linear in $T$, but it must **read** every cached key and value from memory. That's why decode
+is memory-bound.
+
+##### "Why √d and not d?"
+
+The typical size of a dot product grows with $\sqrt{d}$, not $d$ (5.5). Dividing by $d$ would over-shrink the scores
+and flatten every softmax towards uniform.
+
+##### "What does GQA lose?"
+
+Fewer distinct keys and values: 4 query heads must share each one. Experiments (the GQA paper, Ainslie et al., 2023)
+show quality close to full multi-head attention, while the KV cache, and the memory traffic of every decode step,
+shrink 4×.
+
+#### 5.13 Check your understanding
+
+1. Which step of a layer is the only one where tokens exchange information?
+2. In one phrase each: what are Q, K and V for?
+3. Compute $(2, 1) \cdot (1, 3)$.
+4. Why divide the scores by √d? What is √d in the real model?
+5. Why are masked scores set to −∞ rather than 0?
+6. Softmax of $[0, 0]$? Of $[0, -\infty]$?
+7. "the" can only attend to itself. What is its output?
+8. With 32 query heads and 8 KV heads, which KV head does query head 13 use?
+9. Shapes of the scores for a decode step with 300 tokens of context?
+10. Why does the mask use absolute positions?
+
+> [!success]- Answers
+> 1. Attention.
+> 2. Q: what I'm looking for. K: what I offer, used to be found. V: what I pass on if chosen.
+> 3. 2·1 + 1·3 = 5.
+> 4. Dot products grow like √d; without it softmax saturates onto one token. √64 = 8.
+> 5. A score of 0 still gets weight e⁰ = 1 before normalising; only −∞ gives weight 0.
+> 6. [0.5, 0.5]; [1, 0].
+> 7. Exactly its own value vector: weight 1.0 on itself.
+> 8. 13 // 4 = 3.
+> 9. [32, 1, 300]: 32 heads, 1 query, 300 keys.
+> 10. A decode step's single query sits at the last position; with the bare index it would see only key 0.
+
+#### 5.14 The five things to remember
+
+1. **Purpose:** the only step where a token gathers information from earlier tokens.
+2. **Formula:** $\text{softmax}\big(QK^{\top}/\sqrt{d} + \text{mask}\big)\,V$, per head.
+3. **Scaling and mask:** ÷√d keeps softmax soft; −∞ on future keys keeps the model causal.
+4. **Output:** a weighted average of value vectors; the weights come from query–key matches.
+5. **Heads and GQA:** several heads learn different relationships. Llama-3.2-1B shares 8 KV heads among 32 query heads, making the KV cache 4× smaller. The code expands them with `repeat_interleave` (naive path) or indexes `h // 4` (Triton).
 
 ## C. Rebuild it yourself (block 7, 75 min)
 
