@@ -1,0 +1,16 @@
+/* Interview-prep notes: make every Mermaid diagram use the full width of the note.
+   Obsidian normally shows a diagram at its natural size and shrinks it when it is wider than the
+   column, which makes the text tiny. This stretches each diagram to the column width instead,
+   and caps the height so a tall one still fits on one screen. */
+.markdown-rendered .mermaid,
+.markdown-source-view .mermaid {
+  width: 100%;
+  text-align: center;
+}
+.markdown-rendered .mermaid svg,
+.markdown-source-view .mermaid svg {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: 85vh;
+}

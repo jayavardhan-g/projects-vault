@@ -119,7 +119,7 @@ The KV cache of a request grows by 32 KiB with every token, and you do not know 
 
 ### B0. The model (block 2, 45 min)
 
-> [!tip] The code for this block, explained line by line: [[#Code, explained]] §4 (one token through one layer).
+> [!tip] The code for this block, explained line by line: [[#1. Trace: one forward pass, shape by shape|Code, explained §1: the shape-by-shape trace]].
 
 `model/llama.py`: follow one token through embedding → one decoder layer (RMSNorm → Q/K/V projections → RoPE →
 attention with 32 query and 8 KV heads → output projection → SwiGLU MLP) → logits. Write down every tensor shape (hidden
@@ -168,7 +168,7 @@ Use the figure from the prerequisite as your map, and fill in the right-hand col
 
 ### B1. The memory manager (block 6, 75 min, deep)
 
-> [!tip] The code for this block, explained line by line: [[#Code, explained]] §1 allocator, §2 block table, §3 KV cache, §5 how they connect.
+> [!tip] The code for this block, explained line by line: [[#2. Deep dive: the paged KV cache|Code, explained §2: the paged KV cache deep dive]] (2a allocator, 2b block table, 2c cache tensor, 2d write and read, 2e who builds the slots).
 
 How the three files fit together:
 
@@ -211,7 +211,7 @@ Then read README *Phase 1: paged memory manager* (line 602) and *Fragmentation* 
 
 ## Code, explained
 
-Read this **with the files open**. Each part has a small figure of the pipeline, then the exact code (copied from the repo at the commit named below, so the line numbers match), then what it does and how it hands off to the next piece.
+Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 Repo `vLLMmini`, branch `main` (`3679394`). Read this **with the files open**:
 each section has one small figure of the pipeline, then the exact code in reading order, then what each piece does
@@ -221,25 +221,347 @@ and how it hands off to the next.
 positions into *slot numbers* → the model *writes* K,V into those slots and *reads* them back by block table.
 
 ```mermaid
-flowchart LR
-  S["Scheduler._prepare<br/>scheduler.py:599"] -->|append_tokens n| BT["BlockTable<br/>block_table.py:29"]
-  BT -->|allocate_many k| BA["BlockAllocator<br/>block_allocator.py:37"]
-  BT -->|slot_index p| S
-  S -->|tokens, positions, slots| M["PagedLlama.forward<br/>llama.py:232"]
-  M -->|"k_flat[slots] = k"| KV[("PagedKVCache<br/>kv_cache.py:116")]
-  KV -->|gather by block ids| M
+flowchart TB
+  S["Scheduler._prepare  scheduler.py:599<br/>decides how many tokens this step"]
+  S -->|"append_tokens(n)"| BT["BlockTable, one per request<br/>block_table.py:29"]
+  BT -->|"allocate_many(k)"| BA["BlockAllocator  block_allocator.py:37<br/>free list + refcounts"]
+  BT -->|"slot_index(p) for each token"| SL["slot_mapping<br/>slot = block_id × B + offset"]
+  SL --> M["PagedLlama.forward  llama.py:232"]
+  M -->|"write: k_flat[slots] = k"| KV[("PagedKVCache  kv_cache.py:116<br/>K, V per layer")]
+  KV -->|"read: gather by block table"| M
 ```
+
+### 1. Trace: one forward pass, shape by shape
+
+**The example.** One engine step that mixes two requests:
+- **A** is prefilling its **5** prompt tokens (positions 0–4);
+- **B** is decoding **1** token at position 12 (its context is 13 tokens).
+
+So the step carries **T = 6 tokens** in total. Model sizes (Llama-3.2-1B): hidden **2048**, **32** query heads and **8**
+KV heads of size **64**, MLP width **8192**, vocabulary **128,256**, **16** layers.
+
+```mermaid
+flowchart TB
+  IN["inputs from the scheduler<br/>input_ids [6] · positions [6] · slot_mapping [6]"] --> EMB["1.1 embed_tokens  :264<br/>[6] → hidden [6, 2048]"]
+  IN --> ROT["1.2 rotary(positions)  :265<br/>cos, sin [6, 64]"]
+  EMB --> NORM1["1.4 RMSNorm  :281<br/>[6, 2048] → [6, 2048]"]
+  NORM1 --> QKV["1.5 q / k / v projections  :283–285<br/>q [6, 32, 64] · k, v [6, 8, 64]"]
+  ROT --> ROPE["1.6 apply_rope  :286<br/>rotate q and k by position"]
+  QKV --> ROPE
+  ROPE -->|"k, v"| WR["1.7 write_kv_to_cache  :290<br/>BIG CONCEPT: see section 2"]
+  ROPE -->|"q"| ATT["1.8 attention  :292–297<br/>per request, over its cached K, V<br/>→ [6, 32, 64]"]
+  WR --> ATT
+  ATT --> OPJ["1.9 merge heads + o_proj + residual  :298–299<br/>→ [6, 2048]"]
+  OPJ --> MLP["1.10 RMSNorm → SwiGLU MLP + residual  :301–306<br/>[6, 2048] → [6, 8192] → [6, 2048]"]
+  MLP -->|"repeat for 16 layers  (1.3)"| NORM1
+  MLP --> HEAD["1.11 final norm, keep last token per request, lm_head  :308–311<br/>[6, 2048] → [2, 2048] → [2, 128256]"]
+  HEAD --> TOK["1.12 argmax  engine.py:149<br/>2 next tokens"]
+```
+
+#### 1.0 What comes in
+
+The engine flattens every request's tokens into one list, so there is no batch dimension and no padding.
+
+`src/mini_vllm/engine.py:122–135`
+```python
+token_ids, positions, slots, query_lens = [], [], [], []
+for scheduled in output.scheduled:
+    token_ids.extend(scheduled.token_ids)
+    positions.extend(scheduled.positions)
+    slots.extend(scheduled.slot_mapping)
+    query_lens.append(scheduled.num_tokens)
+
+# Logits are needed only at each request's final token; the vocab
+# projection is 128256 wide, so computing it for every prefill token
+# would dominate an iteration containing a long prompt.
+logits_indices, offset = [], 0
+for q_len in query_lens:
+    offset += q_len
+    logits_indices.append(offset - 1)
+```
+
+| Input | Value for our step | Shape |
+|---|---|---|
+| `input_ids` | A's 5 prompt tokens, then B's 1 token | `[6]` |
+| `positions` | `[0, 1, 2, 3, 4, 12]` (each token's position **in its own request**) | `[6]` |
+| `slot_mapping` | where each token's K, V will be stored (§2) | `[6]` |
+| `query_lens` | `[5, 1]`: how many of the 6 tokens belong to each request | per request |
+| `context_lens` | `[5, 13]`: total tokens each request has, including this step's | per request |
+| `logits_indices` | `[4, 5]`: the last token of each request | `[2]` |
+
+#### 1.1 Embedding: ids → vectors
+
+`src/mini_vllm/model/llama.py:264–264`
+```python
+hidden = self.embed_tokens(input_ids)
+```
+
+- **In:** `input_ids [6]` (integers). **Out:** `hidden [6, 2048]`.
+- **How it works:** the embedding is a lookup table of shape `[128256, 2048]`. Row `i` is the learned vector for token `i`. Embedding = pick 6 rows. No arithmetic.
+
+#### 1.2 RoPE angles, computed once for all layers
+
+`src/mini_vllm/model/llama.py:115–117`
+```python
+inv_freq = 1.0 / (
+    base ** (torch.arange(0, head_dim, 2, device=device, dtype=torch.float32) / head_dim)
+)
+```
+
+`src/mini_vllm/model/llama.py:144–148`
+```python
+def forward(self, positions: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """positions: [num_tokens] absolute positions -> (cos, sin) [num_tokens, head_dim]."""
+    freqs = positions.to(torch.float32).unsqueeze(1) * self.inv_freq.unsqueeze(0)
+    emb = torch.cat((freqs, freqs), dim=-1)
+    return emb.cos().to(self._dtype), emb.sin().to(self._dtype)
+```
+
+- **In:** `positions [6]`. **Out:** `cos, sin [6, 64]`.
+- **How it works:** RoPE (rotary position embedding) encodes position by **rotating** pairs of features. There are 32 frequencies, `inv_freq[i] = 1 / base^(2i/64)` with `base = 500,000`. Token at position `p` gets angle `p × inv_freq[i]` for pair `i`. High-frequency pairs spin fast (they encode fine, local order); low-frequency pairs spin slowly (coarse, long-range order). Llama 3 additionally slows the lowest frequencies (`_apply_llama3_scaling`, `:124–142`) to handle long contexts.
+- `freqs [6, 32]` is duplicated to `[6, 64]` so it lines up with the two halves of each head (see 1.6).
+- It's computed **once per forward pass**, because every layer uses the same angles.
+
+#### 1.3 The layer loop
+
+`src/mini_vllm/model/llama.py:275–281`
+```python
+for index, layer in enumerate(self.layers):
+    input_norm, post_norm = self._layer_norms(layer)
+    attn = layer.self_attn
+    total_tokens = hidden.shape[0]
+
+    residual = hidden
+    x = input_norm(hidden)
+```
+
+Steps 1.4–1.10 run **16 times**, once per decoder layer, with different weights each time. `residual = hidden` saves the layer's input for the skip connection in 1.9.
+
+#### 1.4 RMSNorm: rescale each token's vector
+
+`src/mini_vllm/model/llama.py:60–65`
+```python
+def forward(self, x: torch.Tensor) -> torch.Tensor:
+    dtype = x.dtype
+    x = x.to(torch.float32)
+    variance = x.pow(2).mean(-1, keepdim=True)
+    x = x * torch.rsqrt(variance + self.eps)
+    return self.weight * x.to(dtype)
+```
+
+- **In and out:** `[6, 2048]`. Shape unchanged.
+- **How it works**, per token (per row of 2048 numbers):
+  1. `variance = mean(x²)` over the 2048 features (line 63);
+  2. `x = x / sqrt(variance + ε)`: now the row has root-mean-square 1 (line 64);
+  3. multiply by a learned per-feature weight `w` (line 65).
+
+  So `RMSNorm(x) = w ⊙ x / sqrt(mean(x²) + ε)`. Unlike LayerNorm, it **doesn't subtract the mean** and has **no bias**: cheaper, and it works as well for LLMs.
+- **Why:** it keeps the scale of activations stable going into attention, whatever the earlier layers did. It's computed in **float32** (line 62) because bf16 rounding here changed results enough to break the layer-by-layer comparison with Hugging Face.
+
+#### 1.5 Project into queries, keys and values
+
+`src/mini_vllm/model/llama.py:283–285`
+```python
+q = attn.q_proj(x).view(total_tokens, self.num_q_heads, self.head_dim)
+k = attn.k_proj(x).view(total_tokens, self.num_kv_heads, self.head_dim)
+v = attn.v_proj(x).view(total_tokens, self.num_kv_heads, self.head_dim)
+```
+
+- **In:** `x [6, 2048]`.
+- `q_proj` is a `[2048 → 2048]` matrix: `[6, 2048] → [6, 2048]`, then `.view(6, 32, 64)`: **32 query heads of 64 features**.
+- `k_proj`, `v_proj` are `[2048 → 512]`: `[6, 512] → .view(6, 8, 64)`: **only 8 KV heads**. That's **grouped-query attention (GQA)**: each KV head is shared by 4 query heads, so the KV cache is 4× smaller.
+- `.view` only reinterprets the 2048 numbers as 32 × 64; it doesn't copy.
+
+#### 1.6 Rotate q and k by position
+
+`src/mini_vllm/model/llama.py:151–154`
+```python
+def rotate_half(x: torch.Tensor) -> torch.Tensor:
+    """Split the last dim in half and rotate: [x1, x2] -> [-x2, x1]."""
+    half = x.shape[-1] // 2
+    return torch.cat((-x[..., half:], x[..., :half]), dim=-1)
+```
+
+`src/mini_vllm/model/llama.py:165–167`
+```python
+cos = cos.unsqueeze(1)
+sin = sin.unsqueeze(1)
+return (q * cos + rotate_half(q) * sin), (k * cos + rotate_half(k) * sin)
+```
+
+- **In:** `q [6, 32, 64]`, `k [6, 8, 64]`, `cos, sin [6, 64]`. **Out:** the same shapes, rotated. **v is not rotated.**
+- **How it works:** feature `j` is paired with feature `j + 32`. For a pair `(a, b)` and angle θ: `a' = a·cos θ − b·sin θ`, `b' = b·cos θ + a·sin θ`. That's exactly `x·cos + rotate_half(x)·sin`, because `rotate_half` turns `[a, b]` into `[−b, a]`.
+- **Why it works:** after rotating q by angle `p_q·ω` and k by `p_k·ω`, their dot product depends only on `p_q − p_k`. So attention scores see **relative** position.
+- `cos.unsqueeze(1)` → `[6, 1, 64]`, so the same angles broadcast over all heads.
+
+#### 1.7 Store this step's K and V: the paged cache
+
+`src/mini_vllm/model/llama.py:288–290`
+```python
+# Write this step's KV before attending, so a sequence attends to
+# its own new tokens (context_lens already counts them).
+write_kv_to_cache(cache, index, slot_mapping, k, v)
+```
+
+- **In:** `k, v [6, 8, 64]` and `slot_mapping [6]`. **Out:** nothing returned; 6 rows of this layer's cache are written.
+- `write_kv_to_cache` does `k_flat[slots] = k` (`paged_attention.py:64`): token `i`'s K goes to row `slots[i]` of a `[num_blocks × 16, 8, 64]` tensor.
+- **Big concept.** Where those slot numbers come from (block tables, the allocator, why memory is split into 16-token blocks) is [[#2. Deep dive: the paged KV cache|§2. Deep dive: the paged KV cache]]. Read it after this trace.
+- **Order matters:** the write happens **before** attention, so each new token can attend to itself.
+
+#### 1.8 Attention, request by request
+
+The batch mixes a prefill (A) with a decode (B), so the fused Triton kernel can't be used (it handles pure decode steps only, Day 3). The naive path runs:
+
+`src/mini_vllm/paged_attention.py:214–222`
+```python
+for blocks, q_len, ctx_len in zip(block_tables, query_lens, context_lens):
+    q = query[offset : offset + q_len]
+    offset += q_len
+    if q_len == 0:
+        continue
+    k, v = gather_kv(cache, layer, blocks, ctx_len)
+    k = _repeat_kv_heads(k, num_q_heads)
+    v = _repeat_kv_heads(v, num_q_heads)
+    outputs.append(attention_scores(q, k, v, scale, compute_dtype))
+```
+
+It loops over the requests. For each one:
+
+**a. Gather its K, V from the cache** (`gather_kv`, `paged_attention.py:85–100`, also in §2). A: `[5, 8, 64]`. B: all **13** of its tokens, `[13, 8, 64]`.
+
+**b. Expand 8 KV heads to 32** (GQA):
+
+`src/mini_vllm/paged_attention.py:119–119`
+```python
+return x.repeat_interleave(num_q_heads // num_kv_heads, dim=1)
+```
+
+`repeat_interleave(4)` turns KV heads `[0, 1, …, 7]` into `[0, 0, 0, 0, 1, 1, 1, 1, …]`, so query head `h` meets KV head `h // 4`. A: `[5, 32, 64]`. B: `[13, 32, 64]`.
+
+**c. The attention maths:**
+
+`src/mini_vllm/paged_attention.py:160–169`
+```python
+q = query.transpose(0, 1).to(compute_dtype)          # [heads, q_len, dim]
+k = key.transpose(0, 1).to(compute_dtype)            # [heads, ctx_len, dim]
+v = value.transpose(0, 1).to(compute_dtype)
+
+scores = torch.matmul(q, k.transpose(1, 2)) * scale  # [heads, q_len, ctx_len]
+mask = causal_mask(query_len, context_len, query.device)
+scores = scores.masked_fill(~mask.unsqueeze(0), float("-inf"))
+weights = torch.softmax(scores, dim=-1)
+out = torch.matmul(weights, v)                       # [heads, q_len, dim]
+return out.transpose(0, 1).to(query.dtype)
+```
+
+`src/mini_vllm/paged_attention.py:135–137`
+```python
+q_pos = torch.arange(context_len - query_len, context_len, device=device).unsqueeze(1)
+k_pos = torch.arange(context_len, device=device).unsqueeze(0)
+return k_pos <= q_pos
+```
+
+| Step | Request A (prefill) | Request B (decode) |
+|---|---|---|
+| move heads first (`transpose`) | q `[32, 5, 64]`, k `[32, 5, 64]` | q `[32, 1, 64]`, k `[32, 13, 64]` |
+| `scores = q·kᵀ × 1/√64` | `[32, 5, 5]` | `[32, 1, 13]` |
+| causal mask | query at position i sees keys 0..i (a triangle) | its one query is at position 12: sees all 13 keys |
+| `softmax` over the last axis | each row sums to 1 | each row sums to 1 |
+| `weights · v` | `[32, 5, 64]` | `[32, 1, 64]` |
+| transpose back | `[5, 32, 64]` | `[1, 32, 64]` |
+
+- **How attention works:** for each head, each query scores every allowed key by dot product (how relevant is that token to me?). Dividing by √64 = 8 keeps the scores' scale independent of head size, so softmax doesn't saturate. Softmax turns the scores into weights that sum to 1, and the output is the weighted average of the value vectors.
+- **The mask uses absolute positions** (`context_len − query_len + i`, line 135). That's why B's single query correctly sees its whole history rather than just one key.
+- The results are concatenated in request order: `[5 + 1, 32, 64] = [6, 32, 64]`.
+
+#### 1.9 Merge the heads, project, add the residual
+
+`src/mini_vllm/model/llama.py:298–299`
+```python
+out = out.reshape(total_tokens, self.num_q_heads * self.head_dim)
+hidden = residual + attn.o_proj(out)
+```
+
+- `reshape(6, 32 × 64)`: the 32 heads' outputs side by side → `[6, 2048]`.
+- `o_proj` (`[2048 → 2048]`) mixes information across heads.
+- `residual + …`: **skip connection**. The layer adds a correction to its input instead of replacing it, which keeps gradients healthy through 16 layers.
+
+#### 1.10 The MLP: SwiGLU
+
+`src/mini_vllm/model/llama.py:301–306`
+```python
+residual = hidden
+x = post_norm(hidden)
+mlp = layer.mlp
+hidden = residual + mlp.down_proj(
+    nn.functional.silu(mlp.gate_proj(x)) * mlp.up_proj(x)
+)
+```
+
+- `post_norm`: a second RMSNorm (same maths as 1.4).
+- `gate_proj(x)` and `up_proj(x)`: two `[2048 → 8192]` projections → both `[6, 8192]`.
+- `silu(g) = g · sigmoid(g)` is a smooth version of ReLU. The gating comes from the **product**: `silu(gate(x)) * up(x)` scales each of the 8192 features of the up branch by the gate branch, so the network learns, per token, which features pass and how strongly. That's SwiGLU (a gated linear unit with SiLU).
+- `down_proj` (`[8192 → 2048]`) brings it back to `[6, 2048]`; add the second residual.
+- This is the end of one layer. Go back to 1.4 with the new `hidden`, **16 times in total**.
+
+#### 1.11 From the last hidden state to logits
+
+`src/mini_vllm/model/llama.py:308–311`
+```python
+hidden = self.norm(hidden)
+if logits_indices is not None:
+    hidden = hidden[logits_indices]
+return self.lm_head(hidden)
+```
+
+- Final RMSNorm: `[6, 2048]`.
+- `hidden[logits_indices]`: keep rows `[4, 5]` only, the last token of A and of B → `[2, 2048]`. The other 4 prefill positions don't need predictions.
+- `lm_head` (`[2048 → 128256]`): a score for every vocabulary entry → `[2, 128256]`. Doing this for only 2 rows instead of 6 matters, because this matrix is the biggest single multiply in the model.
+
+#### 1.12 Pick the next tokens
+
+`src/mini_vllm/engine.py:149–150`
+```python
+sampled = logits.argmax(dim=-1).tolist()
+return self.scheduler.update(output, sampled)
+```
+
+- `argmax` over 128,256 scores per row (greedy decoding) → **2 token ids**: A's first generated token and B's next one. `scheduler.update` appends them and decides who has finished (Day 2).
+
+**Check yourself:** for a pure decode step with 32 requests, what are the shapes of `hidden` after 1.1, of `scores` for one request with 300 tokens of context, and of the final logits? (*`[32, 2048]`; `[32, 1, 300]`; `[32, 128256]`.*)
 
 ---
 
-### 1. The memory pool: `BlockAllocator`
+### 2. Deep dive: the paged KV cache
+
+This is the big concept behind step 1.7 of the trace: **where `slot_mapping` comes from**, and how K, V are stored in fixed 16-token blocks instead of one long buffer per request. Read it in order: the memory flow, then the three classes, then how the model writes and reads the cache, then who builds the slots.
+
+#### The memory flow, step by step
+
+Follow one request through today's code. To keep the numbers small, use block size **B = 4** and a fresh pool of
+**8 blocks** (the real code uses B = 16 and ~76,000 blocks). Request A has a **5-token prompt**.
+
+1. **The scheduler admits A** and calls `_prepare(A)` (`scheduler.py:599`), which calls `table.append_tokens(5)` (`block_table.py:106`).
+2. **How many blocks?** `blocks_needed_for(5)` (`:75`): ceil(5 / 4) = 2 blocks, minus 0 already held = **2**.
+3. **Take them, all or nothing.** `allocate_many(2)` (`block_allocator.py:80`) checks 2 ≤ 8 free, then `pop()`s twice. The free list is `[7, 6, …, 0]`, so it hands out **0, then 1**, each with refcount 1. A's table is now `[0, 1]`.
+4. **Positions → slots.** `_prepare` asks `slot_index(p)` (`block_table.py:137`) for positions 0–4: positions 0–3 are logical block 0 → physical 0 → slots 0–3; position 4 is logical block 1, offset 0 → physical 1 → slot 1 × 4 + 0 = **4**. So `slot_mapping = [0, 1, 2, 3, 4]`.
+5. **One forward pass.** The engine passes `input_ids` (5 tokens), `positions [0..4]` and `slot_mapping` to `PagedLlama.forward` (`llama.py:232`).
+6. **Inside every one of the 16 layers:** compute q, k, v (`:283–285`), rotate q and k (`:286`), then `write_kv_to_cache` (`:290` → `paged_attention.py:61–65`) stores token i's K and V at row `slots[i]`. Attention then `gather_kv`s blocks `[0, 1]` back into token order and cuts it to 5 tokens (`paged_attention.py:85–100`).
+7. **Logits for the last token only** (`llama.py:308–311`), so 1 new token is sampled.
+8. **Next step (decode):** `append_tokens(1)`: 6 tokens still fit in 2 blocks (capacity 8), so **no allocation**. Its slot is block 1, offset 1 → **5**.
+9. **When A finishes:** `table.free()` → `free_many([0, 1])` → both refcounts hit 0 → both ids go back on the free list.
+
+
+#### 2a. The memory pool: BlockAllocator
 
 ```mermaid
-flowchart LR
-  F["free list<br/>(stack of ids)"] -->|"pop() · refcount=1"| A["allocate :70"]
-  A --> AM["allocate_many :80<br/>check count first"]
-  I["incref :96<br/>refcount += 1"] --> R[("refcounts[]")]
-  FR["free :111<br/>refcount -= 1"] -->|"reaches 0 → push back"| F
+flowchart TB
+  F[("free list, a stack<br/>[7, 6, … 1, 0]: pop takes 0 first")] -->|"pop(): id, refcount = 1"| A["allocate :70"]
+  AM["allocate_many(k) :80<br/>k > free? raise before taking any"] -->|"k times"| A
+  A --> R[("refcount[id]")]
+  I["incref(id) :96<br/>refcount + 1; refuses a free block"] --> R
+  FR["free(id) :111<br/>refcount − 1"] --> R
+  R -->|"reaches 0: push id back"| F
 ```
 
 The pool is two plain Python lists: a **stack of free ids** and a **refcount per block**.
@@ -323,18 +645,17 @@ def free(self, block_id: int) -> int:
 
 **Check yourself:** pool of 4. `allocate()` twice, `incref(first)`, `free(first)`. What is on the free list now, and what are the refcounts?
 
----
 
-### 2. Logical → physical: `BlockTable`
+#### 2b. Logical to physical: BlockTable
 
 ```mermaid
-flowchart LR
-  N["append_tokens(n) :106"] --> BN["blocks_needed_for(n) :75<br/>ceil division"]
-  BN -->|k new blocks| AM["allocator.allocate_many(k)"]
-  AM --> IDS["_block_ids list"]
-  P["position t"] --> L["locate :128<br/>divmod(t, B)"]
+flowchart TB
+  N["append_tokens(n) :106"] --> BN["blocks_needed_for(n) :75<br/>ceil((tokens + n) / B) − blocks held"]
+  BN -->|"k new blocks"| AM["allocator.allocate_many(k)"]
+  AM --> IDS[("_block_ids, e.g. [7, 2]<br/>logical block i → physical id")]
+  P["token position t"] --> L["locate(t) :128<br/>divmod(t, B) = (block, offset)"]
   IDS --> L
-  L --> SI["slot_index :137<br/>block_id·B + offset"]
+  L --> SI["slot_index(t) :137<br/>block_id × B + offset"]
 ```
 
 One `BlockTable` per request. It is the request's page table: list index = logical block, value = physical block id.
@@ -426,15 +747,14 @@ def num_wasted_slots(self) -> int:
 
 **Check yourself:** B = 4, an empty table, `append_tokens(5)` then `append_tokens(1)` ×3. How many `allocate_many` calls actually take a block? What is `num_wasted_slots` at the end?
 
----
 
-### 3. The bytes: `PagedKVCache`
+#### 2c. The bytes: PagedKVCache
 
 ```mermaid
-flowchart LR
-  C["KVCacheConfig<br/>bytes_per_token :80"] --> NB["num_blocks_for_budget :88<br/>floor(budget / bytes_per_block)"]
-  NB --> T[("per layer: K and V<br/>[N, B, 8, 64] :131")]
-  T --> FL["k_flat :166<br/>view as [N·B, 8, 64]"]
+flowchart TB
+  C["bytes_per_token :80<br/>2 × 16 layers × 8 heads × 64 × 2 B = 32 KiB"] --> NB["num_blocks_for_budget :88<br/>floor(budget ÷ 512 KiB per block)"]
+  NB --> T[("one K and one V tensor per layer<br/>[N blocks, 16, 8, 64]  :131")]
+  T --> FL["k_flat :166<br/>a view as [N × 16, 8, 64]: row = slot"]
 ```
 
 `src/mini_vllm/kv_cache.py:79–92`
@@ -490,68 +810,8 @@ def k_flat(self, layer: int) -> torch.Tensor:
 
 - `.view(...)` reshapes without copying. Row `block_id × B + offset` of the flat view is exactly element `[block_id, offset]` of the block view. That is why `slot_index` works as an address.
 
----
 
-### 4. One token through one layer: `PagedLlama.forward`
-
-```mermaid
-flowchart TB
-  E["embed_tokens<br/>[T] → [T,2048]"] --> N1["RMSNorm"] --> QKV["q,k,v_proj<br/>q [T,32,64] · k,v [T,8,64]"]
-  QKV --> RP["apply_rope(q, k)"]
-  RP -->|k, v| W["write_kv_to_cache(slots)"]
-  RP -->|q| AT["paged_attention<br/>(gather by block table)"]
-  W --> AT --> O["o_proj + residual"] --> N2["RMSNorm → SwiGLU MLP + residual"]
-  N2 -->|"× 16 layers"| H["norm → lm_head<br/>last token only"]
-```
-
-`src/mini_vllm/model/llama.py:264–265`
-```python
-hidden = self.embed_tokens(input_ids)
-cos, sin = self.rotary(positions)
-```
-
-`src/mini_vllm/model/llama.py:275–306`
-```python
-for index, layer in enumerate(self.layers):
-    input_norm, post_norm = self._layer_norms(layer)
-    attn = layer.self_attn
-    total_tokens = hidden.shape[0]
-
-    residual = hidden
-    x = input_norm(hidden)
-
-    q = attn.q_proj(x).view(total_tokens, self.num_q_heads, self.head_dim)
-    k = attn.k_proj(x).view(total_tokens, self.num_kv_heads, self.head_dim)
-    v = attn.v_proj(x).view(total_tokens, self.num_kv_heads, self.head_dim)
-    q, k = apply_rope(q, k, cos, sin)
-
-    # Write this step's KV before attending, so a sequence attends to
-    # its own new tokens (context_lens already counts them).
-    write_kv_to_cache(cache, index, slot_mapping, k, v)
-
-    if decode_meta is not None:
-        out = paged_attention_decode(q, cache, index, decode_meta, self.scale)
-    else:
-        out = paged_attention(
-            q, cache, index, block_tables, query_lens, context_lens, self.scale
-        )
-    out = out.reshape(total_tokens, self.num_q_heads * self.head_dim)
-    hidden = residual + attn.o_proj(out)
-
-    residual = hidden
-    x = post_norm(hidden)
-    mlp = layer.mlp
-    hidden = residual + mlp.down_proj(
-        nn.functional.silu(mlp.gate_proj(x)) * mlp.up_proj(x)
-    )
-```
-
-Read it top to bottom with shapes (T = all tokens of all requests this step, concatenated):
-- `x = input_norm(hidden)`: RMSNorm *before* attention (pre-norm). `residual` keeps the un-normalised input for the skip connection.
-- `q_proj` → `[T, 32, 64]`; `k_proj`, `v_proj` → `[T, 8, 64]`. **8 KV heads for 32 query heads = GQA**: 4 query heads share one K,V. That is why the KV cache is 4× smaller than with full multi-head attention.
-- `apply_rope` rotates q and k by their **position**, not their index in the flat batch.
-- **`write_kv_to_cache` happens before attention**, so each new token can attend to itself.
-- `hidden = residual + o_proj(out)`: the first residual. Then the MLP: `down(silu(gate(x)) * up(x))` = SwiGLU, with a second residual.
+#### 2d. Writing and reading the cache (used in trace steps 1.7 and 1.8)
 
 `src/mini_vllm/paged_attention.py:61–65`
 ```python
@@ -586,19 +846,7 @@ v = v_cache[blocks].reshape(-1, v_cache.shape[2], v_cache.shape[3])[:context_len
 
 - The read is a **gather**: index the block-shaped cache by the request's block ids, flatten to token order, cut off the empty tail of the last block (`[:context_len]`). Day 3's Triton kernel fuses this gather into attention so this intermediate tensor is never built.
 
-`src/mini_vllm/model/llama.py:308–311`
-```python
-hidden = self.norm(hidden)
-if logits_indices is not None:
-    hidden = hidden[logits_indices]
-return self.lm_head(hidden)
-```
-
-- Logits only at `logits_indices`: one position per request (its last token). The vocabulary is 128,256 wide, so computing it for every prefill token would dominate the step.
-
----
-
-### 5. How it all connects in one step
+#### 2e. Who builds the slots: Scheduler._prepare
 
 `src/mini_vllm/scheduler.py:599–612`
 ```python

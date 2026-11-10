@@ -1,1 +1,5 @@
-{}
+{
+  "enabledCssSnippets": [
+    "full-width-diagrams"
+  ]
+}
