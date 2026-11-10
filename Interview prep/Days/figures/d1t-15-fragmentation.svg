@@ -1,0 +1,133 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 905 292' width='905' height='292' font-family='Inter, Helvetica, Arial, sans-serif'><title>Contiguous vs paged KV cache</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='905' height='292' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='450' y='26' text-anchor='middle' font-size='15' font-weight='700' fill='#1f2328'>Same three requests, two ways to store their KV cache (48 slots of memory)</text>
+<text x='450' y='46' text-anchor='middle' font-size='12' fill='#57606a'>A needs 6 slots, B needs 10, C needs 2. Solid = holds a token's K, V; pale = reserved but empty (wasted); grey = free.</text>
+<text x='165' y='92' text-anchor='end' font-size='13' font-weight='700' fill='#1f2328'>contiguous</text>
+<text x='165' y='108' text-anchor='end' font-size='11' fill='#57606a'>reserve max_len = 16 each</text>
+<rect x='175' y='80' width='14' height='26' fill='#0969da' opacity='0.9'/>
+<rect x='190' y='80' width='14' height='26' fill='#0969da' opacity='0.9'/>
+<rect x='205' y='80' width='14' height='26' fill='#0969da' opacity='0.9'/>
+<rect x='220' y='80' width='14' height='26' fill='#0969da' opacity='0.9'/>
+<rect x='235' y='80' width='14' height='26' fill='#0969da' opacity='0.9'/>
+<rect x='250' y='80' width='14' height='26' fill='#0969da' opacity='0.9'/>
+<rect x='265' y='80' width='14' height='26' fill='#0969da' opacity='0.22'/>
+<rect x='280' y='80' width='14' height='26' fill='#0969da' opacity='0.22'/>
+<rect x='295' y='80' width='14' height='26' fill='#0969da' opacity='0.22'/>
+<rect x='310' y='80' width='14' height='26' fill='#0969da' opacity='0.22'/>
+<rect x='325' y='80' width='14' height='26' fill='#0969da' opacity='0.22'/>
+<rect x='340' y='80' width='14' height='26' fill='#0969da' opacity='0.22'/>
+<rect x='355' y='80' width='14' height='26' fill='#0969da' opacity='0.22'/>
+<rect x='370' y='80' width='14' height='26' fill='#0969da' opacity='0.22'/>
+<rect x='385' y='80' width='14' height='26' fill='#0969da' opacity='0.22'/>
+<rect x='400' y='80' width='14' height='26' fill='#0969da' opacity='0.22'/>
+<rect x='415' y='80' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='430' y='80' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='445' y='80' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='460' y='80' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='475' y='80' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='490' y='80' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='505' y='80' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='520' y='80' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='535' y='80' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='550' y='80' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='565' y='80' width='14' height='26' fill='#1a7f37' opacity='0.22'/>
+<rect x='580' y='80' width='14' height='26' fill='#1a7f37' opacity='0.22'/>
+<rect x='595' y='80' width='14' height='26' fill='#1a7f37' opacity='0.22'/>
+<rect x='610' y='80' width='14' height='26' fill='#1a7f37' opacity='0.22'/>
+<rect x='625' y='80' width='14' height='26' fill='#1a7f37' opacity='0.22'/>
+<rect x='640' y='80' width='14' height='26' fill='#1a7f37' opacity='0.22'/>
+<rect x='655' y='80' width='14' height='26' fill='#bf8700' opacity='0.9'/>
+<rect x='670' y='80' width='14' height='26' fill='#bf8700' opacity='0.9'/>
+<rect x='685' y='80' width='14' height='26' fill='#bf8700' opacity='0.22'/>
+<rect x='700' y='80' width='14' height='26' fill='#bf8700' opacity='0.22'/>
+<rect x='715' y='80' width='14' height='26' fill='#bf8700' opacity='0.22'/>
+<rect x='730' y='80' width='14' height='26' fill='#bf8700' opacity='0.22'/>
+<rect x='745' y='80' width='14' height='26' fill='#bf8700' opacity='0.22'/>
+<rect x='760' y='80' width='14' height='26' fill='#bf8700' opacity='0.22'/>
+<rect x='775' y='80' width='14' height='26' fill='#bf8700' opacity='0.22'/>
+<rect x='790' y='80' width='14' height='26' fill='#bf8700' opacity='0.22'/>
+<rect x='805' y='80' width='14' height='26' fill='#bf8700' opacity='0.22'/>
+<rect x='820' y='80' width='14' height='26' fill='#bf8700' opacity='0.22'/>
+<rect x='835' y='80' width='14' height='26' fill='#bf8700' opacity='0.22'/>
+<rect x='850' y='80' width='14' height='26' fill='#bf8700' opacity='0.22'/>
+<rect x='865' y='80' width='14' height='26' fill='#bf8700' opacity='0.22'/>
+<rect x='880' y='80' width='14' height='26' fill='#bf8700' opacity='0.22'/>
+<text x='295' y='72' text-anchor='middle' font-size='11' font-weight='600' fill='#0969da'>A: 6 used, 10 wasted</text>
+<text x='535' y='72' text-anchor='middle' font-size='11' font-weight='600' fill='#1a7f37'>B: 10 used, 6 wasted</text>
+<text x='775' y='72' text-anchor='middle' font-size='11' font-weight='600' fill='#bf8700'>C: 2 used, 14 wasted</text>
+<text x='535' y='128' text-anchor='middle' font-size='12' fill='#1f2328'>reserved 48, used 18 → <tspan fill='#cf222e' font-weight='700'>30 wasted (62%)</tspan>, and a 4th request has no room at all</text>
+<text x='165' y='182' text-anchor='end' font-size='13' font-weight='700' fill='#1f2328'>paged, B = 4</text>
+<text x='165' y='198' text-anchor='end' font-size='11' fill='#57606a'>blocks of 4, anywhere</text>
+<rect x='175' y='170' width='14' height='26' fill='#0969da' opacity='0.9'/>
+<rect x='190' y='170' width='14' height='26' fill='#0969da' opacity='0.9'/>
+<rect x='205' y='170' width='14' height='26' fill='#0969da' opacity='0.9'/>
+<rect x='220' y='170' width='14' height='26' fill='#0969da' opacity='0.9'/>
+<rect x='235' y='170' width='14' height='26' fill='#0969da' opacity='0.9'/>
+<rect x='250' y='170' width='14' height='26' fill='#0969da' opacity='0.9'/>
+<rect x='265' y='170' width='14' height='26' fill='#0969da' opacity='0.22'/>
+<rect x='280' y='170' width='14' height='26' fill='#0969da' opacity='0.22'/>
+<rect x='295' y='170' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='310' y='170' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='325' y='170' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='340' y='170' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='355' y='170' width='14' height='26' fill='#bf8700' opacity='0.9'/>
+<rect x='370' y='170' width='14' height='26' fill='#bf8700' opacity='0.9'/>
+<rect x='385' y='170' width='14' height='26' fill='#bf8700' opacity='0.22'/>
+<rect x='400' y='170' width='14' height='26' fill='#bf8700' opacity='0.22'/>
+<rect x='415' y='170' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='430' y='170' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='445' y='170' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='460' y='170' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='475' y='170' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='490' y='170' width='14' height='26' fill='#1a7f37' opacity='0.9'/>
+<rect x='505' y='170' width='14' height='26' fill='#1a7f37' opacity='0.22'/>
+<rect x='520' y='170' width='14' height='26' fill='#1a7f37' opacity='0.22'/>
+<rect x='535' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='550' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='565' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='580' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='595' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='610' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='625' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='640' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='655' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='670' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='685' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='700' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='715' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='730' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='745' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='760' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='775' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='790' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='805' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='820' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='835' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='850' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='865' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<rect x='880' y='170' width='14' height='26' fill='#eef1f4' opacity='1'/>
+<text x='205' y='164' text-anchor='middle' font-size='9' fill='#57606a'>block 0</text>
+<line x1='174.5' y1='168' x2='174.5' y2='198' stroke='#ffffff' stroke-width='2'/>
+<text x='265' y='164' text-anchor='middle' font-size='9' fill='#57606a'>block 1</text>
+<line x1='234.5' y1='168' x2='234.5' y2='198' stroke='#ffffff' stroke-width='2'/>
+<text x='325' y='164' text-anchor='middle' font-size='9' fill='#57606a'>block 2</text>
+<line x1='294.5' y1='168' x2='294.5' y2='198' stroke='#ffffff' stroke-width='2'/>
+<text x='385' y='164' text-anchor='middle' font-size='9' fill='#57606a'>block 3</text>
+<line x1='354.5' y1='168' x2='354.5' y2='198' stroke='#ffffff' stroke-width='2'/>
+<text x='445' y='164' text-anchor='middle' font-size='9' fill='#57606a'>block 4</text>
+<line x1='414.5' y1='168' x2='414.5' y2='198' stroke='#ffffff' stroke-width='2'/>
+<text x='505' y='164' text-anchor='middle' font-size='9' fill='#57606a'>block 5</text>
+<line x1='474.5' y1='168' x2='474.5' y2='198' stroke='#ffffff' stroke-width='2'/>
+<text x='565' y='164' text-anchor='middle' font-size='9' fill='#57606a'>block 6</text>
+<line x1='534.5' y1='168' x2='534.5' y2='198' stroke='#ffffff' stroke-width='2'/>
+<text x='625' y='164' text-anchor='middle' font-size='9' fill='#57606a'>block 7</text>
+<line x1='594.5' y1='168' x2='594.5' y2='198' stroke='#ffffff' stroke-width='2'/>
+<text x='685' y='164' text-anchor='middle' font-size='9' fill='#57606a'>block 8</text>
+<line x1='654.5' y1='168' x2='654.5' y2='198' stroke='#ffffff' stroke-width='2'/>
+<text x='745' y='164' text-anchor='middle' font-size='9' fill='#57606a'>block 9</text>
+<line x1='714.5' y1='168' x2='714.5' y2='198' stroke='#ffffff' stroke-width='2'/>
+<text x='805' y='164' text-anchor='middle' font-size='9' fill='#57606a'>block 10</text>
+<line x1='774.5' y1='168' x2='774.5' y2='198' stroke='#ffffff' stroke-width='2'/>
+<text x='865' y='164' text-anchor='middle' font-size='9' fill='#57606a'>block 11</text>
+<line x1='834.5' y1='168' x2='834.5' y2='198' stroke='#ffffff' stroke-width='2'/>
+<text x='535' y='218' text-anchor='middle' font-size='12' fill='#1f2328'>6 blocks = 24 slots, used 18 → <tspan fill='#1a7f37' font-weight='700'>6 wasted (25%)</tspan>, and 24 slots still free</text>
+<text x='175' y='252' font-size='12' fill='#1f2328'>block tables:  A → [0, 1]   B → [2, 4, 5]   C → [3]     (B's blocks are not next to each other, and that's fine)</text>
+<text x='175' y='272' font-size='12' fill='#57606a'>waste per request is always less than one block: only a request's last block can be partly empty</text></svg>

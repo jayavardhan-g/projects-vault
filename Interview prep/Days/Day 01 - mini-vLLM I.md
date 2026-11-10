@@ -725,7 +725,149 @@ print("logits", [round(v, 2) for v in logits], "-> next token:", VOCAB[nxt])
 
 ### 2. Deep dive: the paged KV cache
 
-This is the big concept behind step 1.7 of the trace: **where `slot_mapping` comes from**, and how K, V are stored in fixed 16-token blocks instead of one long buffer per request. Read it in order: the memory flow, then the three classes, then how the model writes and reads the cache, then who builds the slots.
+This is the big concept behind step 1.7, and the heart of Day 1's resume bullet ("reducing fragmentation by 4.3×").
+We build it from zero, then read the code. Order:
+
+1. what the KV cache is, and why it exists;
+2. how big it is;
+3. the naive way to store it, and how it wastes memory;
+4. the fix borrowed from operating systems: pages;
+5. the slot arithmetic;
+6. growing one token at a time;
+7. sharing blocks, and why refcounts exist;
+8. the measured result;
+9. choosing the block size;
+10. the code: the memory flow, then each class (2a–2e);
+11. common questions, a check, and the five things to remember.
+
+> [!important] The one sentence to hold on to
+> Instead of reserving one long, contiguous buffer per request, store K and V in **fixed-size blocks** placed
+> **anywhere** in memory, and give each request a **block table** that says which blocks are its own, in order.
+
+#### 2.1 What the KV cache is, and why it exists
+
+Generating text is a loop: predict one token, append it, predict the next. At every step, the new token's attention
+(§5) needs the **K and V of every earlier token**.
+
+**Without a cache**, every step recomputes K and V for the whole sequence from scratch. A 1,000-token prompt followed
+by 100 generated tokens means about $1000 + 1001 + \dots + 1099 \approx 105{,}000$ token computations.
+
+**With a cache**, each token's K and V are computed **once**, when the token is first processed, and stored. Every
+later step only computes the **new** token and reads the rest from memory: $1000 + 100 = 1{,}100$ token computations.
+That's ~95× less work.
+
+The price is **memory**: those stored K and V vectors are the KV cache, and they're what this whole day is about.
+
+#### 2.2 How big it is
+
+Per token, Llama-3.2-1B stores a K and a V vector in **every layer**, for each **KV head**:
+
+$$\underbrace{2}_{K,\ V} \times \underbrace{16}_{\text{layers}} \times \underbrace{8}_{\text{KV heads}} \times \underbrace{64}_{\text{head size}} \times \underbrace{2\ \text{bytes}}_{\text{bf16}} = 32{,}768 \text{ bytes} = \mathbf{32\ KiB \text{ per token}}$$
+
+- a 2,000-token conversation: 2,000 × 32 KiB ≈ **62.5 MiB**;
+- 100 such conversations at once: about **6.1 GiB**;
+- 40 GB of free GPU memory holds about **1.2 million tokens** of cache in total.
+
+So the number of requests a server can run at once is limited by **KV-cache memory**, and every wasted slot is a
+request that can't run.
+
+#### 2.3 The naive way: reserve the maximum for every request
+
+When a request arrives, we don't know how many tokens it will generate. The simple approach reserves room for the
+**maximum** (`max_len`) in one contiguous buffer.
+
+Take `max_len = 16` slots and three requests that end up using **6, 10 and 2** slots:
+- reserved: 3 × 16 = **48** slots;
+- actually used: 6 + 10 + 2 = **18**;
+- wasted: **30 slots (62%)**.
+
+![[d1t-15-fragmentation.svg]]
+
+Two kinds of waste:
+- **Internal fragmentation:** reserved but unused slots *inside* a request's buffer (the pale cells above).
+- **External fragmentation:** when requests finish at different times, free memory ends up in scattered gaps. A new request needing one contiguous buffer may not fit anywhere, even when the gaps add up to enough.
+
+#### 2.4 The fix: pages, like an operating system
+
+Operating systems solved the same problem decades ago with **virtual memory**: a program sees one contiguous address
+space, but the OS stores it in fixed-size **pages** scattered around physical RAM, and a **page table** maps each
+virtual page to a physical one.
+
+PagedAttention (vLLM, Kwon et al., 2023) applies this to the KV cache:
+- memory is split into **blocks** of B token slots each (B = 16 in this project);
+- each request gets a **block table**: a list where position $i$ holds the physical block id of the request's $i$-th logical block;
+- blocks are taken from a pool **one at a time, as needed**, from anywhere.
+
+The same three requests with B = 4 need $\lceil 6/4 \rceil + \lceil 10/4 \rceil + \lceil 2/4 \rceil = 2 + 3 + 1 = 6$
+blocks = 24 slots, so **6 wasted (25%)** instead of 30, and 24 slots stay free for more requests. B's blocks (2, 4, 5)
+aren't next to each other, and that doesn't matter: the block table records where they are.
+
+| | contiguous, max_len 16 | paged, B = 4 |
+|---|---|---|
+| slots reserved | 48 | 24 |
+| slots used | 18 | 18 |
+| wasted | 30 (62%) | 6 (25%) |
+| needs contiguous free memory? | yes | no: any free block works |
+| worst-case waste per request | max_len − 1 | **B − 1** (only the last block can be partly empty) |
+
+#### 2.5 The slot arithmetic
+
+The cache tensor is one big array of slots (2c). Token number $t$ of a request (its position) lives at:
+
+$$\text{logical block} = \lfloor t / B \rfloor, \qquad \text{offset} = t \bmod B$$
+$$\text{slot} = \text{table}[\text{logical block}] \times B + \text{offset}$$
+
+With B = 4 and request B's table `[2, 4, 5]`:
+- token 0: logical block 0, offset 0 → physical block 2 → slot 2 × 4 + 0 = **8**;
+- token 5: logical block 1, offset 1 → physical block 4 → slot 4 × 4 + 1 = **17**;
+- token 9: logical block 2, offset 1 → physical block 5 → slot 5 × 4 + 1 = **21**.
+
+That's `BlockTable.slot_index` (2b). The list of slots for every token being processed is the `slot_mapping` that the
+model writes K and V into (step 1.7).
+
+#### 2.6 Growing one token at a time
+
+A request asks for a new block only when its next token **crosses a block boundary**. With B = 4, a request at 6
+tokens holds 2 blocks (8 slots): tokens 7 and 8 fit; token 9 needs a 3rd block.
+
+So with B = 16, a decoding request allocates a new block once every 16 tokens, and its waste is always under 16 slots.
+That's `blocks_needed_for` and `append_tokens` (2b).
+
+#### 2.7 Sharing blocks, and why refcounts exist
+
+Two requests that start with the **same** text (a shared system prompt, say) have identical K and V for that prefix.
+With paging they can simply **point at the same physical blocks**. Day 2's prefix cache does exactly this.
+
+But then a block may belong to **several** requests at once, and freeing it when *one* of them finishes would destroy
+the other's data. So every block has a **reference count**: how many tables (plus the prefix cache) are using it.
+- allocate → refcount 1;
+- another request starts sharing it → refcount + 1 (`incref`);
+- a request finishes → refcount − 1 (`free`);
+- the block goes back to the free pool **only at 0**.
+
+The allocator built refcounts in from the start, before anything shared blocks, because adding them later would mean
+re-checking every call site for use-after-free bugs (2a).
+
+#### 2.8 The measured result: 16.8% → 3.9% (4.3×)
+
+The fragmentation benchmark (README *Fragmentation*, line 321) compares wasted KV slots under the two schemes. On the
+`independent` workload (requests of varied lengths), **16.8%** of allocated slots were wasted with contiguous
+reservations, against **3.9%** with paging: 4.3× less waste.
+
+On **uniform** prompts, paging is slightly *worse*: when every request has exactly the same length, contiguous
+reservations waste nothing, while paging still leaves part of each request's last block empty. Say that if asked:
+it shows you understand where the gain comes from.
+
+#### 2.9 Choosing the block size B
+
+| B | waste per request | block table | kernel efficiency |
+|---|---|---|---|
+| 1 | none | one entry per token: huge | poor: every token is a separate lookup |
+| **16** | under 16 slots | short | good: 16 contiguous tokens per read |
+| 256 | up to 255 slots | very short | good, but waste is back |
+
+Small blocks waste less but cost more bookkeeping and slower memory reads; big blocks are the reverse. 16 is the
+usual middle ground (vLLM's default too).
 
 #### The memory flow, step by step
 
@@ -1068,6 +1210,65 @@ def _prepare(self, request: Request) -> ScheduledRequest:
 - The engine concatenates these lists across requests and calls `forward` (section 4), which writes K,V to the slots (section 3).
 
 **End-of-day test:** B = 4, request A has 5 prompt tokens, physical blocks come out as `[7, 2]`. Write A's `slot_mapping` for its prefill. Then A decodes one token: does `append_tokens(1)` allocate? Which slot does token 5 go to? (*Answers: slots 28, 29, 30, 31, 8; no allocation; slot 9.*)
+
+#### 2.11 Questions people usually ask next
+
+##### "Why not just allocate exactly the right length?"
+
+Because we don't know it. The prompt length is known, but the number of tokens a request will generate isn't, until
+it emits an end token or hits its limit. Paging sidesteps the question: allocate as you go.
+
+##### "Why not grow a contiguous buffer when it fills up, like a Python list?"
+
+Growing means allocating a bigger buffer and **copying** everything. That's slow on a GPU in the middle of serving,
+and it still needs a large contiguous free region, which fragmentation makes scarce. Blocks never move.
+
+##### "Doesn't attention need each request's K and V to be contiguous?"
+
+The maths doesn't care where they are, only which ones belong to the request and in what order: that's what the block
+table says. The naive path **gathers** a request's blocks into token order before attending (2d); Day 3's Triton
+kernel reads straight from the scattered blocks, using the block table.
+
+##### "Is this exactly like OS paging?"
+
+The idea is the same (fixed blocks, a mapping table, allocation on demand, sharing via refcounts). The differences:
+no hardware address translation, and no swapping blocks to disk by default (this project preempts by recomputing, Day 2).
+
+##### "What limits the number of blocks?"
+
+GPU memory left after the model weights and some headroom: `blocks_for_free_memory` divides the free bytes by
+`bytes_per_block` (2c). With 512 KiB per block, 40 GB gives about 76,000 blocks.
+
+#### 2.12 Check your understanding
+
+1. Without a KV cache, what does every generation step have to redo?
+2. Compute the KV bytes per token for 16 layers, 8 KV heads, head size 64, bf16.
+3. A request needs 10 slots. How many blocks with B = 4, and how many slots are wasted?
+4. Internal vs external fragmentation: one sentence each.
+5. B = 4, table `[7, 3]`: which slot holds token 6?
+6. A request at 8 tokens with B = 4 appends 1 token. Does it allocate?
+7. Two requests share a block and one finishes. What happens to the block?
+8. Why is paging slightly worse than contiguous allocation on uniform-length prompts?
+9. What does B = 1 cost, and what does B = 256 cost?
+
+> [!success]- Answers
+> 1. Recompute K and V for every earlier token.
+> 2. 2 × 16 × 8 × 64 × 2 = 32,768 bytes = 32 KiB.
+> 3. ⌈10/4⌉ = 3 blocks = 12 slots, so 2 wasted.
+> 4. Internal: reserved but unused space inside an allocation. External: free memory split into gaps too small to use.
+> 5. Logical block 6 // 4 = 1 → physical 3, offset 6 % 4 = 2 → slot 3 × 4 + 2 = 14.
+> 6. Yes: 9 tokens need ⌈9/4⌉ = 3 blocks and it holds 2.
+> 7. Its refcount drops from 2 to 1; it stays allocated for the other request.
+> 8. With equal lengths, contiguous reservations can be sized exactly, while paging still leaves part of the last block empty.
+> 9. B = 1: no waste, but a table entry per token and slow scattered reads. B = 256: up to 255 wasted slots per request.
+
+#### 2.13 The five things to remember
+
+1. **Why a cache:** each token's K and V are computed once and reused at every later step; the cost is memory (32 KiB per token here).
+2. **The problem:** reserving `max_len` contiguously wastes most of the memory (internal fragmentation) and leaves unusable gaps (external fragmentation).
+3. **The fix:** fixed blocks of B tokens, allocated on demand from anywhere; a per-request block table maps logical blocks to physical ones.
+4. **The address:** `slot = table[t // B] × B + t % B`; waste per request is under B.
+5. **Sharing:** refcounts let several requests use one block, freed only at 0. Measured: 16.8% → 3.9% waste (4.3×), slightly worse only for uniform lengths.
 
 ---
 
