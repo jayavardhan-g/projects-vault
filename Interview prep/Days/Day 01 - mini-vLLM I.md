@@ -325,6 +325,8 @@ and 7 (outlined in red) into `X`, in token order. That's the whole operation: no
 
 #### 1.2 RoPE angles, computed once for all layers
 
+> [!tip] New to RoPE? [[#3. Deep dive: RoPE from scratch, on our three tokens|§3 builds it from scratch on this example]]: why rotate, where the angles and the base come from, and the full arithmetic for "cat".
+
 `src/mini_vllm/model/llama.py:115–117`
 ```python
 inv_freq = 1.0 / (
@@ -439,6 +441,8 @@ both query heads will share. In the real model it's the same picture, scaled up:
 ![[d1t-2-qkv.svg]]
 
 #### 1.6 Rotate q and k by position
+
+> [!tip] New to RoPE? [[#3. Deep dive: RoPE from scratch, on our three tokens|§3 builds it from scratch on this example]]: why rotate, where the angles and the base come from, and the full arithmetic for "cat".
 
 `src/mini_vllm/model/llama.py:151–154`
 ```python
@@ -1060,6 +1064,221 @@ def _prepare(self, request: Request) -> ScheduledRequest:
 - The engine concatenates these lists across requests and calls `forward` (section 4), which writes K,V to the slots (section 3).
 
 **End-of-day test:** B = 4, request A has 5 prompt tokens, physical blocks come out as `[7, 2]`. Write A's `slot_mapping` for its prefill. Then A decodes one token: does `append_tokens(1)` allocate? Which slot does token 5 go to? (*Answers: slots 28, 29, 30, 31, 8; no allocation; slot 9.*)
+
+---
+
+### 3. Deep dive: RoPE from scratch, on our three tokens
+
+Steps 1.2 and 1.6 use RoPE (rotary position embedding). This section builds it up from zero on the same example:
+"the", "cat", "sat" at positions 0, 1, 2. Every number below is computed from the toy model (the script in 1.13).
+
+#### 3.1 The problem: attention can't see order
+
+Attention scores are dot products `q · k`. A dot product only looks at the two vectors, not at **where** the tokens
+are. Without position information, "the cat sat" and "sat cat the" give exactly the same set of scores, just
+shuffled. The model would see a bag of words.
+
+So we must put position into q and k somehow. Older models **added** a learned position vector to each token's
+embedding. RoPE does something else: it **rotates** q and k by an angle that depends on the position.
+
+#### 3.2 The idea in 2-D: rotate, then the score depends only on the distance
+
+Take any two features of a vector and treat them as an arrow in a plane, `(a, b)`. Rotating the arrow by an angle θ:
+
+```
+a' = a·cos θ − b·sin θ
+b' = a·sin θ + b·cos θ
+```
+
+Rotation changes the direction, never the length.
+
+Now the key fact. The dot product of two arrows is `|q| · |k| · cos(angle between them)`. If q sits at position **m**
+and is rotated by `m·ω`, and k sits at position **n** and is rotated by `n·ω`, the angle between them changes by
+`(m − n)·ω`. So:
+
+> **After RoPE, the score q · k depends on the two vectors and on the distance m − n, but not on m and n themselves.**
+
+That's exactly what language needs: "the word two positions back" means the same thing at position 5 or at position 5,000.
+
+**Checked on our example** (head 0, query "sat", key "the", score = q·k ÷ 2):
+
+| q at position | k at position | distance | score |
+|---|---|---|---|
+| 2 | 0 | 2 | **−0.1833** |
+| 5 | 3 | 2 | **−0.1833** |
+| 102 | 100 | 2 | **−0.1833** |
+| 1002 | 1000 | 2 | **−0.1833** |
+| 2 | 1 | 1 | −0.8281 |
+| 3 | 0 | 3 | 0.2434 |
+| no RoPE at all | | | −1.0986 |
+
+Same distance → same score, wherever the sentence sits. Different distance → different score.
+
+#### 3.3 Applying it to our tokens
+
+A head has 4 features (64 in the real model), so we form **2 pairs**. In this code, feature `j` is paired with
+feature `j + 2` (in general `j + d/2`):
+- **pair 0** = features (f0, f2);
+- **pair 1** = features (f1, f3).
+
+Each pair turns at its own speed `ω` (next sections explain the speeds). For our toy, **pair 0 turns 1 radian per
+position, and pair 1 turns 0.0014 radians per position**. The angle for a token is `position × ω`:
+
+| token | position | pair 0 angle | pair 1 angle |
+|---|---|---|---|
+| the | 0 | 0 | 0 |
+| cat | 1 | 1 rad (57°) | 0.0014 rad |
+| sat | 2 | 2 rad (115°) | 0.0028 rad |
+
+Here is pair 0 of each token's K vector, before (grey) and after (red):
+
+![[d1t-6-rope-tokens.svg]]
+
+**The full arithmetic for "cat"** (position 1). Its K row is `[1.379, −0.965, −0.531, 1.096]`.
+- Pair 0 is `(a, b) = (f0, f2) = (1.379, −0.531)`, angle 1 rad, so cos = 0.540 and sin = 0.841:
+  - `a' = 1.379 × 0.540 − (−0.531) × 0.841 = 0.745 + 0.447 = 1.192`;
+  - `b' = 1.379 × 0.841 + (−0.531) × 0.540 = 1.160 − 0.287 = 0.873`.
+- Pair 1 is `(f1, f3) = (−0.965, 1.096)`, angle 0.0014 rad, so cos ≈ 1.000 and sin ≈ 0.0014: it barely moves, to `(−0.966, 1.095)`.
+- Result: `[1.192, −0.966, 0.873, 1.095]`, the "cat" row of "K after RoPE" in step 1.6.
+
+"the" sits at position 0: angle 0, cos = 1, sin = 0, so it's unchanged. Q is rotated the same way, head by head. V is never rotated.
+
+#### 3.4 Why more than one speed
+
+One pair alone can't encode position well. Pair 0 turns 1 rad per position, so it completes a full turn every
+2π ≈ **6.3 positions**. Then positions 1 and 7.3 look almost identical to it. A fast pair tells **neighbours**
+apart but gets confused over longer distances.
+
+The fix is the one a clock uses: a second hand, a minute hand and an hour hand. RoPE uses many pairs at
+**geometrically decreasing speeds**. The fast pairs resolve the last few tokens; the slow pairs resolve where you are
+over thousands of tokens. Together they give every distance a unique pattern of angles.
+
+The animation in step 1.2 shows two of them: the fast pair spinning, the slow pair hardly moving.
+
+#### 3.5 Where the speeds come from: the formula
+
+For a head of size `d` there are `d/2` pairs, `i = 0, 1, …, d/2 − 1`, and pair `i` turns at:
+
+```
+inv_freq[i] = 1 / base^(2i / d)
+```
+
+- `i = 0` always gives `1 / base^0 = 1` radian per position: the fastest pair.
+- Each next pair is slower by the same factor, `base^(2/d)`.
+- The last pair is the slowest, about `1 / base` radians per position.
+
+**Toy (d = 4, base 500,000):**
+- `i = 0`: `1 / 500000^0 = 1`;
+- `i = 1`: `1 / 500000^(2/4) = 1 / √500000 = 1 / 707.1 = 0.0014`.
+
+That's where `[1, 0.0014]` came from.
+
+**Real model (d = 64, base 500,000):** 32 pairs, each 500000^(2/64) ≈ **1.51× slower** than the one before.
+A useful way to read a speed is its **wavelength**, `2π / inv_freq`: how many positions one full turn takes.
+
+| pair i | inv_freq (rad per position) | wavelength (positions per turn) |
+|---|---|---|
+| 0 | 1 | 6.3 |
+| 1 | 0.664 | 9.5 |
+| 4 | 0.194 | 32 |
+| 8 | 0.0376 | 167 |
+| 12 | 0.0073 | 862 |
+| 16 | 0.0014 | 4,443 |
+| 20 | 0.00027 | 22,911 |
+| 24 | 0.000053 | 118,143 |
+| 31 | 0.000003 | 2,084,765 |
+
+In the code that's one line (`llama.py:115–117`): `torch.arange(0, head_dim, 2) / head_dim` is exactly `2i / d` for
+i = 0 … 31.
+
+#### 3.6 Why the base is 500,000
+
+The base is a **chosen hyperparameter**, not something derived. What it controls is the **slowest wavelength**: with
+d = 64, the slowest pair's wavelength is about `2π × base^(62/64)`.
+
+- **Base 10,000** (original RoPE paper, Llama 2): the slowest pair turns once every ~47,000 positions.
+- **Base 500,000** (Llama 3): the slowest pair turns once every ~2,100,000 positions.
+
+Why it matters: if even the slowest pairs wrap around within the context, two far-apart positions can end up with
+similar angle patterns and the model struggles to tell them apart. A bigger base stretches every pair (except pair 0)
+so the angle patterns stay distinct over much longer contexts. Meta raised the base to 500,000 for Llama 3 to support
+longer contexts. That's the documented reason; the exact value is an empirical choice.
+
+![[d1t-7-rope-frequencies.svg]]
+
+In the chart, bars are base 500,000 and dots are base 10,000. Except for pair 0 (always 1 rad per position, whatever the base), every dot is lower
+than its bar: with base 10,000 each pair turns faster, and the slowest wavelength is ~44× shorter.
+
+#### 3.7 Llama 3's extra trick: scaling the slow pairs
+
+Llama 3 was trained on 8,192-token contexts, but Llama 3.2 supports 131,072. To stretch it further, the code applies
+**llama3 scaling** (`_apply_llama3_scaling`, `llama.py:124–142`). The values are from the model's `config.json`
+(quoted here from memory; the code reads them from `config.rope_parameters`): `factor 32`, `low_freq_factor 1`,
+`high_freq_factor 4`, `original_max_position_embeddings 8192`.
+- pairs with a wavelength **under 2,048** positions (8192 / 4): **unchanged**. They encode local order, which works the same at any context length. That's pairs 0–14.
+- pairs with a wavelength **over 8,192** (8192 / 1): divided by **32**, so they turn 32× slower. They now cover 32× more positions. That's pairs 18–31.
+- the 3 pairs in between (15–17) are **blended** smoothly between the two.
+
+That's the colouring in the chart above.
+
+#### 3.8 How the code builds cos and sin
+
+`src/mini_vllm/model/llama.py:144–148`
+```python
+def forward(self, positions: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """positions: [num_tokens] absolute positions -> (cos, sin) [num_tokens, head_dim]."""
+    freqs = positions.to(torch.float32).unsqueeze(1) * self.inv_freq.unsqueeze(0)
+    emb = torch.cat((freqs, freqs), dim=-1)
+    return emb.cos().to(self._dtype), emb.sin().to(self._dtype)
+```
+
+For our 3 positions: `freqs = positions × inv_freq` gives `[3, 2]` angles. `cat(freqs, freqs)` repeats them to
+`[3, 4]`, so the angles line up with features `[f0, f1, f2, f3]` = `[pair 0, pair 1, pair 0, pair 1]`. For "cat":
+- `cos = [0.540, 1.000, 0.540, 1.000]`;
+- `sin = [0.841, 0.0014, 0.841, 0.0014]`.
+
+`src/mini_vllm/model/llama.py:151–154`
+```python
+def rotate_half(x: torch.Tensor) -> torch.Tensor:
+    """Split the last dim in half and rotate: [x1, x2] -> [-x2, x1]."""
+    half = x.shape[-1] // 2
+    return torch.cat((-x[..., half:], x[..., :half]), dim=-1)
+```
+
+`src/mini_vllm/model/llama.py:165–167`
+```python
+cos = cos.unsqueeze(1)
+sin = sin.unsqueeze(1)
+return (q * cos + rotate_half(q) * sin), (k * cos + rotate_half(k) * sin)
+```
+
+`rotate_half` turns `[f0, f1, f2, f3]` into `[−f2, −f3, f0, f1]`. Then `x·cos + rotate_half(x)·sin` is the 2-D rotation
+of 3.2, done for all pairs at once. For "cat":
+
+| feature | x | rotate_half(x) | cos | sin | x·cos + rh·sin |
+|---|---|---|---|---|---|
+| f0 | 1.379 | 0.531 | 0.540 | 0.841 | **1.192** |
+| f1 | −0.965 | −1.096 | 1.000 | 0.0014 | **−0.966** |
+| f2 | −0.531 | 1.379 | 0.540 | 0.841 | **0.873** |
+| f3 | 1.096 | −0.965 | 1.000 | 0.0014 | **1.095** |
+
+Row f0 is `a·cos − b·sin` (because `rotate_half` put `−f2` there), and row f2 is `b·cos + a·sin`: the two lines of the
+rotation formula. Pairing `j` with `j + d/2` (rather than neighbours) is just the Hugging Face layout. It's the same
+maths with the features listed in a different order.
+
+#### 3.9 Why it matters for this project
+
+The README's "bug this phase actually found": under transformers 5.x, `config.rope_theta` no longer exists, and a
+`getattr` default silently used **base 10,000 instead of 500,000**. Every pair except pair 0 turned at the wrong
+speed (look at the dots vs the bars). **74.8% of the cos/sin values were wrong**, yet short prompts still read
+fluently, because the fast pairs, which dominate local word order, are nearly the same under both bases. Only a direct
+comparison with Hugging Face's rotary module caught it. `resolve_rope_config` now raises instead of guessing.
+
+**Check yourself:**
+1. What angle does pair 0 of a token at position 4 get, and what about pair 1 in the toy? (*4 rad; 4 × 0.0014 = 0.0057 rad.*)
+2. Why is "the" unchanged by RoPE? (*Position 0: angle 0, cos 1, sin 0.*)
+3. With base 10,000 and d = 64, what is inv_freq for pair 1? (*1 / 10000^(2/64) = 10000^(−0.03125) ≈ 0.750.*)
+4. If you move a whole sentence 1,000 positions later, which attention scores change? (*None: only distances matter, and those didn't change.*)
 
 ## C. Rebuild it yourself (block 7, 75 min)
 
