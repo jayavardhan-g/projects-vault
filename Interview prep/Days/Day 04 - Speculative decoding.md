@@ -139,7 +139,7 @@ distribution" is *tested* despite bf16 noise (the noise-floor method; see the pr
 
 ## Code, explained
 
-Read this **with the files open**. Each part has a small figure of the pipeline, then the exact code (copied from the repo at the commit named below, so the line numbers match), then what it does and how it hands off to the next piece.
+Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 Repo `speculative_decoding`, branch `main` (`99ed1c2`), package
 `src/specdec/`.
@@ -148,16 +148,38 @@ Repo `speculative_decoding`, branch `main` (`99ed1c2`), package
 pass; the accept/reject rule keeps a prefix and adds one token; both caches are cut back to what was kept.
 
 ```mermaid
-flowchart LR
-  D["1. draft loop<br/>γ × forward_with_cache(draft)"] -->|"proposals, q rows"| T["2. one target pass<br/>γ+1 tokens"]
-  T -->|"p rows"| VC["3. verify_and_correct<br/>speculative.py:84"]
-  VC -->|"n_accepted, next_token"| C["4. commit + crop_cache<br/>both caches to seq_len + n"]
-  C --> D
+flowchart TB
+  D["1. draft loop: γ forwards of the small model<br/>sample x₁ … x_γ, keep each q row"] --> T["2. ONE target forward over γ + 1 tokens<br/>gives the p rows"]
+  T --> VC["3. verify_and_correct  speculative.py:84<br/>keep n proposals + 1 extra token"]
+  VC --> C["4. commit tokens, crop both caches<br/>to seq_len + n"]
+  C -->|"next iteration"| D
 ```
+
+### The flow, step by step
+
+One iteration with **greedy decoding, γ = 4** and a **100-token prompt**.
+
+1. **Prefill, holding the last token back.** Both models run over prompt tokens 0–98 (`speculative.py:321–326`). Both caches now hold **99** positions.
+2. **Draft γ = 4 tokens.** `pending = cur_ids[99:]` is token 99 (the held-back token). The draft runs 1 token at a time: x₁ from token 99, then x₂, x₃, x₄ (`:341–356`). Each proposal and its `q` row are kept.
+3. **One target pass over 5 tokens.** `t_len = 99`, `feed = [token 99, x₁, x₂, x₃, x₄]` (`:361–363`), so **5 rows** of logits. `lo = seq_len − 1 − t_len = 100 − 1 − 99 = 0`, so `p_probs` = rows 0–4: the target's prediction at each proposal, plus the bonus row.
+4. **Accept or reject** (`verify_and_correct`, `:84`). Suppose the target's argmaxes are `[x₁, x₂, c, …]`. x₁ matches, x₂ matches, x₃ ≠ c → it returns **(2, c)**.
+5. **Commit.** `emitted = [x₁, x₂, c]`, so the sequence is now 103 tokens. `keep = seq_len + n_accepted = 100 + 2 = 102`. The target cache is cropped 104 → 102, the draft cache 103 → 102 (`:388–396`).
+6. **Why 102 and not 103?** Position 102 holds `c`, which neither model has computed K, V for yet. Next iteration, the target feeds `cur_ids[102:] + 4 proposals` = **5 tokens again**. The shape never changes, which is what lets each step be a captured CUDA graph.
+
+Result: 3 tokens for one target pass. With perfect agreement you'd get 5 (4 proposals + the bonus).
 
 ---
 
 ### 1. Turning logits into the distributions p and q
+
+```mermaid
+flowchart TB
+  TL["target logits, 152,064 wide"] --> AV["align_vocab :42<br/>cut every model to the narrowest width"]
+  DL["draft logits, 151,936 wide"] --> AV
+  AV --> LP["logits_to_probs :73<br/>temperature → top-k → top-p"]
+  LP -->|"greedy"| PM["point mass at the argmax"]
+  LP -->|"sampling"| SM["softmax distribution"]
+```
 
 `src/specdec/sampling.py:64–70`
 ```python
@@ -358,11 +380,11 @@ Map each line to the algorithm:
 ### 4. Rollback and the 0.88× → 2.25× fix
 
 ```mermaid
-flowchart LR
-  SC["StaticCache<br/>fixed addresses"] --> CG["torch.compile(reduce-overhead)<br/>= CUDA graphs per shape"]
-  CG --> FW["forward_with_cache<br/>picks compiled fn for captured lengths"]
-  CR["crop_cache :124"] -->|"static: move write offset"| RW["_rewind_static :150"]
-  WU["warmup_decode :110<br/>3 passes per shape"] --> CG
+flowchart TB
+  SC["StaticCache<br/>fixed shapes, fixed tensor addresses"] --> CG["torch.compile(mode = reduce-overhead)<br/>one CUDA graph per input length"]
+  WU["warmup_decode :110<br/>3 passes per shape, before any timing"] --> CG
+  CG --> FW["forward_with_cache :170<br/>replays the graph for captured lengths"]
+  CR["crop_cache :124  (rollback)"] -->|"static cache"| RW["_rewind_static :150<br/>move the write counter, in place"]
 ```
 
 `src/specdec/cache_utils.py:137–146`

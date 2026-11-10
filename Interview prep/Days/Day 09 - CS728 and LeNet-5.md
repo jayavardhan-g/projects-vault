@@ -101,7 +101,7 @@ Find and trace: the LeNet-5 definition; the IMP loop (per-round rate, rewind or 
 
 ## Code, explained
 
-Read this **with the files open**. Each part has a small figure of the pipeline, then the exact code (copied from the repo at the commit named below, so the line numbers match), then what it does and how it hands off to the next piece.
+Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 > [!warning] Your CS728 and LeNet-5 code is not on the server
 > Sections 1–2 read a **worked example**: your own `LongContext_RAG/heads/` (branch `main`, `bfb2ec9`), which scores
@@ -109,14 +109,27 @@ Read this **with the files open**. Each part has a small figure of the pipeline,
 > as a figure. Once the course code is copied to `interview_materials/`, ask Claude to add its snippets here.
 
 ```mermaid
-flowchart LR
-  P["probe: haystack + needle"] --> D["decode token by token"]
-  D --> A["per step: attention of every head<br/>[layers, heads, keys]"]
-  A --> H["copy_hits: argmax in needle AND<br/>token there == token emitted"]
-  H --> S["per-head score over many probes"]
-  S --> TOP["top-k heads"]
-  TOP --> USE["CS728: sum their attention over each tool<br/>→ rank tools → Recall@1/@5"]
+flowchart TB
+  P["probe: haystack + needle<br/>(CS728: query + tool list)"] --> D["decode one token at a time"]
+  D --> A["each step: attention of every head<br/>[layers, heads, keys]"]
+  A --> H["copy_hits  scorer.py:121<br/>argmax inside the needle AND that token is being emitted"]
+  H --> S["per-head score, averaged over probes<br/>_aggregate  run_head_id.py:121"]
+  S --> TOP["keep the top-k heads"]
+  TOP --> USE["CS728: sum their attention over each tool<br/>rank the tools → Recall@1, Recall@5"]
 ```
+
+### The flow, step by step
+
+One probe through the scorer (illustrative numbers). The haystack is 2,000 tokens; the needle "The secret code is
+4721" sits at positions 500–507; the model answers "4721".
+
+1. **Prefill** everything except the last prompt token (`scorer.py:74`). Then decode one token at a time, so each step's attention is a clean `[layers, heads, keys]` tensor (`:83–101`).
+2. **The step that emits "47":** for every head at once, take the argmax over keys (`copy_hits`, `:138`).
+   - Head (layer 14, head 3) points at position 505, which is inside the needle, and the token there is "47": a **hit**.
+   - Head (layer 2, head 9) points at position 3, outside the needle: **no hit**.
+3. **Coverage:** `covered` marks which needle positions each head copied (`:98–101`). Score = covered positions ÷ needle length (`:106`).
+4. **Over many probes:** `_aggregate` averages the scores and computes copy-precision (hits ÷ steps where the emitted token was in the needle) (`run_head_id.py:129–142`). Rank the heads; keep the top k.
+5. **CS728's version:** a probe = a query whose correct tool is known; a hit = the head's top attention lands on that tool's description. Keep the 10 heads with the most hits. At test time, sum those heads' attention over each tool's tokens and rank the tools. Recall@1 = the share of queries whose correct tool ranks first.
 
 ---
 

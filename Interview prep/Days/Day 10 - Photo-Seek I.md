@@ -104,27 +104,55 @@ Eval scripts, metric code only: `eval/retrieval.py`, `eval/router.py`, `eval/off
 
 ## Code, explained
 
-Read this **with the files open**. Each part has a small figure of the pipeline, then the exact code (copied from the repo at the commit named below, so the line numbers match), then what it does and how it hands off to the next piece.
+Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 Repo `photo_seek`, branch **`upgrade-2026-10`** (`aa5d476`); read it with
 `git show upgrade-2026-10:<path>`. Paths below are under `src/photoseek/`.
 
 ```mermaid
-flowchart LR
-  Q["'photos of mom at the beach<br/>last summer'"] --> HY["HybridRouter.route<br/>router.py:383"]
-  HY --> LLM["OllamaRouter :314<br/>JSON schema, T=0"]
-  HY --> RU["RuleRouter :95<br/>regex dates"]
-  HY -->|"StructuredQuery"| RUN["SearchEngine.run<br/>engine.py:78"]
-  RUN --> SQL["candidate_ids :109<br/>SQL filters → id set"]
-  RUN --> CL["embed_texts<br/>clip.py:100"]
-  SQL -->|"subset"| FS["FaissStore.search :111<br/>IDSelectorBatch"]
-  CL -->|"512-d unit vector"| FS
+flowchart TB
+  Q["'photos of mom at the beach last summer'"] --> HY["HybridRouter.route  router.py:383"]
+  HY --> LLM["OllamaRouter :314<br/>people, place, text (JSON schema)"]
+  HY --> RU["RuleRouter :95<br/>dates by regex"]
+  LLM --> SQ["StructuredQuery<br/>the rules' dates win"]
+  RU --> SQ
+  SQ --> RUN["SearchEngine.run  engine.py:78"]
+  RUN --> SQL["candidate_ids :109<br/>SQL filters → set of photo ids"]
+  RUN --> CL["embed_texts  clip.py:100<br/>512-d unit vector"]
+  SQL -->|"allowed ids"| FS["FaissStore.search :111<br/>scores only those ids"]
+  CL --> FS
   FS --> RES["ranked photos"]
 ```
+
+### The flow, step by step
+
+The query **"photos of mom at the beach last summer"**, asked on **2026-11-05**, with `--router hybrid`.
+
+1. **LLM parse** (`OllamaRouter.route`, `router.py:314`): Ollama returns schema-constrained JSON: `people = ["mom"]`, `place = "beach"`, `text = ""`, plus its own guess at the dates. Any failure here would fall back to the rules (`:332`).
+2. **Rule parse** (`RuleRouter.route`, `:95`): `_extract_dates` matches "last summer" (`:118–123`). `_season_year`: November > August, so the year stays 2026 → **2026-06-01 to 2026-08-31** (`:183–186`).
+3. **Merge** (`:386`): the rules found a date, so their dates replace the LLM's.
+4. **Place check** (`engine.py:84–90`): no photo has the place label "beach" (nothing is reverse-geocoded), so "beach" moves into the CLIP text: `text = "beach"`, `place = None`.
+5. **SQL filters** (`candidate_ids`, `:109`): `taken_at >= '2026-06-01' AND taken_at < '2026-09-01' AND EXISTS (a face of identity "mom")`. Say that gives photos **{12, 40, 77}**. If nobody is named "mom", it returns an empty set and the search stops with no results.
+6. **Embed the text:** CLIP's text encoder turns "beach" into a 512-d unit vector (`clip.py:105–114`).
+7. **Vector search on the subset** (`faiss_store.py:131–145`): `IDSelectorBatch({12, 40, 77})` makes FAISS score only those three photos, by cosine similarity.
+8. **Hydrate** (`engine.py:207`): join the hits back to their paths and the people in them.
 
 ---
 
 ### 1. Parsing: the LLM for words, the rules for dates
+
+```mermaid
+flowchart TB
+  Q["query"] --> L["OllamaRouter.route :314"]
+  L -->|"valid JSON"| S1["LLM's StructuredQuery"]
+  L -->|"bad JSON, empty, timeout"| FB["fallback: RuleRouter<br/>last_fallback = True"]
+  Q --> R["RuleRouter.route :95"]
+  R --> D{"did the rules find a date?"}
+  S1 --> MERGE["HybridRouter.route :383"]
+  FB --> MERGE
+  D -->|"yes: use the rule dates"| MERGE
+  D -->|"no: keep the LLM's dates"| MERGE
+```
 
 `src/photoseek/search/router.py:314–337` (`upgrade-2026-10`)
 ```python
@@ -198,6 +226,19 @@ def route(self, query: str, *, limit: int | None = None) -> StructuredQuery:
 
 ### 2. Executing: filters first, then vectors
 
+```mermaid
+flowchart TB
+  SQ["StructuredQuery"] --> PL{"does any photo have that place label?  :84"}
+  PL -->|"no"| MV["move the place into the CLIP text"]
+  PL -->|"yes"| CI
+  MV --> CI["candidate_ids :109"]
+  CI -->|"None: no filters"| ALL["search every photo"]
+  CI -->|"empty set"| EMPTY["return nothing, e.g. unknown person"]
+  CI -->|"some ids"| TXT{"any text left to rank by?"}
+  TXT -->|"no"| DATE["sort by date, skip CLIP"]
+  TXT -->|"yes"| VEC["CLIP + FAISS on that subset"]
+```
+
 `src/photoseek/search/engine.py:84–107` (`upgrade-2026-10`)
 ```python
 if structured.place and not self._place_known(structured.place):
@@ -266,6 +307,16 @@ return {row["id"] for row in self.catalog.conn.execute(sql, params)}
 ---
 
 ### 3. The vector side: CLIP + FAISS
+
+```mermaid
+flowchart TB
+  I["each photo, at indexing time"] --> EI["CLIP image encoder → L2 normalise  clip.py:64"]
+  EI --> IX[("IndexIDMap2(IndexFlatIP)<br/>photo id → 512-d vector")]
+  T["query text"] --> E["CLIP text encoder → L2 normalise  clip.py:100"]
+  E --> S["FaissStore.search :111<br/>inner product = cosine"]
+  IX --> S
+  SUB["allowed ids from SQL"] -->|"IDSelectorBatch"| S
+```
 
 `src/photoseek/embed/clip.py:105–114` (`upgrade-2026-10`)
 ```python

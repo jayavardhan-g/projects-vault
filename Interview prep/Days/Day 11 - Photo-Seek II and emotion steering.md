@@ -113,7 +113,7 @@ Skim `faces/detect.py` (127 SCRFD `detect_array`) and `embed/arcface.py` (72 ali
 
 ## Code, explained
 
-Read this **with the files open**. Each part has a small figure of the pipeline, then the exact code (copied from the repo at the commit named below, so the line numbers match), then what it does and how it hands off to the next piece.
+Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 Morning: `photo_seek`, branch `upgrade-2026-10`
 (`aa5d476`, paths under `src/photoseek/`). Afternoon: `emotion_steering/Project.ipynb` (`d725cbe`); notebook
@@ -124,16 +124,29 @@ references are **cell N, line L**.
 ### Part 1: Photo-Seek faces
 
 ```mermaid
-flowchart LR
-  DB[("faces: ArcFace 512-d,<br/>identity_id, is_pinned")] --> NB["next_batch<br/>active.py:97"]
-  NB -->|"margin: d2 − d1 smallest"| UI["user: confirm / reject / name"]
-  UI --> REC["record :173<br/>append to corrections, pin face"]
-  REC -->|"≥ 25 pending"| RF["ActiveLearner.refine :290"]
-  RF --> HD["fit head on pinned faces<br/>(added nothing)"]
-  RF --> CR["IdentityClusterer.refine<br/>cluster.py:174"]
-  CR --> PS["persist :341<br/>stable identity ids"]
+flowchart TB
+  DB[("faces: ArcFace vector,<br/>identity_id, is_pinned")] --> NB["next_batch  active.py:97<br/>margin: d2 − d1 smallest first"]
+  NB --> UI["user answers: confirm, reject or name"]
+  UI --> REC["record :173<br/>log the correction, pin the face"]
+  REC -->|"25 pending corrections"| RF["ActiveLearner.refine :290"]
+  RF --> HD["fit the adapter head<br/>(it added nothing)"]
+  RF --> CR["IdentityClusterer.refine  cluster.py:174"]
+  CR --> PS["persist :341<br/>identity ids stay stable"]
   PS --> DB
 ```
+
+#### The flow, step by step (faces)
+
+One face goes from "unsure" to "fixed".
+
+1. **Pick the question** (`next_batch`, `active.py:97`). Face f is assigned to identity 7. Distances: d1 = 0.40 to identity 7, d2 = 0.38 to identity 9. Its margin `d2 − d1` is tiny, so the **margin** strategy asks about it first (`:141–144`).
+2. **The user says "not this person"** → `answer(…, "reject")` → `record` (`:173`) appends a `reject (f, 7)` row to `corrections`. It's committed at once.
+3. **After 25 pending corrections**, `refine()` runs (`:290`):
+   - fit the adapter head on the pinned faces (only if there are ≥ 20 labels across ≥ 3 identities);
+   - read every `reject` row as a cannot-link: f can't be in 7 (`:319–325`);
+   - call `IdentityClusterer.refine` (`cluster.py:174`).
+4. **Inside the clusterer:** the distance to each identity is `1 − x · mean(members)` (`:232–233`). For f, identity 7 becomes ∞. f's own identity is no longer allowed, so the `elif` branch applies: the nearest allowed identity is 9 at 0.38 ≤ 0.75, so **f joins 9** (`:243–249`).
+5. **Persist** (`:341`) writes the new assignments, keeping identity ids stable. **Only then** are the 25 corrections marked consumed (`active.py:333`).
 
 #### 1. Which face to ask about: `next_batch`
 
@@ -177,6 +190,19 @@ elif strategy == "random":
 - `_spread` caps questions at 2 per proposed identity, so one big messy cluster doesn't eat the whole batch.
 
 #### 2. Updating clusters without starting over: `IdentityClusterer.refine`
+
+```mermaid
+flowchart TB
+  F["a face that isn't pinned"] --> D["distance to each identity<br/>1 − x · mean(members)"]
+  D --> RJ["identities the user rejected for it → ∞"]
+  RJ --> O{"is its own identity still allowed?"}
+  O -->|"yes"| MV{"is another identity strictly closer?"}
+  MV -->|"yes"| TO["move there"]
+  MV -->|"no"| STAY["stay"]
+  O -->|"no, or unassigned"| TH{"nearest allowed ≤ 0.75?"}
+  TH -->|"yes"| JOIN["join the nearest"]
+  TH -->|"no"| LEFT["leftover: clustered among themselves"]
+```
 
 `src/photoseek/faces/cluster.py:232–249` (`upgrade-2026-10`)
 ```python
@@ -243,16 +269,28 @@ self.catalog.consume_corrections([row["id"] for row in pending])
 ### Part 2: Emotion steering
 
 ```mermaid
-flowchart LR
-  CAL["15 + 15 sentences per axis"] --> HS["one forward, output_hidden_states<br/>last token of all 17 states (cell 4:15)"]
-  HS --> DM["mean(pos) − mean(neg), normalise<br/>(cell 4:48-51)"]
+flowchart TB
+  CAL["15 + 15 sentences per axis"] --> HS["one forward each, all 17 hidden states<br/>keep the last token  cell 4:15"]
+  HS --> DM["mean(pos) − mean(neg), normalise<br/>cell 4:48–51"]
   DM --> VEC[("vectors[state][axis]")]
-  VEC -->|"set_layer(L): index L+1"| HK["forward hook on layer L<br/>hidden[:, -1] += vec (cell 4:64)"]
+  VEC -->|"set_layer(L) reads index L + 1"| HK["forward hook on layer L<br/>hidden[:, −1] += α · v   cell 4:64"]
   HK --> GEN["generate, T = 0.8, seeded"]
-  GEN --> GD["guard: ppl ratio vs same-seed baseline<br/>ladder 1.0 → 0.25 (cell 6:51)"]
+  GEN --> GD["guard: perplexity ratio vs a same-seed baseline<br/>ladder 1.0 → 0.25   cell 6:51"]
 ```
 
 #### 4. Calibration: difference of means
+
+##### The flow, step by step (steering)
+
+The Gradio demo with the prompt "I am waiting for the results.", **Joy = 5**, **layer 9**, guard on, seed 0
+(perplexities below are illustrative).
+
+1. `set_layer(9)` makes the active vectors `all_layer_vectors[10]`: index 10 is layer 9's output, since index 0 is the embeddings (cell 4:61).
+2. `vec = 5 × v_joy`, a vector of norm 5 (cell 5:12–15).
+3. **Baseline:** `generate(strength = 0, seed = 0)`. The hook is registered but adds nothing. Its continuation's perplexity is, say, 8.0 (cell 6:58–60).
+4. **Rung 1.0:** `generate(manual_vec = vec, seed = 0)`. At layer 9, the hook adds `vec` to the last position on every forward pass (cell 4:64–72). Same seed, so the only difference from the baseline is the vector.
+5. **Check:** the steered continuation is scored by the **unsteered** model, giving a perplexity of, say, 11.2. Ratio 1.4 ≤ 1.75 → **accepted** (cell 6:66–80). Above 1.75, it would retry at 0.75, 0.5 and 0.25 of the vector, then fall back to the baseline.
+6. The classifier labels both texts; the demo shows them side by side with the rung table.
 
 `Project.ipynb` cell 4, lines 15–19
 ```python
@@ -325,6 +363,17 @@ finally:
 - `torch.manual_seed(seed)` right before `generate`: the steered and baseline runs draw the same random numbers, so they differ only by the vector (story S2).
 
 #### 6. The guard: back off before the text collapses
+
+```mermaid
+flowchart TB
+  B["baseline: strength 0, seed s → base_ppl"] --> R["try: vec × scale, same seed s"]
+  R --> P["perplexity of the steered text<br/>under the UNsteered model"]
+  P --> Q{"ppl ÷ base_ppl ≤ 1.75?<br/>(a NaN ratio also passes)"}
+  Q -->|"yes"| OK["return the steered text"]
+  Q -->|"no"| N{"rungs left: 1.0 → 0.75 → 0.5 → 0.25"}
+  N -->|"yes"| R
+  N -->|"no"| BASE["return the baseline, collapsed = True"]
+```
 
 `Project.ipynb` cell 6, lines 45–48
 ```python

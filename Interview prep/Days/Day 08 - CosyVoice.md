@@ -123,23 +123,49 @@ For each, write one line: what question did it answer, and what was the answer? 
 
 ## Code, explained
 
-Read this **with the files open**. Each part has a small figure of the pipeline, then the exact code (copied from the repo at the commit named below, so the line numbers match), then what it does and how it hands off to the next piece.
+Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 Repo `/data/jayavardhan/cosyvoice_rnd` (`0bb4e20`). Your code is `scripts/`;
 `cosyvoice/` is Alibaba's upstream package (one function from it is here because your loss comes from it).
 
 ```mermaid
-flowchart LR
-  PQ[("IndicVoices-R parquet<br/>audio + transcript")] --> PT["phase4a_pretokenize<br/>frontend extractors"]
-  PT -->|"one .pt per clip"| DS["CachedTokenDataset + collate_fn<br/>phase4b :42 :55"]
-  DS --> TR["train loop phase4b :228<br/>LoRA on Qwen2 only, bf16"]
-  TR -->|"best/lora.pt (adapter only)"| GEN["phase4c_generate<br/>inject LoRA + load + zero-shot TTS"]
-  GEN -->|"wav per sentence"| EV["phase5_eval_wer<br/>IndicConformer → jiwer"]
+flowchart TB
+  PQ[("IndicVoices-R parquet<br/>audio + transcript")] --> PT["phase4a_pretokenize<br/>speech tokens, text tokens, speaker emb"]
+  PT -->|"one .pt file per clip"| DS["CachedTokenDataset + collate_fn<br/>phase4b :42, :55"]
+  DS --> TR["training loop  phase4b :228<br/>LoRA on Qwen2 only, bf16"]
+  TR -->|"best/lora.pt: the adapter only"| GEN["phase4c_generate<br/>inject LoRA, load it, zero-shot TTS"]
+  GEN -->|"one wav per test sentence"| EV["phase5_eval_wer<br/>IndicConformer ASR → jiwer"]
 ```
+
+### The flow, step by step
+
+Follow **one Hindi clip**: 4 seconds of audio with a transcript of about 20 text tokens.
+
+1. **Pretokenize** (`phase4a_pretokenize.py:140–169`): the audio becomes **100 S3 speech tokens** (25 Hz × 4 s), the transcript becomes ~20 text tokens, and a 192-d speaker embedding is extracted. All three are saved in one `.pt` file.
+2. **Batch** (`phase4b_train_lora.py:66–89`): 4 clips are padded to the longest, and the true lengths are kept.
+3. **Build the sequence** (upstream `Qwen2LM.forward` → `prepare_lm_input_target`, `cosyvoice/llm/llm.py:318–343`):
+   - half the time (unistream): `[sos, 20 text, task_id, 100 speech]` = 122 inputs;
+   - the other half (bistream): text and speech interleaved 5 : 15.
+4. **Targets:** `IGNORE_ID` for the first 21 positions (sos + text), then the 100 speech tokens and `eos`. So the loss is cross-entropy on **101 positions**: given the text, predict each next speech token (`llm.py:400–405`).
+5. **Backward:** the loss is divided by 4 (gradient accumulation), and only the LoRA `A`/`B` matrices get gradients. Every 4 batches: clip the gradient norm to 1.0, AdamW step (`phase4b:235–250`).
+6. **Every 300 steps:** validate; on a new best, save only the trainable tensors to `best/lora.pt` (`:267–278`).
+7. **Inference** (`phase4c_generate.py`): rebuild the LoRA structure, copy in `lora.pt`, call `inference_zero_shot(text, prompt text, prompt wav)` → a wav.
+8. **Score** (`phase5_eval_wer.py`): IndicConformer transcribes the wav, both texts are normalised, `jiwer` gives this clip's WER, and the report averages over clips.
 
 ---
 
 ### 1. Pretokenize once, so training never runs the frozen tokenisers
+
+```mermaid
+flowchart TB
+  A["clip audio (parquet bytes)"] --> W["temporary .wav"]
+  W --> ST["_extract_speech_token :141<br/>S3 tokens, 25 Hz: the TARGET"]
+  W --> SE["_extract_spk_embedding :146<br/>192-d; used by the flow model only"]
+  T["normalised transcript"] --> TT["_extract_text_token :153<br/>the CONDITION"]
+  ST --> PT[("hi_….pt  :162")]
+  SE --> PT
+  TT --> PT
+```
 
 `scripts/phase4a_pretokenize.py:140–169`
 ```python
@@ -182,6 +208,14 @@ torch.save({
 ---
 
 ### 2. Batching and LoRA injection
+
+```mermaid
+flowchart TB
+  CV["CosyVoice 2: llm + flow + hift"] --> FR["freeze all three  :155"]
+  FR --> Q["inner Qwen2: cv.model.llm.llm.model"]
+  Q --> INJ["inject_adapter_in_model :101<br/>LoRA r 16, α 32 on q k v o gate up down"]
+  INJ --> TR["trainable: only lora_A and lora_B<br/>8,798,208 parameters"]
+```
 
 `scripts/phase4b_train_lora.py:66–89`
 ```python
@@ -268,14 +302,14 @@ log({"event": "lora_applied",
 ### 3. What the loss actually is (upstream `Qwen2LM`)
 
 ```mermaid
-flowchart LR
-  subgraph UNI["unistream (50%)"]
+flowchart TB
+  subgraph UNI["unistream: half the time"]
     u1["sos"] --> u2["text tokens"] --> u3["task_id"] --> u4["speech tokens"] --> u5["eos"]
   end
-  subgraph BI["bistream (50%, if speech/text > 3)"]
+  subgraph BI["bistream: the other half, if speech / text > 3"]
     b1["sos"] --> b2["5 text"] --> b3["15 speech"] --> b4["5 text"] --> b5["15 speech …"]
   end
-  UNI --> L["loss = cross-entropy on speech positions only<br/>(text positions = IGNORE_ID)"]
+  UNI --> L["loss = cross-entropy on speech positions only<br/>text positions are IGNORE_ID"]
   BI --> L
 ```
 
@@ -321,6 +355,18 @@ return {'loss': loss, 'acc': acc}
 ---
 
 ### 4. The training loop
+
+```mermaid
+flowchart TB
+  B["batch of 4 clips"] --> F["forward in bf16 autocast<br/>loss ÷ 4"]
+  F --> BW["backward: LoRA gradients only"]
+  BW --> ACC{"4 batches accumulated?"}
+  ACC -->|"no"| B
+  ACC -->|"yes"| ST["clip grad norm to 1.0 → AdamW step"]
+  ST --> V{"step is a multiple of 300?"}
+  V -->|"yes"| VAL["validate: save best lora.pt,<br/>or patience − 1 → early stop"]
+  V -->|"no"| B
+```
 
 `scripts/phase4b_train_lora.py:235–250`
 ```python
@@ -378,6 +424,16 @@ else:
 ---
 
 ### 5. Generate and score
+
+```mermaid
+flowchart TB
+  L["inject LoRA structure, load lora.pt<br/>phase4c :101, :105"] --> G["inference_zero_shot(text, prompt text, prompt wav)  :139"]
+  G --> WAV["h01_hi.wav, h02_hi.wav, …"]
+  WAV --> ASR["IndicConformer transcribes  phase5 :135"]
+  ASR --> N["normalise both texts  :30"]
+  N --> WER["jiwer WER per clip  :142"]
+  WER --> M["mean over clips  :169"]
+```
 
 `scripts/phase4c_generate.py:59–68`
 ```python

@@ -101,21 +101,33 @@ generated? Where is the ratio computed?
 
 ## Code, explained
 
-Read this **with the files open**. Each part has a small figure of the pipeline, then the exact code (copied from the repo at the commit named below, so the line numbers match), then what it does and how it hands off to the next piece.
+Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 Repo `vLLMmini`, branch `main` (`3679394`). Builds on
 [[Day 01 - mini-vLLM I#Code, explained]] (slots, gather) and [[Day 02 - mini-vLLM II#Code, explained]] (the step loop).
 
 ```mermaid
-flowchart LR
-  HTTP["POST /generate<br/>server.py"] --> SUB["EngineLoop.submit :156"]
-  SUB --> LOOP["EngineLoop.run :211<br/>step() forever"]
-  LOOP --> STEP["engine.step"] --> FWD["PagedLlama.forward"]
-  FWD -->|"all query_lens == 1"| TK["Triton kernel<br/>paged_attention_triton.py:64"]
-  FWD -->|"any prefill"| NV["naive gather path<br/>paged_attention.py:172"]
-  BENCH["benchmarks/serving.py<br/>paired_rounds :229"] -.->|same requests| STEP
-  BENCH -.-> HF["HF static batching<br/>run_hf :86"]
+flowchart TB
+  HTTP["POST /generate  server.py"] --> SUB["EngineLoop.submit :156"]
+  SUB --> LOOP["EngineLoop.run :211<br/>step() while there is work"]
+  LOOP --> FWD["engine.step → PagedLlama.forward"]
+  FWD -->|"every query_len == 1"| TK["Triton decode kernel<br/>paged_attention_triton.py:64"]
+  FWD -->|"any prefill in the batch"| NV["naive gather path<br/>paged_attention.py:172"]
+  BENCH["benchmarks/serving.py<br/>paired_rounds :229"] -.->|"same requests"| HF["HF static batching  run_hf :86"]
+  BENCH -.->|"same requests"| FWD
 ```
+
+### The flow, step by step
+
+One pure-decode step on the live server, with **two** running requests: request 0 has **300** tokens of context,
+request 1 has **40**. Block size 16.
+
+1. **A request arrives.** The HTTP handler calls `EngineLoop.submit` (`server.py:156`). `engine.add_request` runs first, so a request that can never fit is rejected before anything is registered (`:175`). Then `_work.set()` wakes the loop.
+2. **The loop steps.** `run()` (`:211`) calls `engine.step()`. The scheduler returns both requests with one token each, so `query_lens = [1, 1]`.
+3. **Pick the kernel, once.** In `forward`, `can_use_decode_kernel([1, 1])` (`paged_attention_triton.py:196`) is true, so `build_decode_metadata` (`:164`) pads the two block tables into one int32 tensor `[2, 19]`. That's ceil(300/16) = 19 blocks; request 1's 3 blocks are padded with zeros. This is built **once**, then reused by all 16 layers.
+4. **Each layer** writes the two new tokens' K, V, then calls `paged_attention_decode` (`:207`), which launches a grid of **(2 sequences × 32 heads) = 64 programs**.
+5. **Inside program (seq 0, head 5):** `kv_head = 5 // 4 = 1`. It loops over the 300 positions in tiles of 128 (starts 0, 128, 256). Each tile looks up physical blocks through the table, loads K, masks positions ≥ 300 to −∞, updates the running max `m`, sum `l` and output `acc`, then loads V. At the end it stores `acc / l`, a 64-float vector.
+6. **Back in the loop:** argmax → `update`; `_drain_streams` (`server.py:194`) pushes the new tokens to streaming clients; finished requests resolve their futures; `await asyncio.sleep(0)` lets the HTTP handlers run, so a new request can join the next step.
 
 ---
 
@@ -290,13 +302,13 @@ tl.store(
 ### 3. The benchmark: like for like, paired
 
 ```mermaid
-flowchart LR
-  LEN["identical length list<br/>uniform or varied"] --> R{"round r"}
-  R -->|"r even: HF first"| A["run_hf → run_ours"]
-  R -->|"r odd: ours first"| B["run_ours → run_hf"]
+flowchart TB
+  LEN["one length list for both arms<br/>uniform or varied"] --> R{"round r"}
+  R -->|"r even"| A["run_hf, then run_ours"]
+  R -->|"r odd"| B["run_ours, then run_hf"]
   A --> RT["ratio = ours tok/s ÷ HF tok/s"]
   B --> RT
-  RT --> MED["median of per-round ratios"]
+  RT --> MED["median of the per-round ratios<br/>+ print that round's details"]
 ```
 
 `benchmarks/serving.py:99–125`
@@ -388,13 +400,13 @@ idx = ratios.index(median_ratio) if len(ratios) % 2 else min(
 ### 4. The server: one loop, many waiters
 
 ```mermaid
-flowchart LR
-  H1["handler A"] -->|submit| PEND[("_pending: id → future/queue")]
-  H2["handler B"] -->|submit| PEND
-  PEND -->|"_work.set()"| RUN["run(): step() while work"]
-  RUN -->|"tokens → queue (streaming)"| H1
+flowchart TB
+  H1["request handler A"] -->|"submit"| PEND[("_pending<br/>id → future, stream queue")]
+  H2["request handler B"] -->|"submit"| PEND
+  PEND -->|"_work.set()"| RUN["EngineLoop.run<br/>step() while there is work"]
+  RUN -->|"new tokens → stream queue"| H1
   RUN -->|"finished → future.set_result"| H2
-  RUN -->|"await sleep(0)"| H1
+  RUN -->|"await sleep(0): handlers get to run"| RUN
 ```
 
 `src/mini_vllm/server.py:168–182`

@@ -114,7 +114,7 @@ On `upgrade-2026-10`:
 
 ## Code, explained
 
-Read this **with the files open**. Each part has a small figure of the pipeline, then the exact code (copied from the repo at the commit named below, so the line numbers match), then what it does and how it hands off to the next piece.
+Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 Morning: `decs/project/` (`82de05e`). Afternoon: `microexchange`,
 branch **`upgrade-2026-10`** (`1fc2869`), read with `git show upgrade-2026-10:<path>`.
@@ -124,17 +124,43 @@ branch **`upgrade-2026-10`** (`1fc2869`), read with `git show upgrade-2026-10:<p
 ### Part 1: DECS
 
 ```mermaid
-flowchart LR
-  K6["k6 VU<br/>GET /val?id=1234"] --> TP["cpp-httplib thread pool<br/>1 worker per keep-alive conn"]
-  TP --> H["GET handler<br/>server.cpp:81"]
-  H -->|"hit"| C[("KVCache<br/>list + map + mutex")]
-  H -->|"miss"| P["LibpqxxPool.acquire<br/>DBPool.h:31"]
-  P --> PG[("Postgres<br/>BEGIN · SELECT · COMMIT")]
-  PG -->|"row"| H
-  H -->|"cache.put"| C
+flowchart TB
+  K6["k6 virtual user<br/>GET /val?id=1234"] --> TP["cpp-httplib thread pool<br/>one worker per keep-alive connection"]
+  TP --> H["GET handler  server.cpp:81"]
+  H -->|"hit"| C[("KVCache: list + map + one mutex")]
+  H -->|"miss"| P["LibpqxxPool.acquire  DBPool.h:31"]
+  P --> PG[("Postgres: BEGIN · SELECT · COMMIT")]
+  PG -->|"row found"| PUT["cache.put, reply 200"]
+  PUT --> C
 ```
 
+#### The flow, step by step (DECS)
+
+A GET for key **1234** that misses, then the same GET again.
+
+1. A k6 virtual user sends `GET /val?id=1234` on its keep-alive connection.
+2. The worker thread that owns that connection parses the request and calls the handler at `server.cpp:81`.
+3. `parse_id` gives 1234 (bad ids get a 400). `cache.get` locks the mutex and **misses** (`KVCache.h:21–25`).
+4. `pool.acquire()` waits on the condition variable until a database connection is free (`DBPool.h:31–37`).
+5. `BEGIN`, `SELECT value … WHERE id = $1`, `COMMIT`: **three round trips** to Postgres (`server.cpp:107–110`). Then `pool.release(conn)` (`:111`).
+6. The row exists, so `cache.put` inserts it at the front of the LRU list and evicts the tail if the cache is full (`KVCache.h:34–44`). Reply 200.
+7. cpp-httplib writes the headers and the body in **two** `write()` calls. With `TCP_NODELAY` off, Nagle holds the body until the client ACKs the headers, and the client delays that ACK ~40 ms: the **43 ms floor**.
+8. **The second GET for 1234 hits:** `splice` moves the node to the front, and the handler returns at `:100–101` without touching Postgres.
+
 #### 1. The LRU cache
+
+```mermaid
+flowchart TB
+  G["get(key)"] --> M{"key in the index map?"}
+  M -->|"no"| MISS["return false"]
+  M -->|"yes"| SP["splice the node to the list front<br/>(now most recent)"]
+  P["put(key, v)"] --> E{"key present?"}
+  E -->|"yes"| RM["erase its old node"]
+  E -->|"no, cache full"| EV["evict the list back (least recent)"]
+  E -->|"no, room left"| FR
+  RM --> FR["insert at the front; map[key] = front"]
+  EV --> FR
+```
 
 `project/KVCache.h:12–46`
 ```cpp
@@ -181,6 +207,17 @@ public:
 - **One mutex** for everything: simple and correct, but every reader serialises on it. At 11K requests/s that lock is part of the per-request CPU cost. A sharded cache (N mutexes by key hash) is the standard fix.
 
 #### 2. The connection pool
+
+```mermaid
+flowchart TB
+  A["acquire()"] --> W{"queue empty?"}
+  W -->|"yes"| SL["cv.wait: sleep (no timeout)"]
+  SL --> W
+  W -->|"no"| POP["pop a connection"]
+  POP --> USE["handler: BEGIN, query, COMMIT"]
+  USE --> R["release(): push back, unlock, notify_one"]
+  R -->|"wakes one waiter"| SL
+```
 
 `project/DBPool.h:31–44`
 ```cpp
@@ -247,6 +284,20 @@ try {
 
 #### 4. Two bugs to know before anyone points at them
 
+```mermaid
+flowchart TB
+  subgraph RACE["cache-aside race: two PUTs to one key"]
+    A1["PUT A commits to the DB"] --> B1["PUT B commits to the DB"]
+    B1 --> B2["PUT B: cache.put(B)"]
+    B2 --> A2["PUT A: cache.put(A)<br/>cache now stale: DB says B"]
+  end
+  subgraph LEAK["connection leak: DELETE"]
+    O["outer conn = nullptr  :190"] --> I["inner conn = acquire()  :192<br/>shadows the outer one"]
+    I --> X["the query throws"]
+    X --> C["catch sees the outer conn = null<br/>so it is never released"]
+  end
+```
+
 `project/server.cpp:158–163`
 ```cpp
 txn.exec_params(sql, id_int, val);
@@ -278,17 +329,28 @@ try {
 ### Part 2: Micro Exchange
 
 ```mermaid
-flowchart LR
-  PR["producer thread<br/>pinned core A"] -->|"push: write slot, release head"| RB[("SPSC ring<br/>65,536 slots")]
-  RB -->|"pop: acquire head, read slot"| ME["MatchingEngine.apply<br/>pinned core B"]
-  ME -->|"1. log first"| WAL[("mmap WAL<br/>append + release count")]
+flowchart TB
+  PR["producer thread, core A"] -->|"push: write slot, release-store head"| RB[("SPSC ring, 65,536 slots")]
+  RB -->|"pop: acquire-load head, read slot"| ME["MatchingEngine.apply, core B"]
+  ME -->|"1. log first"| WAL[("mmap WAL<br/>append + release-store count")]
   ME -->|"2. then apply"| OB["OrderBook.submit / cancel"]
-  OB --> LV[("flat Level arrays by price<br/>intrusive FIFO lists")]
+  OB --> LV[("flat price levels<br/>an intrusive FIFO per price")]
   OB --> IX[("IdTable: id → Order*")]
-  OB --> POOL[("ObjectPool&lt;Order&gt;")]
+  OB --> POOL[("ObjectPool of Orders")]
 ```
 
 #### 5. The lock-free SPSC ring buffer
+
+##### The flow, step by step (Micro Exchange)
+
+A **buy 70 @ 102** arrives; resting sells at 101 are S1 (40, the older) and S2 (20).
+
+1. **Producer** (`ring_buffer.hpp:27–35`): copy the 40-byte command into `slots_[head & mask]`, then `head_.store(head + 1, release)`.
+2. **Matching thread** (`:38–46`): `head_.load(acquire)` sees the new head, so the slot copy sees the whole command. Copy it out, then `tail_.store(tail + 1, release)` frees the slot.
+3. **Log first** (`matching_engine.hpp:25` → `wal_logger.hpp:76–82`): copy the command into the mmap'd log, then release-store the new record count.
+4. **Match** (`order_book.cpp:114`): the order is valid. `best_ask_ = 101 ≤ 102`, so trade against the level head, the oldest order: S1 fills 40 and is unlinked by `erase_order` (two pointer fixes, the id-table erase, back to the pool). S2 fills 20 and is erased too. Level 101 is now empty, so `raise_best_ask` scans upward.
+5. **Rest the remainder** (`rest`, `:90–112`): 70 − 60 = **10** remain. Take an `Order` from the pool, append it at the tail of bid level 102, insert its id into the id table, and set `best_bid_ = 102`.
+6. **Latency:** `rdtsc() − c.tsc` goes into the histogram (`matching_engine.hpp:29–30`). Meanwhile the follower thread reads the new log count with acquire, replays the command on its replica, and takes snapshots off the hot path.
 
 `include/core/ring_buffer.hpp:27–47` (`upgrade-2026-10`)
 ```cpp
@@ -332,6 +394,22 @@ size_t head_cache_ = 0;  // consumer's view of head_
 - `alignas(64)` puts `head_` and `tail_` on separate cache lines, so the producer writing `head_` doesn't keep invalidating the consumer's line (**false sharing**).
 
 #### 6. Matching: price-time priority with O(1) unlinking
+
+```mermaid
+flowchart TB
+  IN["buy qty @ price"] --> X{"best_ask ≤ price?"}
+  X -->|"no"| REST["rest the remainder  :90<br/>at the tail of its price level"]
+  X -->|"yes"| H["maker = head of that level (the oldest)"]
+  H --> F["fill min(qty, maker.qty)"]
+  F --> E{"maker fully filled?"}
+  E -->|"no: the incoming order is done"| DONE["done"]
+  E -->|"yes"| U["erase_order :82<br/>2 pointer fixes + id table + pool"]
+  U --> Q{"qty left?"}
+  Q -->|"no"| DONE
+  Q -->|"yes, level still has orders"| H
+  Q -->|"yes, level empty"| RB["raise_best_ask → next price"]
+  RB --> X
+```
 
 `src/order_book.cpp:126–143` (`upgrade-2026-10`)
 ```cpp
@@ -390,6 +468,18 @@ void erase_from(Levels& levels, const OrderPtr& o) {
 - **What "O(n) cancellation" really meant:** the naive engine finds the order by id in O(1) too, but then **walks the price level's `std::list`** to find the node, which is O(orders at that price). Plus `std::map` levels and `shared_ptr` orders: an allocation per order (983,976 allocations vs 3).
 
 #### 7. Write-ahead log
+
+```mermaid
+flowchart TB
+  C["command"] --> L["Journal.log → WalLogger.append :76"]
+  L --> FULL{"segment full?"}
+  FULL -->|"yes"| ROT["rotate: seal it, switch segment"]
+  FULL -->|"no"| WR["copy 40 bytes into the mmap"]
+  ROT --> WR
+  WR --> PUB["release-store count + 1"]
+  PUB --> AP["only THEN Exchange.apply changes the book"]
+  PUB -.->|"acquire-load count"| FOL["follower thread: replica, snapshots"]
+```
 
 `include/engine/matching_engine.hpp:24–31` (`upgrade-2026-10`)
 ```cpp

@@ -106,27 +106,53 @@ Upgrade-only: `start_pre_vote` (283), `take_snapshot` (186), `handle_install_sna
 
 ## Code, explained
 
-Read this **with the files open**. Each part has a small figure of the pipeline, then the exact code (copied from the repo at the commit named below, so the line numbers match), then what it does and how it hands off to the next piece.
+Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 Repo `raftkv`: the **upgrade** is branch `upgrade-2026-10` (`bad36f1`), the
 **original** is commit `2a19135` (= `origin/main`). Your local `main` was fast-forwarded to the upgrade, so read the
 original by commit id. Snippets are from the upgrade unless marked.
 
 ```mermaid
-flowchart LR
-  TK["ticker_loop :409<br/>timeout → election"] --> SE["start_election :333<br/>term+1, vote self"]
-  SE -->|"RequestVote"| RV["handle_request_vote :711<br/>term · one vote · up-to-date log"]
-  RV -->|"majority"| BL["become_leader :229<br/>nextIndex, NOOP"]
-  BL --> RP["replicator_loop :450<br/>1 thread per follower"]
-  RP -->|"AppendEntries"| AE["handle_append_entries :770<br/>match prev · append · commit bound"]
-  AE -->|"success → matchIndex"| MC["maybe_advance_commit :255<br/>current-term majority"]
-  MC --> AP["apply_loop :588<br/>state machine"]
-  AE -.->|"every state change"| PS["persist → write_durably<br/>storage.cpp:78"]
+flowchart TB
+  TK["ticker_loop :409<br/>election timeout fires"] --> SE["start_election :333<br/>term + 1, vote for self"]
+  SE -->|"RequestVote"| RV["handle_request_vote :711"]
+  RV -->|"majority of votes"| BL["become_leader :229<br/>nextIndex, NOOP entry"]
+  BL --> RP["replicator_loop :450<br/>one thread per follower"]
+  RP -->|"AppendEntries"| AE["handle_append_entries :770"]
+  AE -->|"success → matchIndex"| MC["maybe_advance_commit :255"]
+  MC --> AP["apply_loop :588 → state machine"]
+  AE -.->|"every state change"| PS["persist → write_durably  storage.cpp:78"]
 ```
+
+### The flow, step by step
+
+`python3 scripts/client.py set city mumbai` on a 3-node cluster. n1 is leader in **term 2**; its log ends at index 6.
+
+1. **Submit** (`submit`, `raft_node.cpp:619`): the leader appends entry **7** = `(term 2, "SET city mumbai")`, calls `persist()`, and wakes the replicators. The client call waits for the commit, with a timeout.
+2. **Replicate:** n1's replicator for n2 sends `AppendEntries(term 2, prev = 6 / term 2, entries = [7], leader_commit = 6)`.
+3. **The follower checks and appends** (`handle_append_entries`, `:770`): the term is current; its entry 6 has term 2, so the logs match (`:834`). It appends 7 (`:848–857`), persists, and replies success.
+4. **Commit** (`maybe_advance_commit`, `:255`): `matchIndex[n2] = 7`. Entry 7 is from the current term, and it's on 2 of 3 nodes (leader + n2) = a majority, so **commit_index = 7**.
+5. **Apply:** `apply_loop` (`:588`) applies `SET city mumbai` to the key-value map, and `submit` returns OK to the client.
+6. **Followers learn about the commit** on the next heartbeat (`leader_commit = 7`): each sets `commit = min(7, last new entry)` (`:862–865`) and applies too.
+7. **If n1 crashes after step 4:** n2 has entry 7. n3, which lacks it, can't win an election, because n2 won't vote for a less up-to-date log (`:747–748`). So the committed entry survives.
 
 ---
 
 ### 1. Voting: three rules, in order
+
+```mermaid
+flowchart TB
+  RV["RequestVote(term, candidate, last index, last term)"] --> T{"term > mine?"}
+  T -->|"yes"| SD["become follower at that term<br/>(forget the old vote)"]
+  T -->|"no"| S
+  SD --> S{"term < mine?"}
+  S -->|"yes"| NO1["refuse: stale term"]
+  S -->|"no"| V{"already voted for someone else?"}
+  V -->|"yes"| NO2["refuse"]
+  V -->|"no"| U{"candidate's log at least as up to date?"}
+  U -->|"no"| NO3["refuse: log behind"]
+  U -->|"yes"| YES["grant, persist, reset the timer"]
+```
 
 `src/raft_node.cpp:725–759` (`upgrade-2026-10`)
 ```cpp
@@ -174,6 +200,17 @@ if (term < current_term_) {
 - `persist()` before replying (line 766): a vote that's forgotten after a crash could let one node vote twice in one term, which could elect two leaders.
 
 ### 2. Becoming leader, and the commit rule
+
+```mermaid
+flowchart TB
+  N["n = last log index"] --> CT{"term_at(n) == current term?"}
+  CT -->|"no"| STOP["stop: never count old-term entries"]
+  CT -->|"yes"| CNT["replicas = 1 + followers with matchIndex ≥ n"]
+  CNT --> MJ{"replicas ≥ majority?"}
+  MJ -->|"yes"| COM["commit_index = n<br/>(everything before it commits too)"]
+  MJ -->|"no"| DEC["try n − 1"]
+  DEC --> CT
+```
 
 `src/raft_node.cpp:235–251` (`upgrade-2026-10`)
 ```cpp
@@ -306,6 +343,14 @@ if (leader_commit > commit_index_) {
 - **Story 1, the bug you fixed.** The original bounded the commit by `last_log_index()`, the end of the follower's *whole* log. But stale entries can sit past the entries this message just verified. The fix bounds it by the **last entry this message proved**. Trace: B holds stale term-3 entries 75..200; the leader sends 11..74 with `leader_commit = 300`. Old: `min(300, 200) = 200`, so B commits its stale 75..200, a safety violation. New: `min(300, 74) = 74`.
 
 ### 4. Durability
+
+```mermaid
+flowchart TB
+  B["serialised state: term, vote, log"] --> TMP["write raft_node_X.bin.tmp"]
+  TMP --> FS["fsync(tmp): the contents are durable"]
+  FS --> RN["rename tmp → .bin: an atomic swap"]
+  RN --> FD["fsync(directory): the rename is durable"]
+```
 
 `src/storage.cpp:78–91` (`upgrade-2026-10`)
 ```cpp

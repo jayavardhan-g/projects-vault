@@ -96,29 +96,56 @@ Also: "cited explanations" means **54.5%** of sentences carry a citation and **3
 
 ## Code, explained
 
-Read this **with the files open**. Each part has a small figure of the pipeline, then the exact code (copied from the repo at the commit named below, so the line numbers match), then what it does and how it hands off to the next piece.
+Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 Repo `bountybrain`, branch **`upgrade-2026-10`** (`4267980`); read it with
 `git show upgrade-2026-10:<path>`. Paths below are under `bountybrain/`.
 
 ```mermaid
-flowchart LR
-  T["'IDOR'"] --> FW["find_weakness<br/>kg/queries.py:78"]
-  FW -->|"CWE-639 + hierarchy,<br/>CAPEC, writeups"| CTX["KG context"]
-  T --> HS["search :176<br/>rag/hybrid.py"]
-  HS --> BM["_bm25_search :99<br/>top 40"]
-  HS --> DN["_dense_search :137<br/>bge-small → Qdrant, top 40"]
-  BM --> RRF["reciprocal_rank_fusion :155<br/>Σ 1/(60 + rank)"]
+flowchart TB
+  T["topic: 'IDOR'"] --> FW["find_weakness  kg/queries.py:78"]
+  T --> HS["search  rag/hybrid.py:176"]
+  FW -->|"CWE-639, CAPEC, writeups"| CTX["graph context"]
+  HS --> BM["BM25 :99, top 40"]
+  HS --> DN["dense :137, top 40"]
+  BM --> RRF["reciprocal_rank_fusion :155<br/>Σ 1 / (60 + rank)"]
   DN --> RRF
-  RRF -->|"fused[:40]"| RR["rerank<br/>rag/reranker.py:25<br/>cross-encoder → top 6"]
-  RR --> SRC["tutorial_sources<br/>agent/tools.py:102"]
-  CTX -->|"graph = last numbered source"| SRC
-  SRC --> GEN["generate_tutorial :137<br/>Qwen2.5-14B via vLLM"]
+  RRF -->|"fused top 40"| RR["cross-encoder rerank → top 6<br/>rag/reranker.py:25"]
+  RR --> SRC["tutorial_sources  agent/tools.py:102<br/>numbered passages"]
+  CTX -->|"graph facts = last numbered source"| SRC
+  SRC --> GEN["generate_tutorial :137<br/>Qwen2.5-14B through vLLM"]
 ```
+
+### The flow, step by step
+
+`POST /learn {"topic": "IDOR"}`, end to end.
+
+1. **Route:** `api/app.py:106` calls the tools in order. (At start-up, `_startup` at `:33` already ran a throwaway search, so the embedder, the reranker and BM25 are loaded.)
+2. **Resolve the topic** (`find_weakness`, `kg/queries.py:78`): "IDOR" is not a number, not `CWE-…` and not an exact name. The exact-alias query `aliases_json ILIKE '%"IDOR"%'` finds **CWE-639**, because the curated alias is stored in the graph.
+3. **Graph context:** its parent and child weaknesses (`:139`), the attack patterns (`:173`) and up to 8 disclosed writeups (`:244`).
+4. **Retrieve** (`search`, `rag/hybrid.py:176`, mode `hybrid_rerank`):
+   - dense: embed the query (with the BGE instruction prefix) → top 40 from Qdrant;
+   - BM25: score all 11,355 chunks in memory → top 40;
+   - RRF: sum `1/(60 + rank)` per chunk → one fused list;
+   - rerank: the cross-encoder scores the top 40 (query, chunk) pairs and keeps **6**.
+5. **Number the sources** (`tutorial_sources`, `agent/tools.py:102`): 6 passages cut to 1,200 characters, plus the graph summary as source **[7]**.
+6. **Generate** (`generate_tutorial`, `:137`): one chat call to vLLM, temperature 0, 2,048 tokens max. If it fails, a deterministic template is used instead (`:151–152`).
+7. **Labs** (`agent/labs.py:144`): practice labs found through the CWE id, walking up the CWE tree if needed. The response took 9.1 s in the end-to-end test.
 
 ---
 
 ### 1. Resolving a topic in the graph
+
+```mermaid
+flowchart TB
+  T["term"] --> N{"a number or 'CWE-n'?"}
+  N -->|"yes"| ID["look up by cwe_id"]
+  N -->|"no"| NM{"exact name?"}
+  NM -->|"yes"| HIT["return it"]
+  NM -->|"no"| AL{"exact alias in aliases_json?"}
+  AL -->|"yes"| BASE["return it, preferring the Base abstraction"]
+  AL -->|"no"| SUB["name substring match<br/>preferring the most specific (Variant)"]
+```
 
 `bountybrain/kg/queries.py:87–120` (`upgrade-2026-10`)
 ```python
@@ -258,6 +285,17 @@ def rerank(query: str, hits: list, top_n: int = 5) -> list:
 
 ### 3. Grounded generation
 
+```mermaid
+flowchart TB
+  P["6 reranked passages"] --> CUT["cut each to 1,200 chars<br/>number them [1] … [6]"]
+  G["graph facts: CWE, CAPEC, bounties"] --> SEVEN["number them as source [7]"]
+  CUT --> PR["tutorial prompt"]
+  SEVEN --> PR
+  PR --> LLM{"is vLLM up?"}
+  LLM -->|"yes"| TUT["cited tutorial, temperature 0"]
+  LLM -->|"no"| TPL["deterministic template"]
+```
+
 `bountybrain/agent/tools.py:110–125` (`upgrade-2026-10`)
 ```python
 numbered = [
@@ -297,6 +335,14 @@ except (LLMError, Exception):
 ---
 
 ### 4. The planner fix (story 4.2)
+
+```mermaid
+flowchart TB
+  ST["the products in your stack"] --> OBS["n_c = detection signatures of class c<br/>for these products"]
+  PRI["global prior of class c"] --> SH["(n_c + 25 · prior_c) ÷ (N + 25)<br/>planner.py:302"]
+  OBS --> SH
+  SH --> RANK["applicability → rank the weaknesses"]
+```
 
 `bountybrain/recon/planner.py:299–307` (`upgrade-2026-10`)
 ```python

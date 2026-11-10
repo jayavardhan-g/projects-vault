@@ -96,7 +96,7 @@ Report §1.1 and ch. 8. Prep pack §5.2 "Latency anchors" and "Error propagation
 
 ## Code, explained
 
-Read this **with the files open**. Each part has a small figure of the pipeline, then the exact code (copied from the repo at the commit named below, so the line numbers match), then what it does and how it hands off to the next piece.
+Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 The seminar was a reading project, so there is **no code of
 yours** today. Instead: one figure per pipeline, plus a few **illustrative** NumPy snippets (written for this note,
@@ -107,14 +107,28 @@ not from any repo) that make the quantisers concrete. Numbers come from [[Semina
 ### 1. Audio → features → tokens
 
 ```mermaid
-flowchart LR
-  W["waveform<br/>24 kHz × 16 bit = 384 kbps"] --> FR["frames: 25 ms window, 10 ms hop<br/>100 frames/s"]
-  FR --> MEL["log-mel (80 bins)<br/>Whisper input"]
-  MEL --> ENC["encoder (Whisper / HuBERT)<br/>continuous states, 50 Hz"]
-  ENC -->|"for understanding"| LLM["LLM input via adapter"]
-  ENC -->|"discretise"| Q["quantiser: VQ / RVQ / FSQ"]
-  Q --> TOK["token ids<br/>25–600 per second"]
+flowchart TB
+  W["waveform<br/>24 kHz × 16 bit = 384 kbps"] --> FR["frames: 25 ms window, 10 ms hop<br/>100 frames per second"]
+  FR --> MEL["log-mel, 80 bins<br/>(Whisper's input)"]
+  MEL --> ENC["encoder: Whisper or HuBERT<br/>continuous states, 50 Hz"]
+  ENC -->|"understanding"| LLM["into an LLM through an adapter"]
+  ENC -->|"generation"| Q["quantiser: VQ, RVQ or FSQ"]
+  Q --> TOK["token ids, 25 to 600 per second"]
 ```
+
+### The flow, step by step
+
+Follow **10 seconds of speech** through each representation, then back out of CosyVoice 2.
+
+1. **Raw audio:** 24,000 samples/s × 10 s = **240,000 samples** (384 kbps).
+2. **Frames:** a 10 ms hop gives **1,000 frames**, each turned into 80 log-mel values.
+3. **Encoder states:** Whisper's convolutions halve the rate to 50 Hz → **500 vectors**.
+4. **Tokens**, depending on the quantiser:
+   - EnCodec at 6 kbps: 75 frames/s × 8 codebooks = 600 tokens/s → **6,000 tokens**;
+   - WavTokenizer: 75 tokens/s → **750 tokens**;
+   - CosyVoice 2's S3 tokenizer: 25 tokens/s → **250 tokens**.
+5. **Why it matters:** an LM attending over 6,000 tokens does (6000/250)² ≈ **576×** the attention work of one over 250.
+6. **Back out (TTS):** text tokens → the CosyVoice 2 LM generates **250 S3 tokens** → flow matching turns them into a mel spectrogram (using the speaker embedding and prompt mel for the voice) → HiFi-GAN turns the mel into **240,000 samples** again.
 
 - **Continuous** features feed understanding (speech in, text out). **Discrete** tokens let an LM *generate* speech the way it generates text.
 - The **token rate** sets the sequence length: 10 s at 25 Hz = 250 tokens; at 600/s (EnCodec 6 kbps) = 6,000 tokens. That's 24× longer and ~576× the attention FLOPs.
@@ -167,12 +181,13 @@ fsq = np.round(np.tanh(z) * (L // 2))                   # each dim in {-1, 0, 1}
 ### 3. CosyVoice 2: text in, speech out
 
 ```mermaid
-flowchart LR
-  TXT["text tokens"] --> LM["Qwen2.5-0.5B LM<br/>text:speech interleaved 5:15"]
+flowchart TB
+  TXT["text tokens"] --> LM["Qwen2.5-0.5B LM<br/>text : speech interleaved 5 : 15"]
   PR["prompt text + prompt speech tokens<br/>(zero-shot prefix)"] --> LM
-  LM -->|"S3 speech tokens, 25 Hz FSQ"| FM["chunk-aware causal<br/>flow matching"]
-  SPK["speaker embedding<br/>+ prompt mel"] --> FM
-  FM -->|"mel"| VOC["HiFi-GAN vocoder"] --> WAV["waveform"]
+  LM -->|"S3 speech tokens, 25 Hz"| FM["chunk-aware causal flow matching"]
+  SPK["speaker embedding + prompt mel"] --> FM
+  FM -->|"mel spectrogram"| VOC["HiFi-GAN vocoder"]
+  VOC --> WAV["waveform"]
 ```
 
 - The S3 tokens come from an ASR-trained tokenizer, so they carry **content** (and some prosody). The **voice** comes from the speaker embedding and the prompt mel, which feed the **flow model**, not the LM (the CosyVoice 2 LM's `forward` never reads the speaker embedding; see [[Day 08 - CosyVoice#Code, explained]] §3). This is why your Day 8 LoRA adapts only the LM: it teaches the LM which S3 tokens Hindi and Telugu text should produce.

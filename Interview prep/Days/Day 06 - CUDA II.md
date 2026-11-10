@@ -119,25 +119,50 @@ Follow prep pack §2 "End-to-end trace at N = 8192" side by side with `flashatte
 
 ## Code, explained
 
-Read this **with the files open**. Each part has a small figure of the pipeline, then the exact code (copied from the repo at the commit named below, so the line numbers match), then what it does and how it hands off to the next piece.
+Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 Repo `sysml` (`16870fb`): `mlp/mlp_bench.cu` (PA3) and
 `flashattention/flash_lib.cu` (PA4). Builds on [[Day 05 - CUDA I#Code, explained]].
 
 ```mermaid
-flowchart LR
-  subgraph PA3["PA3 · mlp_bench.cu"]
-    TH["mm_thin :47<br/>1 block = 1 row × 256 cols"] --> P1["part1: baseline / batch split / column split"]
-    AR["recompute arena :441"] --> P2["part2: forward :464 · backward :487"]
+flowchart TB
+  subgraph PA3["PA3: mlp/mlp_bench.cu"]
+    TH["mm_thin :47<br/>1 block = 1 row × 256 columns"] --> P1["part1 :198<br/>baseline, batch split, column split"]
+    AR["recompute arena :441<br/>one buffer for two segments"] --> P2["part2_run :352<br/>forward :464, backward :487"]
   end
-  subgraph PA4["PA4 · flash_lib.cu"]
-    FK["flash_forward_kernel :47<br/>tile 32 q-rows, loop 32-key tiles"] --> OS["online softmax per row"]
+  subgraph PA4["PA4: flashattention/flash_lib.cu"]
+    FK["flash_forward_kernel :47<br/>32 query rows per block"] --> OS["loop over 32-key tiles<br/>online softmax per row"]
   end
 ```
+
+### The flow, step by step
+
+**A. One checkpointed training step** (`part2_run`, `mlp_bench.cu:352`):
+1. **Forward** (`:464`): layers 1–2 write `z1, a1, z2` into the arena; `A2` is kept (a checkpoint). Layers 3–4 write `z3, a3` into the **same arena**, overwriting segment A; `Z4` is kept.
+2. **Backward** starts at layer 4 (`:487`): rebuild `z3, a3` from the `A2` checkpoint (`:495–497`), then compute the layer-4 and layer-3 gradients (`:504–511`).
+3. **Line 513:** `z3, a3` are dead now, so rebuild `z1, a1, z2` from `X` over the same arena (`:515–519`).
+4. Layer-2 and layer-1 gradients, then SGD on every weight and bias (`:526–543`).
+
+**B. One FlashAttention block** at N = 8192, B = 8, 16 heads, D = 64:
+1. **Launch** (`flash_lib.cu:194–212`): grid (256, 16, 8); 32 × 8 = 256 threads per block; 28,800 bytes of shared memory.
+2. **Ownership:** block (qt = 10, h = 3, b = 0) owns query rows 320–351. Warp 2 owns rows 328–331 (`r0 = 2 × 4 = 8`, `:72`).
+3. Stage `Qi` (`:81–85`). Then for each of the **256 key tiles**: load `Kj` (row stride 65) and `Vj` (`:103–110`).
+4. **Scores:** lane c computes 4 dot products, one per row, over 64 features (`:118–126`).
+5. **Softmax bookkeeping, per row:** shuffle-reduce the max and the sum across the warp, write `p` into `S`, then update `m`, `l` and the rescale factors `e_run`, `e_tile` (`:130–152`).
+6. **PV:** lane x accumulates features x and x + 32 over the 32 keys, for 4 rows, and rescales `o` (`:157–172`).
+7. After all 256 tiles: `O = o / l` (`:175–183`).
 
 ---
 
 ### 1. The thin GEMM every stream variant uses
+
+```mermaid
+flowchart TB
+  B["block = (column chunk, batch row m)<br/>256 threads"] --> SA["stage A[m, k0 … k0 + BK]<br/>in shared sA  :62"]
+  SA --> L["each thread owns one column:<br/>acc += sA[kk] · B[k0 + kk, col]  :71<br/>adjacent threads: coalesced"]
+  L -->|"next k0"| SA
+  L --> W["C[m, col] = relu(acc + bias)  :78"]
+```
 
 `mlp/mlp_bench.cu:53–79`
 ```cpp
@@ -249,12 +274,12 @@ auto streamed_col = [&] {
 ### 3. Gradient checkpointing: one arena, two segments
 
 ```mermaid
-flowchart LR
-  subgraph FWD["forward"]
-    X --> L1["L1 → z1,a1"] --> L2["L2 → A2 ✔ kept"] --> L3["L3 → z3,a3"] --> L4["L4 → Z4 ✔ kept"]
+flowchart TB
+  subgraph FWD["forward :464"]
+    X["X"] --> L1["layer 1 → z1, a1<br/>(arena)"] --> L2["layer 2 → A2<br/>checkpoint, kept"] --> L3["layer 3 → z3, a3<br/>(same arena)"] --> L4["layer 4 → Z4<br/>checkpoint, kept"]
   end
-  subgraph BWD["backward (4 → 1)"]
-    RB["rebuild z3,a3 from A2<br/>into arena"] --> G43["grads L4, L3"] --> RA["rebuild z1,a1,z2 from X<br/>into SAME arena"] --> G21["grads L2, L1"]
+  subgraph BWD["backward :487, layer 4 → 1"]
+    RB["rebuild z3, a3 from A2<br/>:495"] --> G43["gradients of layers 4, 3<br/>:504"] --> RA["rebuild z1, a1, z2 from X<br/>over the same arena  :515"] --> G21["gradients of layers 2, 1<br/>+ SGD  :526"]
   end
 ```
 

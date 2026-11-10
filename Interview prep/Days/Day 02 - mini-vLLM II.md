@@ -114,7 +114,7 @@ README *Phase 4: radix prefix cache* (763–984). The key sections:
 
 ## Code, explained
 
-Read this **with the files open**. Each part has a small figure of the pipeline, then the exact code (copied from the repo at the commit named below, so the line numbers match), then what it does and how it hands off to the next piece.
+Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 Repo `vLLMmini`, branch `main` (`3679394`). Builds on
 [[Day 01 - mini-vLLM I#Code, explained]].
@@ -123,16 +123,32 @@ Repo `vLLMmini`, branch `main` (`3679394`). Builds on
 hands the sampled tokens back.
 
 ```mermaid
-flowchart LR
-  ST["engine.step<br/>engine.py:111"] -->|1| SC["schedule :296"]
-  SC --> RUN["_schedule_running :322<br/>decode first"]
-  SC --> WAIT["_schedule_waiting :365<br/>admit new"]
-  ST -->|2 forward| M["PagedLlama"]
-  ST -->|3 argmax tokens| UP["update :649"]
-  UP --> PUB["_publish_blocks :544"] --> PC[("RadixPrefixCache")]
-  WAIT -->|match / acquire| PC
-  RUN -->|"short of blocks"| EV["_evict_for :588"] --> PC
+flowchart TB
+  ST["engine.step  engine.py:111"] -->|"1. plan"| SC["Scheduler.schedule :296"]
+  SC --> RUN["_schedule_running :322<br/>decodes first, may preempt"]
+  SC --> WAIT["_schedule_waiting :365<br/>admits new requests"]
+  WAIT -->|"match / acquire"| PC[("RadixPrefixCache")]
+  RUN --> OUT["SchedulerOutput<br/>token ids, positions, slots"]
+  WAIT --> OUT
+  OUT -->|"2. one ragged forward pass"| M["PagedLlama.forward"]
+  M -->|"3. argmax per request"| UP["Scheduler.update :649"]
+  UP -->|"publish full blocks"| PC
 ```
+
+### The flow, step by step
+
+One engine step with two requests. Block size **B = 4**. Request **A** is running: prompt 10 + 2 generated = 12 tokens,
+all computed, table of 3 full blocks, all published to the radix tree. Request **B** has just arrived: a 6-token
+prompt whose **first 4 tokens equal A's first 4**.
+
+1. `engine.step` (`engine.py:111`) calls `schedule()` (`scheduler.py:296`). Budget = 8,192 tokens.
+2. **Running first.** `_schedule_running` (`:322`): A needs 1 token. `blocks_needed_for(1)`: 13 tokens need ceil(13/4) = 4 blocks, A holds 3, so **1 new block**. A free block exists, so `_prepare(A)` (`:599`) appends 1 token. Budget is now 8,191.
+3. **Then the waiting queue.** `_schedule_waiting` (`:365`): B is at the head. Its 6 uncomputed tokens fit the budget.
+4. **Ask the cache (no commitment yet).** `_match_cached_prefix` → `match` (`prefix_cache.py:144`): B's full blocks are just `[t0..t3]`, which is A's first block, so the match is **4 tokens, 1 block**.
+5. **How much new memory?** `_blocks_to_admit` (`:509`): ceil(6/4) = 2 blocks total, minus 1 matched = **1**. The watermark check passes.
+6. **Commit.** `_adopt_cached_prefix` (`:523`): `acquire` increfs the shared block (refcount 3 = tree + A + B) and B's table adopts it with `num_computed_tokens = 4`. `_prepare(B)` appends B's remaining 2 tokens, which allocates 1 block.
+7. **One forward pass** over A's 1 token + B's 2 tokens = **3 tokens**, `query_lens = [1, 2]`.
+8. **`update`** (`:649`): for each request, `num_computed_tokens = num_tokens`, then `_publish_blocks`. A has 13 computed tokens = 3 full blocks, all already published, so nothing new. B has 6 = 1 full block, already in the tree. Then each sampled token is appended, and requests that hit `max_new_tokens` or EOS are finished (published, then freed).
 
 ---
 
@@ -391,13 +407,14 @@ return total_blocks - match.num_blocks
 ### 4. The radix cache: lookup, insert, evict
 
 ```mermaid
-flowchart LR
-  T["token ids"] --> BO["_blocks_of :136<br/>full 16-token chunks only"]
-  BO --> MA["match :144<br/>walk root → child per chunk"]
-  MA --> PM["PrefixMatch<br/>block_ids, nodes"]
-  PM --> AC["acquire :191<br/>incref + touch LRU"]
-  INS["insert :210<br/>new node → tree increfs"] --> TREE[("RadixNode tree")]
-  TREE --> EL["_evictable_leaves :247<br/>leaf AND refcount == 1"] --> EV["evict :265<br/>LRU order, re-scan"]
+flowchart TB
+  T["a request's token ids"] --> BO["_blocks_of :136<br/>full 16-token chunks only"]
+  BO --> MA["match :144<br/>walk root → child, one chunk per level<br/>takes no references"]
+  MA --> PM["PrefixMatch: block_ids, nodes"]
+  PM -->|"only once admission is certain"| AC["acquire :191<br/>incref each block, refresh LRU"]
+  INS["insert :210<br/>new node → tree takes its own ref"] --> TREE[("RadixNode tree")]
+  TREE --> EL["_evictable_leaves :247<br/>leaf AND refcount == 1"]
+  EL --> EV["evict :265<br/>oldest first, re-scan for new leaves"]
 ```
 
 `src/mini_vllm/prefix_cache.py:136–142`
@@ -518,6 +535,16 @@ return freed
 ---
 
 ### 5. After the forward pass: `update`, publish, finish
+
+```mermaid
+flowchart TB
+  S["sampled token for a request"] --> C["num_computed_tokens = num_tokens<br/>this pass's tokens now have K, V"]
+  C --> P["_publish_blocks :544<br/>insert newly FULL blocks into the tree"]
+  P --> A["append the sampled token<br/>it has no K, V yet, so not publishable"]
+  A --> F{"max_new_tokens or EOS?"}
+  F -->|"yes"| FIN["_finish :688<br/>publish, then table.free()"]
+  F -->|"no"| NXT["stays RUNNING, decodes next step"]
+```
 
 `src/mini_vllm/scheduler.py:667–683`
 ```python

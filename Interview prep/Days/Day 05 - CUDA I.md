@@ -94,20 +94,34 @@ Then read `RESULTS.md`'s PA2 section and the CSV `results/pa2_matmul.csv`.
 
 ## Code, explained
 
-Read this **with the files open**. Each part has a small figure of the pipeline, then the exact code (copied from the repo at the commit named below, so the line numbers match), then what it does and how it hands off to the next piece.
+Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 Repo `sysml`, `matmul/matmul_bench.cu` (one commit, `16870fb`).
 
 **The chain, and the one question behind each step:** *where does each operand come from, and how many times?*
 
 ```mermaid
-flowchart LR
-  N1["1 naive :44<br/>lanes walk rows → strided"] -->|"10.9×"| N2["2 coalesced :60<br/>lanes walk columns"]
-  N2 -->|"tiling"| N3["3 tiled 1-to-1 :78<br/>shared tiles, 1 output/thread"]
-  N3 --> N4["4/5 strided vs contiguous :118 :173<br/>F×F outputs/thread"]
-  N4 -->|"register blocking"| N6["6 block2d R×R :232<br/>reuse in registers"]
-  CB["cuBLAS :436<br/>reference + ceiling"] -.->|"correctness check"| N6
+flowchart TB
+  N1["1. mm_naive :44<br/>lanes walk ROWS: strided loads"] -->|"10.9×: swap the mapping"| N2["2. mm_coalesced :60<br/>lanes walk COLUMNS"]
+  N2 -->|"stage tiles in shared memory"| N3["3. mm_tiled_1to1 :78<br/>1 output per thread"]
+  N3 -->|"F × F outputs per thread"| N4["4 / 5. strided :118 vs contiguous :173<br/>same maths, different global loads"]
+  N4 -->|"keep values in registers"| N6["6. mm_block2d :232<br/>R × R outputs, 0.5 shared loads per FMA"]
+  CB["cuBLAS :436<br/>reference + speed ceiling"] -.->|"correctness check"| N6
 ```
+
+### The flow, step by step
+
+Follow **one thread** of the final kernel, `mm_block2d<64, 4>`, at N = 32768. TILE = 64 and R = 4, so each block
+has 64/4 × 64/4 = **16 × 16 = 256 threads**, and each thread owns a **4 × 4 patch of C**.
+
+1. **Which outputs?** Block (bx = 2, by = 1), thread (tx = 3, ty = 5): `rowBase = 1·64 + 5·4 = 84`, `colBase = 2·64 + 3·4 = 140` (`matmul_bench.cu:238–239`). It computes C rows **84–87**, columns **140–143**.
+2. **Loop over K in tiles of 64:** N / 64 = **512** iterations (`:247`).
+3. **Load:** the thread copies 4 × 4 = 16 elements of the A tile and 16 of the B tile into shared memory (`:250–258`). Then `__syncthreads()`: nobody reads until the whole 64 × 64 tile is in.
+4. **Compute:** for each k in 0..63, load `av[4] = sA[20..23][k]` and `bv[4] = sB[k][12..15]` into registers, then do **16 FMAs** into `reg[4][4]` (`:262–273`). That's 8 shared loads for 16 FMAs.
+5. `__syncthreads()` again, so no thread overwrites the tile while another is still reading it. Then the next tile.
+6. **Write:** after 512 tiles, the 16 results go to C (`:277–286`).
+7. **Check:** each thread did 512 × 64 × 16 = 524,288 FMAs = 16 outputs × 32,768 terms. ✓
+8. **On the host:** `time_kernel` (`:312`) times it with CUDA events, and the result is compared with cuBLAS on the first 4M elements (`:445–448`).
 
 Reading rule for every kernel: write down (1) which output `C[row][col]` thread (tx, ty) owns, (2) for one warp
 (32 consecutive `threadIdx.x`), whether its 32 loads hit 32 consecutive addresses (**coalesced**: one 128-byte
@@ -116,6 +130,19 @@ transaction) or 32 scattered ones (**uncoalesced**: up to 32 transactions).
 ---
 
 ### 1. Naive vs coalesced: the same maths, a transposed mapping
+
+```mermaid
+flowchart TB
+  subgraph NAIVE["naive: threadIdx.x → row  (a warp = 32 rows)"]
+    direction LR
+    n1["lane 0 reads A[row0·N + k]"] ~~~ n2["lane 1 reads A[row1·N + k]<br/>N floats away"] ~~~ n3["32 separate transactions"]
+  end
+  subgraph COAL["coalesced: threadIdx.x → col  (a warp = 32 columns)"]
+    direction LR
+    c1["lane 0 reads B[k·N + col0]"] ~~~ c2["lane 1 reads B[k·N + col0 + 1]<br/>the next float"] ~~~ c3["1 transaction of 128 bytes"]
+  end
+  NAIVE -->|"swap lines 62–63"| COAL
+```
 
 `matmul/matmul_bench.cu:44–54`
 ```cpp
@@ -158,10 +185,10 @@ __global__ void mm_coalesced(const float* A, const float* B, float* C, int N)
 ### 2. Shared-memory tiling: load once, use TILE times
 
 ```mermaid
-flowchart LR
-  G[("global A, B")] -->|"each thread loads 1 elem of A-tile and B-tile"| SM["sA, sB in shared memory<br/>TILE × TILE"]
-  SM -->|"__syncthreads"| K["inner k loop: TILE FMAs<br/>reading shared, not global"]
-  K -->|"__syncthreads, next tile"| G
+flowchart TB
+  G[("global memory: A, B")] -->|"each thread loads 1 element<br/>of the A tile and of the B tile"| SM["sA, sB in shared memory<br/>TILE × TILE each"]
+  SM -->|"__syncthreads: everything loaded"| K["inner loop: TILE FMAs<br/>reading shared memory, not global"]
+  K -->|"__syncthreads: everyone done reading"| G
 ```
 
 `matmul/matmul_bench.cu:77–101`
@@ -201,6 +228,19 @@ __global__ void mm_tiled_1to1(const float* A, const float* B, float* C, int N)
 ---
 
 ### 3. More outputs per thread: strided vs contiguous
+
+```mermaid
+flowchart TB
+  subgraph S["strided loader, lines 139–140"]
+    direction LR
+    s0["lane 0 → column 0"] ~~~ s1["lane 1 → column 1"] ~~~ s2["lane 2 → column 2<br/>adjacent: coalesced"]
+  end
+  subgraph C["contiguous loader, lines 194–195, F = 4"]
+    direction LR
+    c0["lane 0 → columns 0–3"] ~~~ c1["lane 1 → columns 4–7"] ~~~ c2["lane 2 → columns 8–11<br/>F apart: F× the sectors"]
+  end
+  S ~~~ C
+```
 
 `matmul/matmul_bench.cu:134–158`
 ```cpp
