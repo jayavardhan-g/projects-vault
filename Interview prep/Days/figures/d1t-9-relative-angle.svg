@@ -1,0 +1,23 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 380' width='800' height='380' font-family='Inter, Helvetica, Arial, sans-serif'><title>Independent rotations give a relative angle</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='800' height='380' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='400' y='30' text-anchor='middle' font-size='15' font-weight='700' fill='#1f2328'>Each vector is rotated on its own, by its own position; the GAP between them is the distance</text>
+<text x='400' y='50' text-anchor='middle' font-size='12' fill='#57606a'>q and k both start as (1, 0); speed ω = 1 rad per position. Red = q, blue = k.</text>
+<circle cx='140' cy='190' r='92' fill='#f6f8fa' stroke='#d0d7de'/><line x1='40' y1='190' x2='240' y2='190' stroke='#d0d7de'/><line x1='140' y1='90' x2='140' y2='290' stroke='#d0d7de'/>
+<line x1='140' y1='190' x2='185.4' y2='119.3' stroke='#cf222e' stroke-width='5' stroke-linecap='round'/><circle cx='185.4' cy='119.3' r='6' fill='#cf222e'/>
+<line x1='140' y1='190' x2='105.0' y2='113.6' stroke='#0969da' stroke-width='5' stroke-linecap='round'/><circle cx='105.0' cy='113.6' r='6' fill='#0969da'/>
+<path d='M158.4,161.4 A34,34 0 0 0 125.9,159.1' fill='none' stroke='#1f2328' stroke-width='2' stroke-dasharray='4 3'/>
+<text x='140' y='310' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>q at position 1, k at position 2</text>
+<text x='140' y='329' text-anchor='middle' font-size='12' fill='#57606a'>q turned 1 rad, k turned 2 rad</text>
+<text x='140' y='349' text-anchor='middle' font-size='13' font-weight='700' fill='#cf222e'>gap = 2 − 1 = 1 rad</text>
+<circle cx='400' cy='190' r='92' fill='#f6f8fa' stroke='#d0d7de'/><line x1='300' y1='190' x2='500' y2='190' stroke='#d0d7de'/><line x1='400' y1='90' x2='400' y2='290' stroke='#d0d7de'/>
+<line x1='400' y1='190' x2='423.8' y2='270.5' stroke='#cf222e' stroke-width='5' stroke-linecap='round'/><circle cx='423.8' cy='270.5' r='6' fill='#cf222e'/>
+<line x1='400' y1='190' x2='480.7' y2='213.5' stroke='#0969da' stroke-width='5' stroke-linecap='round'/><circle cx='480.7' cy='213.5' r='6' fill='#0969da'/>
+<path d='M409.6,222.6 A34,34 0 0 0 432.6,199.5' fill='none' stroke='#1f2328' stroke-width='2' stroke-dasharray='4 3'/>
+<text x='400' y='310' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>q at position 5, k at position 6</text>
+<text x='400' y='329' text-anchor='middle' font-size='12' fill='#57606a'>q turned 5 rad, k turned 6 rad</text>
+<text x='400' y='349' text-anchor='middle' font-size='13' font-weight='700' fill='#cf222e'>gap = 6 − 5 = 1 rad</text>
+<circle cx='660' cy='190' r='92' fill='#f6f8fa' stroke='#d0d7de'/><line x1='560' y1='190' x2='760' y2='190' stroke='#d0d7de'/><line x1='660' y1='90' x2='660' y2='290' stroke='#d0d7de'/>
+<line x1='660' y1='190' x2='705.4' y2='119.3' stroke='#cf222e' stroke-width='5' stroke-linecap='round'/><circle cx='705.4' cy='119.3' r='6' fill='#cf222e'/>
+<line x1='660' y1='190' x2='576.8' y2='178.1' stroke='#0969da' stroke-width='5' stroke-linecap='round'/><circle cx='576.8' cy='178.1' r='6' fill='#0969da'/>
+<path d='M678.4,161.4 A34,34 0 0 0 626.3,185.2' fill='none' stroke='#1f2328' stroke-width='2' stroke-dasharray='4 3'/>
+<text x='660' y='310' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>q at position 1, k at position 3</text>
+<text x='660' y='329' text-anchor='middle' font-size='12' fill='#57606a'>q turned 1 rad, k turned 3 rad</text>
+<text x='660' y='349' text-anchor='middle' font-size='13' font-weight='700' fill='#0969da'>gap = 3 − 1 = 2 rad</text></svg>

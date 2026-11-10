@@ -1,0 +1,15 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 350' width='800' height='350' font-family='Inter, Helvetica, Arial, sans-serif'><title>Rotation basics</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='800' height='350' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='400' y='30' text-anchor='middle' font-size='15' font-weight='700' fill='#1f2328'>Rotating a 2-D arrow: the direction changes, the length doesn't</text>
+<circle cx='200' cy='185' r='110' fill='#f6f8fa' stroke='#d0d7de'/><line x1='82' y1='185' x2='318' y2='185' stroke='#d0d7de'/><line x1='200' y1='67' x2='200' y2='303' stroke='#d0d7de'/>
+<line x1='200' y1='185' x2='299.0' y2='185.0' stroke='#8c959f' stroke-width='5' stroke-linecap='round'/><circle cx='299.0' cy='185.0' r='6' fill='#8c959f'/>
+<line x1='200' y1='185' x2='200.0' y2='86.0' stroke='#cf222e' stroke-width='5' stroke-linecap='round'/><circle cx='200.0' cy='86.0' r='6' fill='#cf222e'/>
+<path d='M236.0,185.0 A36,36 0 0 0 200.0,149.0' fill='none' stroke='#cf222e' stroke-width='2' stroke-dasharray='4 3'/>
+<text x='304' y='207' font-size='13' fill='#1f2328'>(3, 0)</text><text x='210' y='81' font-size='13' fill='#cf222e'>(0, 3)</text>
+<text x='230' y='155' font-size='12' fill='#cf222e'>90°</text>
+<text x='200' y='329' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>(3, 0) turned 90° → (0, 3). Length 3 before and after.</text>
+<circle cx='590' cy='185' r='110' fill='#f6f8fa' stroke='#d0d7de'/><line x1='472' y1='185' x2='708' y2='185' stroke='#d0d7de'/><line x1='590' y1='67' x2='590' y2='303' stroke='#d0d7de'/>
+<line x1='590' y1='185' x2='668.7' y2='145.6' stroke='#8c959f' stroke-width='5' stroke-linecap='round'/><circle cx='668.7' cy='145.6' r='6' fill='#8c959f'/>
+<line x1='590' y1='185' x2='599.4' y2='97.5' stroke='#cf222e' stroke-width='5' stroke-linecap='round'/><circle cx='599.4' cy='97.5' r='6' fill='#cf222e'/>
+<path d='M625.8,167.1 A40,40 0 0 0 594.3,145.2' fill='none' stroke='#cf222e' stroke-width='2' stroke-dasharray='4 3'/>
+<text x='666' y='163' font-size='13' fill='#1f2328'>(a, b)</text><text x='572' y='93' font-size='13' fill='#cf222e'>(a′, b′)</text>
+<text x='620' y='135' font-size='12' fill='#cf222e'>θ</text>
+<text x='590' y='329' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>a′ = a·cos θ − b·sin θ,   b′ = a·sin θ + b·cos θ</text></svg>
