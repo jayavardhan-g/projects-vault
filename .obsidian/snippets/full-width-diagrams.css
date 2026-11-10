@@ -14,3 +14,10 @@
   height: auto !important;
   max-height: 85vh;
 }
+
+/* Same for embedded SVG figures (the worked-example blocks and animations). */
+.internal-embed.image-embed img[src*=".svg"],
+.markdown-rendered img[src$=".svg"] {
+  width: 100%;
+  height: auto;
+}

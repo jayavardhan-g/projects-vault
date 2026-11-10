@@ -258,6 +258,17 @@ flowchart TB
   HEAD --> TOK["1.12 argmax  engine.py:149<br/>2 next tokens"]
 ```
 
+#### The worked example used below (toy sizes, real formulas)
+
+The real shapes (2048 features, 32 heads) are too big to draw, so each step below also shows a **toy model** with
+the same formulas, the same code path and the **real RoPE base of 500,000**:
+- **3 tokens**: "the", "cat", "sat", at positions 0, 1, 2 (one prefill);
+- **8 features** per token (instead of 2048);
+- **2 query heads and 1 KV head**, each of size **4** (instead of 32 and 8 heads of size 64). That keeps grouped-query attention: both query heads share one K and V.
+
+Every number in the figures is computed, not made up; the script in 1.13 reproduces them. Blue cells are negative,
+red cells positive, and the darker the colour, the larger the value.
+
 #### 1.0 What comes in
 
 The engine flattens every request's tokens into one list, so there is no batch dimension and no padding.
@@ -322,6 +333,17 @@ def forward(self, positions: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
 - `freqs [6, 32]` is duplicated to `[6, 64]` so it lines up with the two halves of each head (see 1.6).
 - It's computed **once per forward pass**, because every layer uses the same angles.
 
+**Worked example: the angles.** With head size 4 there are 2 frequencies: `inv_freq = 1 / 500000^(2i/4)` =
+**[1, 0.0014]**. So for position p, pair 0 (features 0 and 2) gets angle **p radians**, and pair 1 (features 1 and 3)
+gets **p × 0.0014**. Position 2 → angles [2.0, 0.0028] rad. `torch.cat((freqs, freqs))` repeats them, so
+`cos` for position 2 is `[cos 2, cos 0.0028, cos 2, cos 0.0028]` = `[-0.42, 1.00, -0.42, 1.00]`.
+
+**Animation: watch the angles grow with position.** Left: the fast pair turns 1 rad per position. Middle: the slow
+pair hardly moves (one turn every ~4,440 positions). Right: a query at position m and a key at position n always keep
+the same gap, m − n, which is why attention ends up seeing **relative** position.
+
+![[d1t-anim-rope.svg]]
+
 #### 1.3 The layer loop
 
 `src/mini_vllm/model/llama.py:275–281`
@@ -358,6 +380,23 @@ def forward(self, x: torch.Tensor) -> torch.Tensor:
   So `RMSNorm(x) = w ⊙ x / sqrt(mean(x²) + ε)`. Unlike LayerNorm, it **doesn't subtract the mean** and has **no bias**: cheaper, and it works as well for LLMs.
 - **Why:** it keeps the scale of activations stable going into attention, whatever the earlier layers did. It's computed in **float32** (line 62) because bf16 rounding here changed results enough to break the layer-by-layer comparison with Hugging Face.
 
+**Worked example.** Token "the" has 8 features. RMSNorm works on this one row:
+1. square each feature, then average: `mean(x²) = 1.15`;
+2. `rms = √(1.15 + 0.00001) = 1.07`;
+3. divide every feature by 1.07: the row now has root-mean-square exactly 1;
+4. multiply by the learned weights `w = [1.00, 0.80, 1.20, 1.00, 0.90, 1.10, 1.00, 0.70]`.
+
+The same happens independently to "cat" (rms 1.34) and "sat" (rms 1.28). Each row is rescaled by its
+**own** size, so a token with huge activations and one with tiny activations come out on the same scale.
+
+**Animation: the five steps on token "the".**
+
+![[d1t-anim-rmsnorm.svg]]
+
+**All three tokens at once:**
+
+![[d1t-1-rmsnorm.svg]]
+
 #### 1.5 Project into queries, keys and values
 
 `src/mini_vllm/model/llama.py:283–285`
@@ -371,6 +410,13 @@ v = attn.v_proj(x).view(total_tokens, self.num_kv_heads, self.head_dim)
 - `q_proj` is a `[2048 → 2048]` matrix: `[6, 2048] → [6, 2048]`, then `.view(6, 32, 64)`: **32 query heads of 64 features**.
 - `k_proj`, `v_proj` are `[2048 → 512]`: `[6, 512] → .view(6, 8, 64)`: **only 8 KV heads**. That's **grouped-query attention (GQA)**: each KV head is shared by 4 query heads, so the KV cache is 4× smaller.
 - `.view` only reinterprets the 2048 numbers as 32 × 64; it doesn't copy.
+
+**Worked example.** The normalised `x` `[3, 8]` is multiplied by three weight matrices. `Q` comes out as `[3, 8]`
+and is **viewed** as 2 heads of 4 (columns h0 and h1). `K` and `V` come out as `[3, 4]`: just **one** KV head, which
+both query heads will share. In the real model it's the same picture, scaled up: `[T, 2048]` → `Q [T, 32, 64]`,
+`K, V [T, 8, 64]`.
+
+![[d1t-2-qkv.svg]]
 
 #### 1.6 Rotate q and k by position
 
@@ -393,6 +439,17 @@ return (q * cos + rotate_half(q) * sin), (k * cos + rotate_half(k) * sin)
 - **How it works:** feature `j` is paired with feature `j + 32`. For a pair `(a, b)` and angle θ: `a' = a·cos θ − b·sin θ`, `b' = b·cos θ + a·sin θ`. That's exactly `x·cos + rotate_half(x)·sin`, because `rotate_half` turns `[a, b]` into `[−b, a]`.
 - **Why it works:** after rotating q by angle `p_q·ω` and k by `p_k·ω`, their dot product depends only on `p_q − p_k`. So attention scores see **relative** position.
 - `cos.unsqueeze(1)` → `[6, 1, 64]`, so the same angles broadcast over all heads.
+
+**Worked example.** The table on the left lists each position's angles. RoPE then rotates every row of K by its own
+position's angles (and the same happens to each head of Q):
+- "the" is at position 0: angle 0, so it's **unchanged**;
+- "cat" is at position 1: features (0, 2) rotate by 1 rad, features (1, 3) by 0.0014 rad. Its K goes from
+  `[1.38, -0.96, -0.53, 1.10]` to `[1.19, -0.97, 0.87, 1.09]`;
+- "sat" is at position 2: rotated by 2 rad and 0.0028 rad.
+
+Columns f0 and f2 (outlined in red) change the most, because they belong to the fast pair. V is never rotated.
+
+![[d1t-3-rope.svg]]
 
 #### 1.7 Store this step's K and V: the paged cache
 
@@ -474,6 +531,24 @@ return k_pos <= q_pos
 - **The mask uses absolute positions** (`context_len − query_len + i`, line 135). That's why B's single query correctly sees its whole history rather than just one key.
 - The results are concatenated in request order: `[5 + 1, 32, 64] = [6, 32, 64]`.
 
+**Worked example: attention for both heads.** Read each row left to right:
+1. **scores** = each query row · each key row ÷ √4. For example, head 0, query "sat" vs key "the" = -0.18.
+2. **causal mask**: "the" may only look at itself, "cat" at "the" and "cat", "sat" at all three. Masked cells become −∞.
+3. **softmax** per row: exponentiate and divide by the row total, so −∞ becomes weight 0 and each row sums to 1. Head 0's row for "sat" is `[0.05, 0.02, 0.93]`.
+4. **· V**: each output row is the weighted average of V's rows. Head 0, "sat": `[0.01, -0.57, -3.36, -3.29]`.
+
+Both heads use the **same** K and V (one KV head) but different queries, so they attend differently. Concatenating
+`out head 0` and `out head 1` gives `[3, 8]`, which step 1.9 projects with `o_proj` and adds to the residual. In the
+real model: 32 heads concatenated to `[T, 2048]`.
+
+**Head 0:**
+
+![[d1t-4-attention-head0.svg]]
+
+**Head 1** (same K and V, a different query, so different weights):
+
+![[d1t-4-attention-head1.svg]]
+
 #### 1.9 Merge the heads, project, add the residual
 
 `src/mini_vllm/model/llama.py:298–299`
@@ -531,6 +606,44 @@ return self.scheduler.update(output, sampled)
 **Check yourself:** for a pure decode step with 32 requests, what are the shapes of `hidden` after 1.1, of `scores` for one request with 300 tokens of context, and of the final logits? (*`[32, 2048]`; `[32, 1, 300]`; `[32, 128256]`.*)
 
 ---
+
+#### 1.13 Reproduce the toy numbers yourself
+
+Plain Python, no libraries; it runs anywhere in under a second. Change a token's features or a position and watch
+the RMSNorm, RoPE and attention numbers move. It mirrors steps 1.4–1.8 line for line.
+
+```python
+import math, random
+random.seed(7)
+T, D, HD, BASE, EPS = 3, 8, 4, 500000.0, 1e-5
+mat = lambda r, c, lo, hi: [[round(random.uniform(lo, hi), 1) for _ in range(c)] for _ in range(r)]
+mm = lambda A, B: [[sum(A[i][k] * B[k][j] for k in range(len(B))) for j in range(len(B[0]))] for i in range(len(A))]
+
+X = mat(T, D, -2, 2)                                  # 1.1 embedding rows of "the", "cat", "sat"
+w = [1.0, 0.8, 1.2, 1.0, 0.9, 1.1, 1.0, 0.7]
+Wq, Wk, Wv = mat(D, 8, -1, 1), mat(D, 4, -1, 1), mat(D, 4, -1, 1)
+
+rms = [math.sqrt(sum(v * v for v in r) / D + EPS) for r in X]          # 1.4 RMSNorm
+x = [[w[j] * X[i][j] / rms[i] for j in range(D)] for i in range(T)]
+
+Q, K, V = mm(x, Wq), mm(x, Wk), mm(x, Wv)            # 1.5 projections: [3,8], [3,4], [3,4]
+
+inv_freq = [1 / BASE ** (2 * i / HD) for i in range(HD // 2)]          # 1.2 RoPE angles
+def rope(v, p):                                                         # 1.6 rotate pairs (j, j + 2)
+    c = [math.cos(p * f) for f in inv_freq] * 2
+    s = [math.sin(p * f) for f in inv_freq] * 2
+    rh = [-a for a in v[2:]] + v[:2]                                     # rotate_half
+    return [v[j] * c[j] + rh[j] * s[j] for j in range(HD)]
+Kr = [rope(K[i], i) for i in range(T)]
+
+for h in range(2):                                                      # 1.8 attention, per query head
+    Qr = [rope(Q[i][4 * h:4 * h + 4], i) for i in range(T)]
+    for i in range(T):
+        sc = [sum(a * b for a, b in zip(Qr[i], Kr[j])) / math.sqrt(HD) if j <= i else -math.inf for j in range(T)]
+        m = max(sc); e = [math.exp(v - m) for v in sc]; wts = [v / sum(e) for v in e]
+        out = [sum(wts[j] * V[j][d] for j in range(T)) for d in range(HD)]
+        print(f"head {h} query {i}: weights", [round(v, 2) for v in wts], "out", [round(v, 2) for v in out])
+```
 
 ### 2. Deep dive: the paged KV cache
 
