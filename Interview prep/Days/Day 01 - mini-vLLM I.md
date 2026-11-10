@@ -300,6 +300,13 @@ for q_len in query_lens:
 | `context_lens` | `[5, 13]`: total tokens each request has, including this step's | per request |
 | `logits_indices` | `[4, 5]`: the last token of each request | `[2]` |
 
+**Worked example: what comes in.** The toy request is one prefill of 3 tokens. The tokenizer turns the words into
+ids from a toy vocabulary of 10 words (`the` = 5, `cat` = 2, `sat` = 7). The pool is fresh and the block size is 4, so
+the request's block table is `[0]` and its tokens get slots 0, 1, 2 (Deep dive §2 explains why). `logits_indices = [2]`
+because only the last token needs a prediction.
+
+![[d1t-0-inputs.svg]]
+
 #### 1.1 Embedding: ids → vectors
 
 `src/mini_vllm/model/llama.py:264–264`
@@ -309,6 +316,12 @@ hidden = self.embed_tokens(input_ids)
 
 - **In:** `input_ids [6]` (integers). **Out:** `hidden [6, 2048]`.
 - **How it works:** the embedding is a lookup table of shape `[128256, 2048]`. Row `i` is the learned vector for token `i`. Embedding = pick 6 rows. No arithmetic.
+
+**Worked example.** The embedding table has one row per vocabulary word. `embed_tokens(input_ids)` copies rows 5, 2
+and 7 (outlined in red) into `X`, in token order. That's the whole operation: no multiplication. The real table is
+128,256 rows × 2048 features.
+
+![[d1t-1a-embedding.svg]]
 
 #### 1.2 RoPE angles, computed once for all layers
 
@@ -358,6 +371,13 @@ for index, layer in enumerate(self.layers):
 ```
 
 Steps 1.4–1.10 run **16 times**, once per decoder layer, with different weights each time. `residual = hidden` saves the layer's input for the skip connection in 1.9.
+
+**Picture: one layer is two blocks reading from, and adding to, one stream.** The `[3, 8]` hidden state is the
+*residual stream*. The attention block reads a normalised copy of it (1.4–1.8) and **adds** its result back (1.9). Then
+the MLP block does the same (1.10). The stream itself is never overwritten, only added to, which is why information
+from the embedding survives all 16 layers.
+
+![[d1t-1b-layer.svg]]
 
 #### 1.4 RMSNorm: rescale each token's vector
 
@@ -465,6 +485,13 @@ write_kv_to_cache(cache, index, slot_mapping, k, v)
 - **Big concept.** Where those slot numbers come from (block tables, the allocator, why memory is split into 16-token blocks) is [[#2. Deep dive: the paged KV cache|§2. Deep dive: the paged KV cache]]. Read it after this trace.
 - **Order matters:** the write happens **before** attention, so each new token can attend to itself.
 
+**Worked example.** `K` after RoPE (and `V`) are scattered into this layer's cache. With block size 4 and block table
+`[0]`: position p → logical block p // 4 = 0 → physical block 0 → slot 0 × 4 + (p % 4). So "the", "cat" and "sat" land
+in slots **0, 1, 2**. Slot 3 is still free inside block 0 (the request's next token will go there), and blocks 1–3
+belong to nobody yet or to other requests. Attention in 1.8 then reads these rows back through the same block table.
+
+![[d1t-1c-cache-write.svg]]
+
 #### 1.8 Attention, request by request
 
 The batch mixes a prefill (A) with a decode (B), so the fused Triton kernel can't be used (it handles pure decode steps only, Day 3). The naive path runs:
@@ -561,6 +588,15 @@ hidden = residual + attn.o_proj(out)
 - `o_proj` (`[2048 → 2048]`) mixes information across heads.
 - `residual + …`: **skip connection**. The layer adds a correction to its input instead of replacing it, which keeps gradients healthy through 16 layers.
 
+**Worked example.**
+1. **Concatenate the heads:** out head 0 (4 columns) and out head 1 (4 columns) → `[3, 8]`.
+2. **o_proj:** × `Wo [8 × 8]` mixes the two heads' results into one `[3, 8]` attention output. Row "the": `[-1.16, 5.81, -0.12, 2.71, -1.39, -2.68, 2.82, -0.96]`.
+3. **Residual add:** `H1 = X + attention output`. Row "the": `[-0.70, -1.40, 0.60, -1.70, 0.10, -0.50, -1.80, 0.00]` + `[-1.16, 5.81, -0.12, 2.71, -1.39, -2.68, 2.82, -0.96]` = `[-1.86, 4.41, 0.48, 1.01, -1.29, -3.18, 1.02, -0.96]`.
+
+The attention block only *adds* a correction to the stream; it doesn't replace what was there.
+
+![[d1t-1d-merge-residual.svg]]
+
 #### 1.10 The MLP: SwiGLU
 
 `src/mini_vllm/model/llama.py:301–306`
@@ -578,6 +614,14 @@ hidden = residual + mlp.down_proj(
 - `silu(g) = g · sigmoid(g)` is a smooth version of ReLU. The gating comes from the **product**: `silu(gate(x)) * up(x)` scales each of the 8192 features of the up branch by the gate branch, so the network learns, per token, which features pass and how strongly. That's SwiGLU (a gated linear unit with SiLU).
 - `down_proj` (`[8192 → 2048]`) brings it back to `[6, 2048]`; add the second residual.
 - This is the end of one layer. Go back to 1.4 with the new `hidden`, **16 times in total**.
+
+**Worked example.** The toy MLP is 16 wide (the real one is 8192 = 4 × 2048).
+1. **RMSNorm** of `H1` (the second norm, with its own weights).
+2. **gate** and **up**: two separate `[8 × 16]` projections of the same `x` → two `[3, 16]` matrices.
+3. **silu(gate) × up**, element by element. SiLU is a smooth ReLU: strongly negative gates squash a feature towards 0, positive gates let it through, scaled by `up`. Example: row "sat", feature 9: gate 2.81 → silu 2.65, up -3.97, product -10.51.
+4. **down_proj** `[16 × 8]` brings it back to `[3, 8]`, and the second **residual add** gives `H2`, the output of the layer.
+
+![[d1t-1e-mlp.svg]]
 
 #### 1.11 From the last hidden state to logits
 
@@ -607,10 +651,18 @@ return self.scheduler.update(output, sampled)
 
 ---
 
+**Worked example: from the last hidden state to a token.** The toy has one layer, so `H2` goes straight to the final
+RMSNorm (the real model goes through 15 more layers first). `logits_indices = [2]` keeps only row "sat". Multiplying
+that row by `Wlm [8 × 10]` gives one score per vocabulary word; `argmax` picks the largest: **id 3, "dog"**
+(score 2.13). The weights are random, so the word means nothing. What matters is the mechanics: one
+row in, 10 scores out, one id picked.
+
+![[d1t-1f-logits.svg]]
+
 #### 1.13 Reproduce the toy numbers yourself
 
 Plain Python, no libraries; it runs anywhere in under a second. Change a token's features or a position and watch
-the RMSNorm, RoPE and attention numbers move. It mirrors steps 1.4–1.8 line for line.
+the RMSNorm, RoPE and attention numbers move. It mirrors every step from 1.1 to 1.12, ending with the predicted token.
 
 ```python
 import math, random
@@ -618,31 +670,49 @@ random.seed(7)
 T, D, HD, BASE, EPS = 3, 8, 4, 500000.0, 1e-5
 mat = lambda r, c, lo, hi: [[round(random.uniform(lo, hi), 1) for _ in range(c)] for _ in range(r)]
 mm = lambda A, B: [[sum(A[i][k] * B[k][j] for k in range(len(B))) for j in range(len(B[0]))] for i in range(len(A))]
+def rmsnorm(M, w):
+    return [[w[j] * r[j] / math.sqrt(sum(v * v for v in r) / len(r) + EPS) for j in range(len(r))] for r in M]
 
-X = mat(T, D, -2, 2)                                  # 1.1 embedding rows of "the", "cat", "sat"
-w = [1.0, 0.8, 1.2, 1.0, 0.9, 1.1, 1.0, 0.7]
+# --- the weights (drawn in this exact order, so the numbers match the figures)
+X = mat(T, D, -2, 2)                                   # 1.1 embedding rows of "the", "cat", "sat"
 Wq, Wk, Wv = mat(D, 8, -1, 1), mat(D, 4, -1, 1), mat(D, 4, -1, 1)
+VOCAB = ["BOS", "a", "cat", "dog", "mat", "the", "on", "sat", "ran", "."]
+E_other = mat(len(VOCAB), D, -2, 2)                   # the other words' embedding rows
+Wo = mat(D, D, -1, 1)
+Wg, Wu, Wd = mat(D, 16, -1, 1), mat(D, 16, -1, 1), mat(16, D, -1, 1)
+Wlm = mat(D, len(VOCAB), -1, 1)
+w_in = [1.0, 0.8, 1.2, 1.0, 0.9, 1.1, 1.0, 0.7]
+w_post = [0.9, 1.1, 1.0, 0.8, 1.2, 1.0, 0.9, 1.1]
 
-rms = [math.sqrt(sum(v * v for v in r) / D + EPS) for r in X]          # 1.4 RMSNorm
-x = [[w[j] * X[i][j] / rms[i] for j in range(D)] for i in range(T)]
-
-Q, K, V = mm(x, Wq), mm(x, Wk), mm(x, Wv)            # 1.5 projections: [3,8], [3,4], [3,4]
-
-inv_freq = [1 / BASE ** (2 * i / HD) for i in range(HD // 2)]          # 1.2 RoPE angles
-def rope(v, p):                                                         # 1.6 rotate pairs (j, j + 2)
+x = rmsnorm(X, w_in)                                   # 1.4
+Q, K, V = mm(x, Wq), mm(x, Wk), mm(x, Wv)              # 1.5
+inv_freq = [1 / BASE ** (2 * i / HD) for i in range(HD // 2)]          # 1.2
+def rope(v, p):                                                         # 1.6
     c = [math.cos(p * f) for f in inv_freq] * 2
     s = [math.sin(p * f) for f in inv_freq] * 2
-    rh = [-a for a in v[2:]] + v[:2]                                     # rotate_half
+    rh = [-a for a in v[2:]] + v[:2]
     return [v[j] * c[j] + rh[j] * s[j] for j in range(HD)]
-Kr = [rope(K[i], i) for i in range(T)]
+Kr = [rope(K[i], i) for i in range(T)]                                  # 1.7 would store Kr, V at slots 0, 1, 2
 
-for h in range(2):                                                      # 1.8 attention, per query head
+heads = []                                                              # 1.8
+for h in range(2):
     Qr = [rope(Q[i][4 * h:4 * h + 4], i) for i in range(T)]
+    out = []
     for i in range(T):
         sc = [sum(a * b for a, b in zip(Qr[i], Kr[j])) / math.sqrt(HD) if j <= i else -math.inf for j in range(T)]
         m = max(sc); e = [math.exp(v - m) for v in sc]; wts = [v / sum(e) for v in e]
-        out = [sum(wts[j] * V[j][d] for j in range(T)) for d in range(HD)]
-        print(f"head {h} query {i}: weights", [round(v, 2) for v in wts], "out", [round(v, 2) for v in out])
+        out.append([sum(wts[j] * V[j][d] for j in range(T)) for d in range(HD)])
+        print(f"head {h} query {i}: weights", [round(v, 2) for v in wts])
+    heads.append(out)
+O = [heads[0][i] + heads[1][i] for i in range(T)]                       # 1.9 concat heads
+H1 = [[X[i][j] + a for j, a in enumerate(r)] for i, r in enumerate(mm(O, Wo))]   # o_proj + residual
+n = rmsnorm(H1, w_post)                                                 # 1.10 SwiGLU
+G, U = mm(n, Wg), mm(n, Wu)
+act = [[g / (1 + math.exp(-g)) * u for g, u in zip(gr, ur)] for gr, ur in zip(G, U)]
+H2 = [[H1[i][j] + a for j, a in enumerate(r)] for i, r in enumerate(mm(act, Wd))]
+logits = mm([rmsnorm(H2, [1.0] * D)[2]], Wlm)[0]                        # 1.11 last token only
+nxt = max(range(len(VOCAB)), key=lambda i: logits[i])                   # 1.12 argmax
+print("logits", [round(v, 2) for v in logits], "-> next token:", VOCAB[nxt])
 ```
 
 ### 2. Deep dive: the paged KV cache
@@ -664,6 +734,13 @@ Follow one request through today's code. To keep the numbers small, use block si
 8. **Next step (decode):** `append_tokens(1)`: 6 tokens still fit in 2 blocks (capacity 8), so **no allocation**. Its slot is block 1, offset 1 → **5**.
 9. **When A finishes:** `table.free()` → `free_many([0, 1])` → both refcounts hit 0 → both ids go back on the free list.
 
+
+**Picture: a 5-token request in a fresh 8-block pool** (block size 4). Its 5 tokens need ceil(5/4) = 2 blocks, and
+the LIFO free list hands out blocks 0 and 1. Token t4 is the first token of logical block 1, which lives in physical
+block 1, so its slot is 1 × 4 + 0 = 4. Three slots of block 1 are allocated but empty: that's the waste paging limits
+to less than one block per request.
+
+![[d1t-5-paging.svg]]
 
 #### 2a. The memory pool: BlockAllocator
 

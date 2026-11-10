@@ -1,0 +1,128 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 460' width='800' height='460' font-family='Inter, Helvetica, Arial, sans-serif'><title>Paging a 5-token request, toy example</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='800' height='460' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='34' font-size='14' font-weight='700' fill='#1f2328'>Request A: 5 tokens, block size 4, fresh pool of 8 blocks</text>
+<rect x='40' y='70' width='40' height='40' rx='5' fill='#ffd8b5' stroke='#ffffff' stroke-width='2'/>
+<text x='60' y='95' text-anchor='middle' font-size='12' fill='#1f2328'>t0</text>
+<rect x='82' y='70' width='40' height='40' rx='5' fill='#ffd8b5' stroke='#ffffff' stroke-width='2'/>
+<text x='102' y='95' text-anchor='middle' font-size='12' fill='#1f2328'>t1</text>
+<rect x='124' y='70' width='40' height='40' rx='5' fill='#ffd8b5' stroke='#ffffff' stroke-width='2'/>
+<text x='144' y='95' text-anchor='middle' font-size='12' fill='#1f2328'>t2</text>
+<rect x='166' y='70' width='40' height='40' rx='5' fill='#ffd8b5' stroke='#ffffff' stroke-width='2'/>
+<text x='186' y='95' text-anchor='middle' font-size='12' fill='#1f2328'>t3</text>
+<text x='124' y='62' text-anchor='middle' font-size='12' fill='#57606a'>logical block 0</text>
+<rect x='230' y='70' width='40' height='40' rx='5' fill='#ffd8b5' stroke='#ffffff' stroke-width='2'/>
+<text x='250' y='95' text-anchor='middle' font-size='12' fill='#1f2328'>t4</text>
+<rect x='272' y='70' width='40' height='40' rx='5' fill='#f3f4f6' stroke='#ffffff' stroke-width='2'/>
+<text x='292' y='95' text-anchor='middle' font-size='12' fill='#1f2328'></text>
+<rect x='314' y='70' width='40' height='40' rx='5' fill='#f3f4f6' stroke='#ffffff' stroke-width='2'/>
+<text x='334' y='95' text-anchor='middle' font-size='12' fill='#1f2328'></text>
+<rect x='356' y='70' width='40' height='40' rx='5' fill='#f3f4f6' stroke='#ffffff' stroke-width='2'/>
+<text x='376' y='95' text-anchor='middle' font-size='12' fill='#1f2328'></text>
+<text x='314' y='62' text-anchor='middle' font-size='12' fill='#57606a'>logical block 1</text>
+<text x='420' y='95' font-size='12' fill='#57606a'>A's tokens, in order (grey = wasted slots: 3)</text>
+<text x='40' y='150' font-size='13' font-weight='600' fill='#1f2328'>block table [0, 1]: logical 0 → physical 0, logical 1 → physical 1</text>
+<text x='124' y='174' text-anchor='middle' font-size='12' fill='#57606a'>physical block 0 (slots 0–3)</text>
+<rect x='40' y='180' width='40' height='40' rx='5' fill='#ffd8b5' stroke='#ffffff' stroke-width='2'/>
+<text x='60' y='197' text-anchor='middle' font-size='11' fill='#1f2328'>t0</text>
+<text x='60' y='213' text-anchor='middle' font-size='9' fill='#57606a'>0</text>
+<rect x='82' y='180' width='40' height='40' rx='5' fill='#ffd8b5' stroke='#ffffff' stroke-width='2'/>
+<text x='102' y='197' text-anchor='middle' font-size='11' fill='#1f2328'>t1</text>
+<text x='102' y='213' text-anchor='middle' font-size='9' fill='#57606a'>1</text>
+<rect x='124' y='180' width='40' height='40' rx='5' fill='#ffd8b5' stroke='#ffffff' stroke-width='2'/>
+<text x='144' y='197' text-anchor='middle' font-size='11' fill='#1f2328'>t2</text>
+<text x='144' y='213' text-anchor='middle' font-size='9' fill='#57606a'>2</text>
+<rect x='166' y='180' width='40' height='40' rx='5' fill='#ffd8b5' stroke='#ffffff' stroke-width='2'/>
+<text x='186' y='197' text-anchor='middle' font-size='11' fill='#1f2328'>t3</text>
+<text x='186' y='213' text-anchor='middle' font-size='9' fill='#57606a'>3</text>
+<text x='314' y='174' text-anchor='middle' font-size='12' fill='#57606a'>physical block 1 (slots 4–7)</text>
+<rect x='230' y='180' width='40' height='40' rx='5' fill='#ffd8b5' stroke='#ffffff' stroke-width='2'/>
+<text x='250' y='197' text-anchor='middle' font-size='11' fill='#1f2328'>t4</text>
+<text x='250' y='213' text-anchor='middle' font-size='9' fill='#57606a'>4</text>
+<rect x='272' y='180' width='40' height='40' rx='5' fill='#fff1e5' stroke='#ffffff' stroke-width='2'/>
+<text x='292' y='197' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='292' y='213' text-anchor='middle' font-size='9' fill='#57606a'>5</text>
+<rect x='314' y='180' width='40' height='40' rx='5' fill='#fff1e5' stroke='#ffffff' stroke-width='2'/>
+<text x='334' y='197' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='334' y='213' text-anchor='middle' font-size='9' fill='#57606a'>6</text>
+<rect x='356' y='180' width='40' height='40' rx='5' fill='#fff1e5' stroke='#ffffff' stroke-width='2'/>
+<text x='376' y='197' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='376' y='213' text-anchor='middle' font-size='9' fill='#57606a'>7</text>
+<text x='504' y='174' text-anchor='middle' font-size='12' fill='#57606a'>physical block 2 (slots 8–11)</text>
+<rect x='420' y='180' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='440' y='197' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='440' y='213' text-anchor='middle' font-size='9' fill='#57606a'>8</text>
+<rect x='462' y='180' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='482' y='197' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='482' y='213' text-anchor='middle' font-size='9' fill='#57606a'>9</text>
+<rect x='504' y='180' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='524' y='197' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='524' y='213' text-anchor='middle' font-size='9' fill='#57606a'>10</text>
+<rect x='546' y='180' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='566' y='197' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='566' y='213' text-anchor='middle' font-size='9' fill='#57606a'>11</text>
+<text x='694' y='174' text-anchor='middle' font-size='12' fill='#57606a'>physical block 3 (slots 12–15)</text>
+<rect x='610' y='180' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='630' y='197' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='630' y='213' text-anchor='middle' font-size='9' fill='#57606a'>12</text>
+<rect x='652' y='180' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='672' y='197' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='672' y='213' text-anchor='middle' font-size='9' fill='#57606a'>13</text>
+<rect x='694' y='180' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='714' y='197' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='714' y='213' text-anchor='middle' font-size='9' fill='#57606a'>14</text>
+<rect x='736' y='180' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='756' y='197' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='756' y='213' text-anchor='middle' font-size='9' fill='#57606a'>15</text>
+<text x='124' y='264' text-anchor='middle' font-size='12' fill='#57606a'>physical block 4 (slots 16–19)</text>
+<rect x='40' y='270' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='60' y='287' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='60' y='303' text-anchor='middle' font-size='9' fill='#57606a'>16</text>
+<rect x='82' y='270' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='102' y='287' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='102' y='303' text-anchor='middle' font-size='9' fill='#57606a'>17</text>
+<rect x='124' y='270' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='144' y='287' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='144' y='303' text-anchor='middle' font-size='9' fill='#57606a'>18</text>
+<rect x='166' y='270' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='186' y='287' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='186' y='303' text-anchor='middle' font-size='9' fill='#57606a'>19</text>
+<text x='314' y='264' text-anchor='middle' font-size='12' fill='#57606a'>physical block 5 (slots 20–23)</text>
+<rect x='230' y='270' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='250' y='287' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='250' y='303' text-anchor='middle' font-size='9' fill='#57606a'>20</text>
+<rect x='272' y='270' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='292' y='287' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='292' y='303' text-anchor='middle' font-size='9' fill='#57606a'>21</text>
+<rect x='314' y='270' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='334' y='287' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='334' y='303' text-anchor='middle' font-size='9' fill='#57606a'>22</text>
+<rect x='356' y='270' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='376' y='287' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='376' y='303' text-anchor='middle' font-size='9' fill='#57606a'>23</text>
+<text x='504' y='264' text-anchor='middle' font-size='12' fill='#57606a'>physical block 6 (slots 24–27)</text>
+<rect x='420' y='270' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='440' y='287' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='440' y='303' text-anchor='middle' font-size='9' fill='#57606a'>24</text>
+<rect x='462' y='270' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='482' y='287' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='482' y='303' text-anchor='middle' font-size='9' fill='#57606a'>25</text>
+<rect x='504' y='270' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='524' y='287' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='524' y='303' text-anchor='middle' font-size='9' fill='#57606a'>26</text>
+<rect x='546' y='270' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='566' y='287' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='566' y='303' text-anchor='middle' font-size='9' fill='#57606a'>27</text>
+<text x='694' y='264' text-anchor='middle' font-size='12' fill='#57606a'>physical block 7 (slots 28–31)</text>
+<rect x='610' y='270' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='630' y='287' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='630' y='303' text-anchor='middle' font-size='9' fill='#57606a'>28</text>
+<rect x='652' y='270' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='672' y='287' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='672' y='303' text-anchor='middle' font-size='9' fill='#57606a'>29</text>
+<rect x='694' y='270' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='714' y='287' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='714' y='303' text-anchor='middle' font-size='9' fill='#57606a'>30</text>
+<rect x='736' y='270' width='40' height='40' rx='5' fill='#eef1f4' stroke='#ffffff' stroke-width='2'/>
+<text x='756' y='287' text-anchor='middle' font-size='11' fill='#1f2328'></text>
+<text x='756' y='303' text-anchor='middle' font-size='9' fill='#57606a'>31</text>
+<text x='40' y='390' font-size='12' fill='#1f2328'>slot_mapping = [0, 1, 2, 3, 4]   (t4: block 1 × 4 + offset 0 = slot 4)</text>
+<text x='40' y='410' font-size='12' fill='#57606a'>refcount: blocks 0, 1 = 1; blocks 2–7 = 0     free list (top first): 2, 3, 4, 5, 6, 7</text>
+<text x='40' y='430' font-size='12' fill='#57606a'>next decode token t5 → slot 5, no new block; t8 would need a third block</text></svg>

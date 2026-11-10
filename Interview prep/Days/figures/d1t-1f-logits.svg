@@ -1,0 +1,91 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 420' width='600' height='420' font-family='Inter, Helvetica, Arial, sans-serif'><title>Logits and argmax, toy example</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='600' height='420' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='206.0' y='34' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328'>final RMSNorm(H2)</text>
+<text x='206.0' y='50' text-anchor='middle' font-size='12' fill='#57606a'>[3, 8]</text>
+<text x='48' y='83.0' text-anchor='end' font-size='11' fill='#57606a'>the</text>
+<rect x='54' y='60' width='36' height='36' rx='4' fill='rgb(142,177,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='72.0' y='83.0' text-anchor='middle' font-size='12' fill='#1f2328'>-1.33</text>
+<rect x='92' y='60' width='36' height='36' rx='4' fill='rgb(255,162,131)' stroke='#ffffff' stroke-width='2'/>
+<text x='110.0' y='83.0' text-anchor='middle' font-size='12' fill='#1f2328'>1.46</text>
+<rect x='130' y='60' width='36' height='36' rx='4' fill='rgb(238,243,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='148.0' y='83.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.19</text>
+<rect x='168' y='60' width='36' height='36' rx='4' fill='rgb(173,198,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='186.0' y='83.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.97</text>
+<rect x='206' y='60' width='36' height='36' rx='4' fill='rgb(120,162,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='224.0' y='83.0' text-anchor='middle' font-size='12' fill='#1f2328'>-1.59</text>
+<rect x='244' y='60' width='36' height='36' rx='4' fill='rgb(194,213,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='262.0' y='83.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.72</text>
+<rect x='282' y='60' width='36' height='36' rx='4' fill='rgb(255,249,248)' stroke='#ffffff' stroke-width='2'/>
+<text x='300.0' y='83.0' text-anchor='middle' font-size='12' fill='#1f2328'>0.08</text>
+<rect x='320' y='60' width='36' height='36' rx='4' fill='rgb(255,238,232)' stroke='#ffffff' stroke-width='2'/>
+<text x='338.0' y='83.0' text-anchor='middle' font-size='12' fill='#1f2328'>0.26</text>
+<text x='48' y='121.0' text-anchor='end' font-size='11' fill='#57606a'>cat</text>
+<rect x='54' y='98' width='36' height='36' rx='4' fill='rgb(167,195,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='72.0' y='121.0' text-anchor='middle' font-size='12' fill='#1f2328'>-1.03</text>
+<rect x='92' y='98' width='36' height='36' rx='4' fill='rgb(255,135,95)' stroke='#ffffff' stroke-width='2'/>
+<text x='110.0' y='121.0' text-anchor='middle' font-size='12' fill='#1f2328'>1.89</text>
+<rect x='130' y='98' width='36' height='36' rx='4' fill='rgb(223,233,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='148.0' y='121.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.37</text>
+<rect x='168' y='98' width='36' height='36' rx='4' fill='rgb(255,229,220)' stroke='#ffffff' stroke-width='2'/>
+<text x='186.0' y='121.0' text-anchor='middle' font-size='12' fill='#1f2328'>0.41</text>
+<rect x='206' y='98' width='36' height='36' rx='4' fill='rgb(200,217,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='224.0' y='121.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.65</text>
+<rect x='244' y='98' width='36' height='36' rx='4' fill='rgb(127,167,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='262.0' y='121.0' text-anchor='middle' font-size='12' fill='#1f2328'>-1.51</text>
+<rect x='282' y='98' width='36' height='36' rx='4' fill='rgb(255,237,231)' stroke='#ffffff' stroke-width='2'/>
+<text x='300.0' y='121.0' text-anchor='middle' font-size='12' fill='#1f2328'>0.28</text>
+<rect x='320' y='98' width='36' height='36' rx='4' fill='rgb(209,223,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='338.0' y='121.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.54</text>
+<text x='48' y='159.0' text-anchor='end' font-size='11' fill='#57606a'>sat</text>
+<rect x='54' y='136' width='36' height='36' rx='4' fill='rgb(255,154,121)' stroke='#cf222e' stroke-width='2'/>
+<text x='72.0' y='159.0' text-anchor='middle' font-size='12' fill='#1f2328'>1.58</text>
+<rect x='92' y='136' width='36' height='36' rx='4' fill='rgb(255,187,164)' stroke='#cf222e' stroke-width='2'/>
+<text x='110.0' y='159.0' text-anchor='middle' font-size='12' fill='#1f2328'>1.07</text>
+<rect x='130' y='136' width='36' height='36' rx='4' fill='rgb(169,196,255)' stroke='#cf222e' stroke-width='2'/>
+<text x='148.0' y='159.0' text-anchor='middle' font-size='12' fill='#1f2328'>-1.01</text>
+<rect x='168' y='136' width='36' height='36' rx='4' fill='rgb(255,224,214)' stroke='#cf222e' stroke-width='2'/>
+<text x='186.0' y='159.0' text-anchor='middle' font-size='12' fill='#1f2328'>0.47</text>
+<rect x='206' y='136' width='36' height='36' rx='4' fill='rgb(185,207,255)' stroke='#cf222e' stroke-width='2'/>
+<text x='224.0' y='159.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.82</text>
+<rect x='244' y='136' width='36' height='36' rx='4' fill='rgb(206,221,255)' stroke='#cf222e' stroke-width='2'/>
+<text x='262.0' y='159.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.57</text>
+<rect x='282' y='136' width='36' height='36' rx='4' fill='rgb(246,249,255)' stroke='#cf222e' stroke-width='2'/>
+<text x='300.0' y='159.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.10</text>
+<rect x='320' y='136' width='36' height='36' rx='4' fill='rgb(255,162,131)' stroke='#cf222e' stroke-width='2'/>
+<text x='338.0' y='159.0' text-anchor='middle' font-size='12' fill='#1f2328'>1.46</text>
+<text x='20' y='196' font-size='12' fill='#57606a'>logits_indices = [2]: keep only 'sat' (red), the last token</text>
+<text x='274.0' y='272' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328'>logits = row 'sat' · Wlm</text>
+<text x='274.0' y='288' text-anchor='middle' font-size='12' fill='#57606a'>[1, 10]: a score for every word in the toy vocabulary</text>
+<text x='76.0' y='310' text-anchor='middle' font-size='10' fill='#57606a'>BOS</text>
+<text x='120.0' y='310' text-anchor='middle' font-size='10' fill='#57606a'>a</text>
+<text x='164.0' y='310' text-anchor='middle' font-size='10' fill='#57606a'>cat</text>
+<text x='208.0' y='310' text-anchor='middle' font-size='10' fill='#57606a'>dog</text>
+<text x='252.0' y='310' text-anchor='middle' font-size='10' fill='#57606a'>mat</text>
+<text x='296.0' y='310' text-anchor='middle' font-size='10' fill='#57606a'>the</text>
+<text x='340.0' y='310' text-anchor='middle' font-size='10' fill='#57606a'>on</text>
+<text x='384.0' y='310' text-anchor='middle' font-size='10' fill='#57606a'>sat</text>
+<text x='428.0' y='310' text-anchor='middle' font-size='10' fill='#57606a'>ran</text>
+<text x='472.0' y='310' text-anchor='middle' font-size='10' fill='#57606a'>.</text>
+<text x='48' y='342.0' text-anchor='end' font-size='11' fill='#57606a'>sat</text>
+<rect x='54' y='316' width='42' height='42' rx='4' fill='rgb(255,251,249)' stroke='#ffffff' stroke-width='2'/>
+<text x='75.0' y='342.0' text-anchor='middle' font-size='12' fill='#1f2328'>0.10</text>
+<rect x='98' y='316' width='42' height='42' rx='4' fill='rgb(95,145,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='119.0' y='342.0' text-anchor='middle' font-size='12' fill='#1f2328'>-3.31</text>
+<rect x='142' y='316' width='42' height='42' rx='4' fill='rgb(255,232,225)' stroke='#ffffff' stroke-width='2'/>
+<text x='163.0' y='342.0' text-anchor='middle' font-size='12' fill='#1f2328'>0.61</text>
+<rect x='186' y='316' width='42' height='42' rx='4' fill='rgb(255,177,152)' stroke='#cf222e' stroke-width='2'/>
+<text x='207.0' y='342.0' text-anchor='middle' font-size='12' fill='#1f2328'>2.13</text>
+<rect x='230' y='316' width='42' height='42' rx='4' fill='rgb(255,212,198)' stroke='#ffffff' stroke-width='2'/>
+<text x='251.0' y='342.0' text-anchor='middle' font-size='12' fill='#1f2328'>1.18</text>
+<rect x='274' y='316' width='42' height='42' rx='4' fill='rgb(196,214,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='295.0' y='342.0' text-anchor='middle' font-size='12' fill='#1f2328'>-1.22</text>
+<rect x='318' y='316' width='42' height='42' rx='4' fill='rgb(215,227,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='339.0' y='342.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.82</text>
+<rect x='362' y='316' width='42' height='42' rx='4' fill='rgb(255,233,226)' stroke='#ffffff' stroke-width='2'/>
+<text x='383.0' y='342.0' text-anchor='middle' font-size='12' fill='#1f2328'>0.59</text>
+<rect x='406' y='316' width='42' height='42' rx='4' fill='rgb(236,242,255)' stroke='#ffffff' stroke-width='2'/>
+<text x='427.0' y='342.0' text-anchor='middle' font-size='12' fill='#1f2328'>-0.38</text>
+<rect x='450' y='316' width='42' height='42' rx='4' fill='rgb(255,185,162)' stroke='#ffffff' stroke-width='2'/>
+<text x='471.0' y='342.0' text-anchor='middle' font-size='12' fill='#1f2328'>1.91</text>
+<path d='M206,206 L206,256' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/>
+<text x='218' y='234' font-size='12' fill='#57606a'>× Wlm [8 × 10]  (real: [2048 × 128,256])</text>
+<text x='20' y='384' font-size='13' font-weight='600' fill='#1f2328'>argmax → id 3 = 'dog': the predicted next token (red outline)</text>
+<text x='20' y='402' font-size='12' fill='#57606a'>The weights are random, so the word itself means nothing; the mechanics are what matter.</text></svg>
