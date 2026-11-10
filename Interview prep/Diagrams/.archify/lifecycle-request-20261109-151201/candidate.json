@@ -1,0 +1,50 @@
+{
+  "schema_version": 3,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Day 2 · Life of one request",
+    "output": "day2-request-lifecycle.html",
+    "quality_profile": "showcase",
+    "repository": { "url": "https://github.com/jayavardhan-g/mini-vLLM.git", "provider": "github", "link_mode": "web", "revision": "367939478bfd6ac2fa1e0c481c357985de72ac7b" }
+  },
+  "mainPath": ["arrived", "waiting", "prefill", "decode", "finished"],
+  "states": [
+    { "id": "arrived", "type": "start", "label": "Arrived", "sublabel": "add_request()", "step": "01",
+      "sources": [ { "path": "src/mini_vllm/scheduler.py", "line": 262, "end_line": 289 } ] },
+    { "id": "waiting", "type": "waiting", "label": "WAITING", "sublabel": "FCFS queue", "tag": "status", "step": "02",
+      "sources": [ { "path": "src/mini_vllm/scheduler.py", "line": 80, "end_line": 83 }, { "path": "src/mini_vllm/scheduler.py", "line": 383, "end_line": 392 } ] },
+    { "id": "prefill", "type": "active", "label": "RUNNING · prefill", "sublabel": "uncomputed tokens > 1", "tag": "one forward pass", "step": "03",
+      "sources": [ { "path": "src/mini_vllm/scheduler.py", "line": 128, "end_line": 136 }, { "path": "src/mini_vllm/scheduler.py", "line": 428, "end_line": 440 } ] },
+    { "id": "decode", "type": "active", "label": "RUNNING · decode", "sublabel": "1 token per step", "tag": "most of its life", "step": "04",
+      "sources": [ { "path": "src/mini_vllm/scheduler.py", "line": 322, "end_line": 359 } ] },
+    { "id": "finished", "type": "success", "label": "FINISHED", "sublabel": "blocks freed at once", "step": "05",
+      "sources": [ { "path": "src/mini_vllm/scheduler.py", "line": 679, "end_line": 702 } ] },
+    { "id": "rejected", "type": "failure", "label": "Rejected", "sublabel": "RequestTooLargeError",
+      "sources": [ { "path": "src/mini_vllm/scheduler.py", "line": 269, "end_line": 287 } ] },
+    { "id": "aborted", "type": "neutral", "label": "Aborted", "sublabel": "abort(request_id)",
+      "sources": [ { "path": "src/mini_vllm/scheduler.py", "line": 704, "end_line": 714 } ] }
+  ],
+  "transitions": [
+    { "id": "queue", "from": "arrived", "to": "waiting", "label": "fits pool" },
+    { "id": "admit", "from": "waiting", "to": "prefill", "label": "admitted", "variant": "emphasis" },
+    { "id": "first", "from": "prefill", "to": "decode", "label": "first token" },
+    { "id": "done", "from": "decode", "to": "finished", "label": "limit or EOS", "variant": "emphasis" },
+    { "id": "preempt", "from": "decode", "to": "waiting", "label": "preempted", "note": "recompute: KV dropped", "variant": "security" },
+    { "id": "too-big", "from": "arrived", "to": "rejected", "label": "can never fit", "variant": "security" },
+    { "id": "abort", "from": "decode", "to": "aborted", "label": "abort()", "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Rejected up front", "items": [
+      "ceil((prompt + max_new) / 16) > pool − watermark blocks",
+      "Or prompt > max_num_batched_tokens: prefills are not chunked" ] },
+    { "dot": "emerald", "title": "Admission", "items": [
+      "Needs budget, max_num_seqs room, and free − needed ≥ watermark",
+      "A cache hit adopts full blocks and skips their prefill",
+      "TTFT is set when the prefill's token is sampled" ] },
+    { "dot": "rose", "title": "Preemption by recompute", "items": [
+      "table.free(); num_computed_tokens = 0; inserted at queue front",
+      "Re-entry prefills prompt + tokens generated so far",
+      "Greedy output is identical to never being preempted",
+      "Chosen over swap: 1B-model prefill is cheap, no CPU buffer needed" ] }
+  ]
+}

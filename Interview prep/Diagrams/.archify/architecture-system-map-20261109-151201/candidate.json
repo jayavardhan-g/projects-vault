@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "mini-vLLM system map (Days 1–2)",
+    "output": "day1-2-system-map.html",
+    "quality_profile": "showcase",
+    "repository": { "url": "https://github.com/jayavardhan-g/mini-vLLM.git", "provider": "github", "link_mode": "web", "revision": "367939478bfd6ac2fa1e0c481c357985de72ac7b" }
+  },
+  "components": [
+    { "id": "caller", "type": "external", "label": "Caller", "sublabel": "benchmark or server", "pos": [40, 60], "size": [140, 64] },
+    { "id": "engine", "type": "backend", "label": "Engine", "sublabel": "ContinuousBatchingEngine", "tag": "one step() per iteration", "pos": [280, 60], "size": [180, 64],
+      "sources": [ { "path": "src/mini_vllm/engine.py", "line": 42, "end_line": 86, "label": "wiring" }, { "path": "src/mini_vllm/engine.py", "line": 111, "end_line": 150, "label": "step()" } ] },
+    { "id": "scheduler", "type": "backend", "label": "Scheduler", "sublabel": "waiting + running queues", "tag": "Day 2", "pos": [560, 60], "size": [180, 64],
+      "sources": [ { "path": "src/mini_vllm/scheduler.py", "line": 229, "end_line": 249 }, { "path": "src/mini_vllm/scheduler.py", "line": 296, "end_line": 320, "label": "schedule()" } ] },
+    { "id": "table", "type": "backend", "label": "BlockTable", "sublabel": "one per request", "tag": "logical → physical", "pos": [850, 60], "size": [170, 64],
+      "sources": [ { "path": "src/mini_vllm/block_table.py", "line": 29, "end_line": 38 }, { "path": "src/mini_vllm/block_table.py", "line": 106, "end_line": 153, "label": "append + slots" } ] },
+    { "id": "prefix", "type": "database", "label": "RadixPrefixCache", "sublabel": "full blocks, LRU leaves", "tag": "Day 2", "pos": [560, 220], "size": [180, 64],
+      "sources": [ { "path": "src/mini_vllm/prefix_cache.py", "line": 121, "end_line": 174 }, { "path": "src/mini_vllm/prefix_cache.py", "line": 210, "end_line": 288, "label": "insert + evict" } ] },
+    { "id": "allocator", "type": "database", "label": "BlockAllocator", "sublabel": "free list + refcounts", "tag": "Day 1", "pos": [850, 220], "size": [170, 64],
+      "sources": [ { "path": "src/mini_vllm/block_allocator.py", "line": 37, "end_line": 47 }, { "path": "src/mini_vllm/block_allocator.py", "line": 70, "end_line": 132, "label": "alloc / incref / free" } ] },
+    { "id": "model", "type": "backend", "label": "PagedLlama", "sublabel": "16 layers, ragged batch", "tag": "Llama-3.2-1B", "pos": [280, 380], "size": [180, 64],
+      "sources": [ { "path": "src/mini_vllm/model/llama.py", "line": 232, "end_line": 311, "label": "forward" } ] },
+    { "id": "kv", "type": "database", "label": "PagedKVCache", "sublabel": "K,V per layer [N,16,8,64]", "tag": "GPU memory", "pos": [850, 380], "size": [170, 64],
+      "sources": [ { "path": "src/mini_vllm/kv_cache.py", "line": 116, "end_line": 139 }, { "path": "src/mini_vllm/kv_cache.py", "line": 166, "end_line": 182, "label": "flat slot view" } ] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Policy and bookkeeping (pure Python, no GPU)", "wraps": ["scheduler", "table", "prefix", "allocator"] },
+    { "kind": "region", "label": "Numerics (GPU)", "wraps": ["model", "kv"] }
+  ],
+  "connections": [
+    { "id": "submit", "from": "caller", "to": "engine", "label": "add_request", "variant": "emphasis" },
+    { "id": "plan", "from": "engine", "to": "scheduler", "label": "schedule()", "variant": "emphasis" },
+    { "id": "grow", "from": "scheduler", "to": "table", "label": "append_tokens" },
+    { "id": "blocks", "from": "table", "to": "allocator", "label": "allocate / free" },
+    { "id": "lookup", "from": "scheduler", "to": "prefix", "label": "match · insert · evict" },
+    { "id": "refs", "from": "prefix", "to": "allocator", "label": "incref / free" },
+    { "id": "run", "from": "engine", "to": "model", "label": "tokens + slot_mapping", "variant": "emphasis" },
+    { "id": "rw", "from": "model", "to": "kv", "label": "write K,V · gather by block table" },
+    { "id": "index", "from": "allocator", "to": "kv", "label": "block id = row", "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Day 1: paged memory", "items": [
+      "KV per token = 2 × 16 layers × 8 heads × 64 dim × 2 B = 32 KiB",
+      "Block of 16 tokens = 512 KiB across all layers",
+      "slot = table[t // 16] × 16 + t % 16",
+      "Waste on 'independent': 16.8% → 3.9% of slots (the 4.3×)" ] },
+    { "dot": "emerald", "title": "Day 2: scheduling and reuse", "items": [
+      "Scheduler runs every step: finished leave, waiting join",
+      "3.82× throughput (2415 vs 631 tok/s); TTFT p50 2448 → 179 ms",
+      "Prefix cache shares only full blocks, held by refcount",
+      "Up to 7.41× faster prefill at 8k context, 90% cached" ] },
+    { "dot": "amber", "title": "Why the split matters", "items": [
+      "All policy is plain Python, so tests run on CPU",
+      "The GPU side only sees flat token ids, positions and slots",
+      "The allocator owns ids; the KV cache owns the bytes" ] }
+  ]
+}

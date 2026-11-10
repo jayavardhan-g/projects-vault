@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "workflow",
+  "quality": "showcase",
+  "specification": {
+    "path": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/.archify/workflow-schedule-step-20261109-151201/candidate.json",
+    "sha256": "61fb21838259fb8600e6d770fc52969d7052ff602809b55398d55ea82dfb15c8",
+    "bytes": 6347
+  },
+  "artifact": {
+    "path": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day2-schedule-workflow.html",
+    "sha256": "4bc9091a441b6f8ac6aa85f3770ae73fa5eedef1c800b7a849360adae1edee39",
+    "bytes": 850177
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/.archify/workflow-schedule-step-20261109-151201/review-2/day2-schedule-workflow.finalize.json",
+    "summaryReceipt": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/.archify/workflow-schedule-step-20261109-151201/review-2/day2-schedule-workflow.finalize-summary.json",
+    "browserCheckReceipt": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/.archify/workflow-schedule-step-20261109-151201/review-2/day2-schedule-workflow.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-09T09:42:25.599Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 4435,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

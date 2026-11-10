@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "74cef03d-88a7-4520-beb2-6d1d4114f988",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/.archify/architecture-system-map-20261109-151201/candidate.json",
+  "output": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day1-2-system-map.html",
+  "specification": {
+    "sha256": "0583b92a8f3cfd4b1f75c6d3228a6e9b976845e668704880fef6732a8ac20696",
+    "bytes": 5054
+  },
+  "artifact": {
+    "sha256": "887ad2ce9d4ae8385c2c10889118ff112e65fdcebe14dfa6c7539a498c73f22e",
+    "bytes": 849391
+  }
+}

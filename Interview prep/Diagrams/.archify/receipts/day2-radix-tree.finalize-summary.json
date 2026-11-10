@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "tree",
+  "quality": "showcase",
+  "specification": {
+    "path": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/.archify/tree-radix-cache-20261109-151201/candidate.json",
+    "sha256": "2df14743be3fd26e1a46a191c4ffffc10bb1bd5bf284ca15e0fc38f7bad2e596",
+    "bytes": 2972
+  },
+  "artifact": {
+    "path": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day2-radix-tree.html",
+    "sha256": "52a441d1e8a93484ba145ec3fb73b52674fd6b74e3de81c70f3cc1b3097bafcd",
+    "bytes": 842652
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day2-radix-tree.finalize.json",
+    "summaryReceipt": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day2-radix-tree.finalize-summary.json",
+    "browserCheckReceipt": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day2-radix-tree.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-09T09:42:25.599Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3420,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

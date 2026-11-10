@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "403dc0a3-4a0e-4d66-a61a-46a26bd2263f",
+  "status": "current",
+  "command": "deliver",
+  "type": "lifecycle",
+  "input": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/.archify/lifecycle-request-20261109-151201/candidate.json",
+  "output": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day2-request-lifecycle.html",
+  "specification": {
+    "sha256": "60552b6150455d1772af3cbda2c6aad7197a966e98fe1c0992c1bf5feca5ee10",
+    "bytes": 3656
+  },
+  "artifact": {
+    "sha256": "a838fd075237cf815e2209342025d6ea8a515739faed966aa39ac04e4216f956",
+    "bytes": 840858
+  }
+}

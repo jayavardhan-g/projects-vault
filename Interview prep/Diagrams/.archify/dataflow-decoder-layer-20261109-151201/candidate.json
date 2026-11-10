@@ -1,0 +1,306 @@
+{
+ "schema_version": 1,
+ "diagram_type": "dataflow",
+ "meta": {
+  "title": "Day 1 · One token batch through PagedLlama",
+  "output": "day1-decoder-layer-dataflow.html",
+  "quality_profile": "showcase",
+  "repository": {
+   "url": "https://github.com/jayavardhan-g/mini-vLLM.git",
+   "provider": "github",
+   "link_mode": "web",
+   "revision": "367939478bfd6ac2fa1e0c481c357985de72ac7b"
+  }
+ },
+ "stages": [
+  {
+   "label": "Embed"
+  },
+  {
+   "label": "Project + RoPE"
+  },
+  {
+   "label": "Paged KV cache"
+  },
+  {
+   "label": "Attend"
+  },
+  {
+   "label": "MLP → logits"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "embed",
+   "type": "frontend",
+   "label": "embed_tokens",
+   "sublabel": "ids [T] → [T, 2048]",
+   "stage": 0,
+   "row": 0,
+   "sources": [
+    {
+     "path": "src/mini_vllm/model/llama.py",
+     "line": 264,
+     "end_line": 265
+    }
+   ]
+  },
+  {
+   "id": "rotary",
+   "type": "frontend",
+   "label": "RotaryEmbedding",
+   "sublabel": "from positions [T]",
+   "stage": 0,
+   "row": 2,
+   "sources": [
+    {
+     "path": "src/mini_vllm/model/llama.py",
+     "line": 97,
+     "end_line": 149
+    }
+   ]
+  },
+  {
+   "id": "qkv",
+   "type": "backend",
+   "label": "q/k/v_proj",
+   "sublabel": "q [T,32,64]",
+   "tag": "k,v [T,8,64]",
+   "stage": 1,
+   "row": 0,
+   "sources": [
+    {
+     "path": "src/mini_vllm/model/llama.py",
+     "line": 280,
+     "end_line": 285
+    }
+   ]
+  },
+  {
+   "id": "rope",
+   "type": "backend",
+   "label": "apply_rope",
+   "sublabel": "rotate q and k only",
+   "stage": 1,
+   "row": 2,
+   "sources": [
+    {
+     "path": "src/mini_vllm/model/llama.py",
+     "line": 151,
+     "end_line": 168
+    },
+    {
+     "path": "src/mini_vllm/model/llama.py",
+     "line": 286,
+     "end_line": 286
+    }
+   ]
+  },
+  {
+   "id": "write",
+   "type": "backend",
+   "label": "write_kv_to_cache",
+   "sublabel": "k_flat[slots] = k",
+   "tag": "before attending",
+   "stage": 2,
+   "row": 0,
+   "sources": [
+    {
+     "path": "src/mini_vllm/model/llama.py",
+     "line": 288,
+     "end_line": 290
+    },
+    {
+     "path": "src/mini_vllm/paged_attention.py",
+     "line": 36,
+     "end_line": 65
+    }
+   ]
+  },
+  {
+   "id": "cache",
+   "type": "database",
+   "label": "KV cache[layer]",
+   "sublabel": "[N, 16, 8, 64]",
+   "tag": "K and V",
+   "stage": 2,
+   "row": 2,
+   "sources": [
+    {
+     "path": "src/mini_vllm/kv_cache.py",
+     "line": 131,
+     "end_line": 139
+    }
+   ]
+  },
+  {
+   "id": "attn",
+   "type": "backend",
+   "label": "paged_attention",
+   "sublabel": "gather by block table",
+   "tag": "GQA: 8 → 32 heads",
+   "stage": 3,
+   "row": 1,
+   "sources": [
+    {
+     "path": "src/mini_vllm/model/llama.py",
+     "line": 292,
+     "end_line": 297
+    },
+    {
+     "path": "src/mini_vllm/paged_attention.py",
+     "line": 172,
+     "end_line": 226
+    }
+   ]
+  },
+  {
+   "id": "oproj",
+   "type": "backend",
+   "label": "o_proj + residual",
+   "sublabel": "[T, 2048]",
+   "stage": 4,
+   "row": 0,
+   "sources": [
+    {
+     "path": "src/mini_vllm/model/llama.py",
+     "line": 298,
+     "end_line": 299
+    }
+   ]
+  },
+  {
+   "id": "mlp",
+   "type": "backend",
+   "label": "SwiGLU MLP",
+   "sublabel": "+ residual",
+   "stage": 4,
+   "row": 1,
+   "sources": [
+    {
+     "path": "src/mini_vllm/model/llama.py",
+     "line": 301,
+     "end_line": 306
+    }
+   ],
+   "tag": "silu(gate)·up"
+  },
+  {
+   "id": "head",
+   "type": "backend",
+   "label": "norm → lm_head",
+   "sublabel": "last token only",
+   "tag": "[B, 128256]",
+   "stage": 4,
+   "row": 2,
+   "sources": [
+    {
+     "path": "src/mini_vllm/model/llama.py",
+     "line": 308,
+     "end_line": 311
+    },
+    {
+     "path": "src/mini_vllm/engine.py",
+     "line": 129,
+     "end_line": 135
+    }
+   ]
+  }
+ ],
+ "flows": [
+  {
+   "id": "hidden-in",
+   "from": "embed",
+   "to": "qkv",
+   "label": "hidden [T,2048]",
+   "variant": "emphasis"
+  },
+  {
+   "id": "angles",
+   "from": "rotary",
+   "to": "rope",
+   "label": "cos, sin"
+  },
+  {
+   "id": "qk",
+   "from": "qkv",
+   "to": "rope",
+   "label": "q, k"
+  },
+  {
+   "id": "kv-new",
+   "from": "rope",
+   "to": "write",
+   "label": "roped k, raw v",
+   "variant": "emphasis"
+  },
+  {
+   "id": "scatter",
+   "from": "write",
+   "to": "cache",
+   "label": "scatter to slots"
+  },
+  {
+   "id": "gather",
+   "from": "cache",
+   "to": "attn",
+   "label": "gather K, V"
+  },
+  {
+   "id": "query",
+   "from": "rope",
+   "to": "attn",
+   "label": "q [T,32,64]",
+   "variant": "emphasis"
+  },
+  {
+   "id": "attn-out",
+   "from": "attn",
+   "to": "oproj",
+   "label": "[T, 2048]",
+   "variant": "emphasis"
+  },
+  {
+   "id": "to-mlp",
+   "from": "oproj",
+   "to": "mlp",
+   "label": "hidden"
+  },
+  {
+   "id": "to-head",
+   "from": "mlp",
+   "to": "head",
+   "label": "after 16 layers",
+   "variant": "dashed"
+  }
+ ],
+ "cards": [
+  {
+   "dot": "cyan",
+   "title": "Shapes to say out loud",
+   "items": [
+    "T = all tokens of all requests this step, concatenated (ragged, no padding)",
+    "hidden 2048 = 32 query heads × 64; K/V use 8 heads (GQA, 4 q heads share one)",
+    "Positions are per request, not indices into the flat batch",
+    "Each layer: RMSNorm before attention and before the MLP"
+   ]
+  },
+  {
+   "dot": "emerald",
+   "title": "Where the cache is touched",
+   "items": [
+    "Each layer writes this step's K,V first, so a token attends to itself",
+    "slot = block_id × 16 + offset, from BlockTable.slot_index",
+    "Gather copies a request's scattered blocks back into token order"
+   ]
+  },
+  {
+   "dot": "amber",
+   "title": "Why decode is memory-bound",
+   "items": [
+    "A decode step does 1 token of maths per request but reads all its KV and all weights",
+    "Logits only at each request's last token: the 128256-wide head is costly"
+   ]
+  }
+ ]
+}

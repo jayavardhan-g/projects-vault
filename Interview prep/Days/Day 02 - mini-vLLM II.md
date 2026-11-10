@@ -18,6 +18,10 @@ Part of [[Interview plan (Nov 2026)]]. Repo `vLLMmini` (branch `main`). About 7 
 - say exactly what "up to 7.4×" means;
 - rebuild a toy radix cache.
 
+**Diagrams** ([[Diagrams]]): [one schedule() iteration](../Diagrams/day2-schedule-workflow.html) ·
+[life of a request](../Diagrams/day2-request-lifecycle.html) · [inside engine.step()](../Diagrams/day2-engine-step-sequence.html) ·
+[radix cache snapshot](../Diagrams/day2-radix-tree.html)
+
 ## Schedule
 
 | # | Time | Kind | What |

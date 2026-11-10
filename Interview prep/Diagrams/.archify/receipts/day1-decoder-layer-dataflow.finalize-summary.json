@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "dataflow",
+  "quality": "showcase",
+  "specification": {
+    "path": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/.archify/dataflow-decoder-layer-20261109-151201/candidate.json",
+    "sha256": "d800647b683033f1dc62e02645246aa4d8f85d86e4ae272b88dae31d0ef5ccfc",
+    "bytes": 5736
+  },
+  "artifact": {
+    "path": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day1-decoder-layer-dataflow.html",
+    "sha256": "1bf60c066deb5bcc7c8e521e6e25d09d8fc7e13bdfc5b296e5c680fda4ec02be",
+    "bytes": 845590
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day1-decoder-layer-dataflow.finalize.json",
+    "summaryReceipt": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day1-decoder-layer-dataflow.finalize-summary.json",
+    "browserCheckReceipt": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day1-decoder-layer-dataflow.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-09T09:42:25.599Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3521,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  },
+  "visualReviewRecommendation": {
+    "action": "inspect-route-readability",
+    "signals": {
+      "resolvedCrossovers": 1
+    },
+    "reason": "Automated gates passed, but crossings or detours still need perceptual review before claiming visual quality.",
+    "affectedRoutes": {
+      "crossings": [
+        {
+          "left": {
+            "id": "scatter",
+            "from": "write",
+            "to": "cache",
+            "label": "scatter to slots",
+            "collectionIndex": 4,
+            "artifactIndex": 5
+          },
+          "right": {
+            "id": "query",
+            "from": "rope",
+            "to": "attn",
+            "label": "q [T,32,64]",
+            "collectionIndex": 6,
+            "artifactIndex": 7
+          },
+          "point": [
+            530,
+            280
+          ]
+        }
+      ],
+      "detours": [],
+      "truncated": false
+    },
+    "repair": "Advisory only: this mode places or routes these relationships itself. Report them; do not remove relationships or meaning to reduce crossings."
+  }
+}

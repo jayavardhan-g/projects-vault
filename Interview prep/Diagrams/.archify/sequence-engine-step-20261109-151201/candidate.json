@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Day 2 · Inside one engine.step()",
+    "output": "day2-engine-step-sequence.html",
+    "quality_profile": "showcase",
+    "repository": { "url": "https://github.com/jayavardhan-g/mini-vLLM.git", "provider": "github", "link_mode": "web", "revision": "367939478bfd6ac2fa1e0c481c357985de72ac7b" }
+  },
+  "participants": [
+    { "id": "engine", "type": "external", "label": "Engine", "sublabel": "step()",
+      "sources": [ { "path": "src/mini_vllm/engine.py", "line": 111, "end_line": 150 } ] },
+    { "id": "sched", "type": "backend", "label": "Scheduler", "sublabel": "policy",
+      "sources": [ { "path": "src/mini_vllm/scheduler.py", "line": 296, "end_line": 440 }, { "path": "src/mini_vllm/scheduler.py", "line": 649, "end_line": 702 } ] },
+    { "id": "prefix", "type": "database", "label": "Prefix cache", "sublabel": "radix tree",
+      "sources": [ { "path": "src/mini_vllm/prefix_cache.py", "line": 144, "end_line": 243 } ] },
+    { "id": "alloc", "type": "database", "label": "Allocator", "sublabel": "refcounts",
+      "sources": [ { "path": "src/mini_vllm/block_allocator.py", "line": 70, "end_line": 132 } ] },
+    { "id": "model", "type": "backend", "label": "PagedLlama", "sublabel": "GPU forward",
+      "sources": [ { "path": "src/mini_vllm/model/llama.py", "line": 232, "end_line": 311 } ] },
+    { "id": "kv", "type": "database", "label": "KV cache", "sublabel": "per-layer tensors",
+      "sources": [ { "path": "src/mini_vllm/paged_attention.py", "line": 36, "end_line": 100 } ] }
+  ],
+  "segments": [
+    { "from": 150, "to": 425, "label": "1 · Plan the batch" },
+    { "from": 435, "to": 640, "label": "2 · One ragged forward pass" },
+    { "from": 650, "to": 830, "label": "3 · Record results" }
+  ],
+  "messages": [
+    { "id": "m-sched", "from": "engine", "to": "sched", "y": 165, "label": "schedule()", "variant": "emphasis" },
+    { "id": "m-grow", "from": "sched", "to": "alloc", "y": 200, "label": "allocate for decodes", "note": "running first; a block only at a boundary" },
+    { "id": "m-match", "from": "sched", "to": "prefix", "y": 260, "label": "match(prompt)", "note": "takes no refs: admission may still fail" },
+    { "id": "m-hit", "from": "prefix", "to": "sched", "y": 315, "label": "PrefixMatch", "variant": "return" },
+    { "id": "m-acq", "from": "sched", "to": "alloc", "y": 345, "label": "acquire → incref", "note": "only after the watermark check passes" },
+    { "id": "m-out", "from": "sched", "to": "engine", "y": 400, "label": "SchedulerOutput", "variant": "return" },
+    { "id": "m-fwd", "from": "engine", "to": "model", "y": 450, "label": "forward(flat batch)", "variant": "emphasis", "note": "ids, positions, slot_mapping, block tables" },
+    { "id": "m-write", "from": "model", "to": "kv", "y": 510, "label": "write K,V to slots", "note": "each layer, before attending" },
+    { "id": "m-gather", "from": "kv", "to": "model", "y": 565, "label": "gather K,V", "variant": "return" },
+    { "id": "m-logits", "from": "model", "to": "engine", "y": 610, "label": "logits, last tokens", "variant": "return" },
+    { "id": "m-update", "from": "engine", "to": "sched", "y": 665, "label": "update(argmax)", "variant": "emphasis", "note": "num_computed = num_tokens; append token" },
+    { "id": "m-pub", "from": "sched", "to": "prefix", "y": 725, "label": "insert(full blocks)", "note": "tree increfs each new full block" },
+    { "id": "m-free", "from": "sched", "to": "alloc", "y": 785, "label": "table.free() if done", "variant": "dashed", "note": "published blocks stay cached" }
+  ],
+  "activations": [
+    { "participant": "engine", "from": 160, "to": 790, "type": "external" },
+    { "participant": "sched", "from": 165, "to": 405, "type": "backend" },
+    { "participant": "sched", "from": 665, "to": 790, "type": "backend" },
+    { "participant": "model", "from": 450, "to": 615, "type": "backend" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Why this is continuous batching", "items": [
+      "The scheduler runs every step, not once per batch",
+      "A finished request frees its blocks inside update(), so the next step can admit",
+      "Prefills and decodes share one forward pass (ragged query_lens)" ] },
+    { "dot": "emerald", "title": "Two-phase cache use", "items": [
+      "match() asks 'how much would this save?' without committing",
+      "acquire() commits only once admission is certain",
+      "Publishing happens after every step, so in-flight requests can share" ] }
+  ]
+}

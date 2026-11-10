@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "sequence",
+  "quality": "showcase",
+  "specification": {
+    "path": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/.archify/sequence-engine-step-20261109-151201/candidate.json",
+    "sha256": "7a65fb87d352e0157e21e6d36e0b54b37fec7203ca58c99a87a8082a05d98456",
+    "bytes": 4545
+  },
+  "artifact": {
+    "path": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day2-engine-step-sequence.html",
+    "sha256": "1199983db2b1d2a38c8cc43be2c7ebd6a866b669456d26a41d16138b86dba6f4",
+    "bytes": 842568
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day2-engine-step-sequence.finalize.json",
+    "summaryReceipt": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day2-engine-step-sequence.finalize-summary.json",
+    "browserCheckReceipt": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day2-engine-step-sequence.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-09T09:42:25.599Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3900,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

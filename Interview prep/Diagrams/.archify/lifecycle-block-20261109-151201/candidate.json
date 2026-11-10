@@ -1,0 +1,187 @@
+{
+ "schema_version": 3,
+ "diagram_type": "lifecycle",
+ "meta": {
+  "title": "Day 1–2 · Life of one physical KV block",
+  "output": "day1-block-lifecycle.html",
+  "quality_profile": "showcase",
+  "repository": {
+   "url": "https://github.com/jayavardhan-g/mini-vLLM.git",
+   "provider": "github",
+   "link_mode": "web",
+   "revision": "367939478bfd6ac2fa1e0c481c357985de72ac7b"
+  }
+ },
+ "mainPath": [
+  "free",
+  "owned",
+  "published",
+  "cached"
+ ],
+ "states": [
+  {
+   "id": "free",
+   "type": "start",
+   "label": "Free",
+   "sublabel": "on free list, refcount 0",
+   "tag": "LIFO reuse",
+   "step": "01",
+   "sources": [
+    {
+     "path": "src/mini_vllm/block_allocator.py",
+     "line": 40,
+     "end_line": 47
+    }
+   ]
+  },
+  {
+   "id": "owned",
+   "type": "active",
+   "label": "Owned",
+   "sublabel": "refcount 1: one BlockTable",
+   "tag": "being filled",
+   "step": "02",
+   "sources": [
+    {
+     "path": "src/mini_vllm/block_allocator.py",
+     "line": 70,
+     "end_line": 94
+    },
+    {
+     "path": "src/mini_vllm/block_table.py",
+     "line": 106,
+     "end_line": 124
+    }
+   ]
+  },
+  {
+   "id": "published",
+   "type": "active",
+   "label": "Published + in use",
+   "sublabel": "refcount = 1 tree + live requests",
+   "tag": "Day 2",
+   "step": "03",
+   "sources": [
+    {
+     "path": "src/mini_vllm/prefix_cache.py",
+     "line": 210,
+     "end_line": 243
+    },
+    {
+     "path": "src/mini_vllm/scheduler.py",
+     "line": 544,
+     "end_line": 586
+    }
+   ]
+  },
+  {
+   "id": "cached",
+   "type": "waiting",
+   "label": "Cached only",
+   "sublabel": "refcount 1: the tree's reference",
+   "tag": "evictable if a leaf",
+   "step": "04",
+   "sources": [
+    {
+     "path": "src/mini_vllm/prefix_cache.py",
+     "line": 247,
+     "end_line": 259
+    }
+   ]
+  },
+  {
+   "id": "error",
+   "type": "failure",
+   "label": "ValueError",
+   "sublabel": "double free / incref of free block",
+   "tag": "bug caught",
+   "sources": [
+    {
+     "path": "src/mini_vllm/block_allocator.py",
+     "line": 96,
+     "end_line": 119
+    }
+   ]
+  }
+ ],
+ "transitions": [
+  {
+   "id": "alloc",
+   "from": "free",
+   "to": "owned",
+   "label": "allocate()"
+  },
+  {
+   "id": "publish",
+   "from": "owned",
+   "to": "published",
+   "label": "block full → insert()",
+   "variant": "emphasis"
+  },
+  {
+   "id": "release",
+   "from": "published",
+   "to": "cached",
+   "label": "request ends"
+  },
+  {
+   "id": "reuse",
+   "from": "cached",
+   "to": "published",
+   "label": "match + acquire()",
+   "note": "a new request adopts it: incref",
+   "variant": "emphasis"
+  },
+  {
+   "id": "evict",
+   "from": "cached",
+   "to": "free",
+   "label": "evict() LRU leaf",
+   "note": "only leaves with refcount exactly 1",
+   "variant": "dashed"
+  },
+  {
+   "id": "drop",
+   "from": "owned",
+   "to": "free",
+   "label": "table.free()",
+   "note": "never published: partial block, or cache off"
+  },
+  {
+   "id": "bad",
+   "from": "free",
+   "to": "error",
+   "label": "free() / incref()",
+   "variant": "security"
+  }
+ ],
+ "cards": [
+  {
+   "dot": "cyan",
+   "title": "The one invariant",
+   "items": [
+    "Every block is on the free list XOR has refcount > 0 (check_invariants)",
+    "A block returns to the pool only when its refcount reaches 0"
+   ]
+  },
+  {
+   "dot": "emerald",
+   "title": "Who holds references",
+   "items": [
+    "Each BlockTable that lists the block: one each",
+    "The radix tree, once the block is published: one",
+    "So refcount 1 + no table = only the cache keeps it alive",
+    "Publish = tree increfs a full, computed block",
+    "Release = finish or preempt calls table.free()"
+   ]
+  },
+  {
+   "dot": "amber",
+   "title": "Interview angle",
+   "items": [
+    "Day 1 Q6: a shared block is freed only when the last holder lets go",
+    "Day 1 Q7: allocate_many never leaks half an allocation"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "18d80587-47f2-4282-810f-38d59da2f657",
+  "status": "current",
+  "command": "deliver",
+  "type": "dataflow",
+  "input": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/.archify/dataflow-decoder-layer-20261109-151201/candidate.json",
+  "output": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day1-decoder-layer-dataflow.html",
+  "specification": {
+    "sha256": "d800647b683033f1dc62e02645246aa4d8f85d86e4ae272b88dae31d0ef5ccfc",
+    "bytes": 5736
+  },
+  "artifact": {
+    "sha256": "1bf60c066deb5bcc7c8e521e6e25d09d8fc7e13bdfc5b296e5c680fda4ec02be",
+    "bytes": 845590
+  }
+}

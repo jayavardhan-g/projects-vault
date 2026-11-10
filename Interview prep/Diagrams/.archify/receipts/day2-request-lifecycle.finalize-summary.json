@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "lifecycle",
+  "quality": "showcase",
+  "specification": {
+    "path": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/.archify/lifecycle-request-20261109-151201/candidate.json",
+    "sha256": "60552b6150455d1772af3cbda2c6aad7197a966e98fe1c0992c1bf5feca5ee10",
+    "bytes": 3656
+  },
+  "artifact": {
+    "path": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day2-request-lifecycle.html",
+    "sha256": "a838fd075237cf815e2209342025d6ea8a515739faed966aa39ac04e4216f956",
+    "bytes": 840858
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day2-request-lifecycle.finalize.json",
+    "summaryReceipt": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day2-request-lifecycle.finalize-summary.json",
+    "browserCheckReceipt": "/data/jayavardhan/vaults/projects/Interview prep/Diagrams/day2-request-lifecycle.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-09T09:42:25.599Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3505,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

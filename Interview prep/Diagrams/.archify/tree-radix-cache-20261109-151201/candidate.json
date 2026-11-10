@@ -1,0 +1,126 @@
+{
+ "schema_version": 1,
+ "diagram_type": "tree",
+ "meta": {
+  "title": "Day 2 · A radix prefix cache snapshot (illustrative)",
+  "output": "day2-radix-tree.html",
+  "quality_profile": "showcase",
+  "repository": {
+   "url": "https://github.com/jayavardhan-g/mini-vLLM.git",
+   "provider": "github",
+   "link_mode": "web",
+   "revision": "367939478bfd6ac2fa1e0c481c357985de72ac7b"
+  }
+ },
+ "layout": {
+  "direction": "right"
+ },
+ "nodes": [
+  {
+   "id": "root",
+   "label": "root",
+   "sublabel": "empty prefix, no block",
+   "sources": [
+    {
+     "path": "src/mini_vllm/prefix_cache.py",
+     "line": 124,
+     "end_line": 132
+    }
+   ]
+  },
+  {
+   "id": "s0",
+   "parent": "root",
+   "label": "System prompt · block 0",
+   "sublabel": "phys 7 · rc 3 (tree + A + D)",
+   "sources": [
+    {
+     "path": "src/mini_vllm/prefix_cache.py",
+     "line": 53,
+     "end_line": 71
+    }
+   ]
+  },
+  {
+   "id": "s1",
+   "parent": "s0",
+   "label": "System prompt · block 1",
+   "sublabel": "phys 2 · rc 3 · inner node"
+  },
+  {
+   "id": "a1",
+   "parent": "s1",
+   "label": "Chat A · turn 1",
+   "sublabel": "phys 9 · rc 2 (tree + A)"
+  },
+  {
+   "id": "a2",
+   "parent": "a1",
+   "label": "Chat A · turn 2",
+   "sublabel": "phys 4 · rc 2 · leaf, A running → keep"
+  },
+  {
+   "id": "b1",
+   "parent": "s1",
+   "label": "Chat B · turn 1",
+   "sublabel": "phys 5 · rc 1 · leaf → evictable",
+   "sources": [
+    {
+     "path": "src/mini_vllm/prefix_cache.py",
+     "line": 247,
+     "end_line": 259
+    }
+   ]
+  },
+  {
+   "id": "c0",
+   "parent": "root",
+   "label": "Old prompt C · block 0",
+   "sublabel": "phys 11 · rc 1 · inner → not yet"
+  },
+  {
+   "id": "c1",
+   "parent": "c0",
+   "label": "Old prompt C · block 1",
+   "sublabel": "phys 3 · rc 1 · oldest leaf → evict first",
+   "sources": [
+    {
+     "path": "src/mini_vllm/prefix_cache.py",
+     "line": 265,
+     "end_line": 299
+    }
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "dot": "cyan",
+   "title": "How to read it",
+   "items": [
+    "Each node = one FULL block of 16 token ids + its physical block id",
+    "Root-to-node path = a token prefix; lookup walks block by block",
+    "rc = refcount = 1 (tree) + live requests whose table holds it",
+    "Request D matched only the system prompt; its own blocks are not full yet"
+   ]
+  },
+  {
+   "dot": "rose",
+   "title": "Eviction: evict(3)",
+   "items": [
+    "Scan 1: leaves with rc exactly 1 are C·1 and B·1; free them in LRU order",
+    "C·0 has now become a leaf, so scan 2 finds it and frees it",
+    "A·2 and the system prompt are never touched while A or D runs",
+    "Never an inner node: its children would become unreachable"
+   ]
+  },
+  {
+   "dot": "amber",
+   "title": "Hit rate is not time saved",
+   "items": [
+    "Prefill T(n) ≈ a + b·n + c·n²; at small n the fixed cost a dominates",
+    "512 tok: 1.00× · 2048: 2.92× · 8192: 7.41× (90% cached)",
+    "Say '7.4× at 8k context' — never just '7.4×'"
+   ]
+  }
+ ]
+}

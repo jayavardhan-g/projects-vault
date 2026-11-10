@@ -22,6 +22,7 @@ Today covers the *paged memory manager* and the **4.3×**. The scheduler and the
 > [!tip] Tools for today
 > - **Interactive lab:** <https://claude.ai/artifact/SNFAyKDabiFMnwXppfj8wi> (offline copy: `figures/inference-lab.html`). The *Paging simulator* tab is loaded with today's hand trace (D), so you can check your paper answer step by step. The *Questions* tab has today's questions as flashcards.
 > - All figures live in `Interview prep/Days/figures/`.
+> - **Archify diagrams** ([[Diagrams]]): [system map](../Diagrams/day1-2-system-map.html) · [one decoder layer](../Diagrams/day1-decoder-layer-dataflow.html) · [life of a KV block](../Diagrams/day1-block-lifecycle.html)
 
 ## Today in one picture
 
