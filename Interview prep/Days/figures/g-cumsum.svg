@@ -1,0 +1,31 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 700 230' width='700' height='230' font-family='Inter, Helvetica, Arial, sans-serif'><title>cumsum</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='700' height='230' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>x.cumsum(dim): running total</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>element k = x[0] + … + x[k]; top-p keeps tokens until this passes p</text>
+<text x='100.0' y='104' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>probs (sorted)</text>
+<rect x='30' y='112' width='140' height='52' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='35' y='117' width='42' height='42' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='56.0' y='142.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>0.5</text>
+<rect x='79' y='117' width='42' height='42' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='100.0' y='142.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>0.3</text>
+<rect x='123' y='117' width='42' height='42' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='144.0' y='142.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>0.2</text>
+<text x='100.0' y='179' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[3]</text>
+<line x1='190' y1='130' x2='324' y2='130' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/><text x='260.0' y='121' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>cumsum</text>
+<text x='420.0' y='104' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>probs.cumsum(-1)</text>
+<rect x='350' y='112' width='140' height='52' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='355' y='117' width='42' height='42' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='376.0' y='142.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>0.5</text>
+<rect x='399' y='117' width='42' height='42' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='420.0' y='142.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>0.8</text>
+<rect x='443' y='117' width='42' height='42' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='464.0' y='142.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>1.0</text>
+<text x='420.0' y='179' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>running total</text>
+<rect x='32' y='114' width='48' height='48' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0800;0.3300;1.0000'/></rect>
+<rect x='352' y='114' width='48' height='48' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0800;0.3300;1.0000'/></rect>
+<rect x='355' y='117' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.1800;1.0000'/></rect>
+<rect x='32' y='114' width='92' height='48' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3500;0.6000;1.0000'/></rect>
+<rect x='396' y='114' width='48' height='48' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3500;0.6000;1.0000'/></rect>
+<rect x='399' y='117' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.4500;1.0000'/></rect>
+<rect x='32' y='114' width='136' height='48' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6200;0.8700;1.0000'/></rect>
+<rect x='440' y='114' width='48' height='48' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6200;0.8700;1.0000'/></rect>
+<rect x='443' y='117' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.7200;1.0000'/></rect>
+<text x='520' y='135' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>0.5, 0.5+0.3, 0.5+0.3+0.2</text>
+<text x='20' y='216' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: the red span grows by one each step</text></svg>

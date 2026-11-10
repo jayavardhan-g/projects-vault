@@ -290,6 +290,9 @@ for q_len in query_lens:
     offset += q_len
     logits_indices.append(offset - 1)
 ```
+> [!info] New functions in this code
+> - `.extend(xs)`: adds **all** items of `xs` at the end. `a = [1]; a.extend([2, 3])` → `[1, 2, 3]`. [[Function glossary#list.extend|→ examples]]
+> - `.append(x)`: adds `x` at the end of a list. `[1].append(2)` → `[1, 2]`. [[Function glossary#list.append|→ examples]]
 
 | Input | Value for our step | Shape |
 |---|---|---|
@@ -333,6 +336,8 @@ inv_freq = 1.0 / (
     base ** (torch.arange(0, head_dim, 2, device=device, dtype=torch.float32) / head_dim)
 )
 ```
+> [!info] New functions in this code
+> - `torch.arange(start, end, step)`: a 1-D tensor counting from `start` up to (not including) `end` in steps of `step`. `torch.arange(0, 8, 2)` → `tensor([0, 2, 4, 6])`. With `head_dim = 64` it gives 0, 2, …, 62: one entry per feature pair. [[Function glossary#torch.arange|→ examples and figure]]
 
 `src/mini_vllm/model/llama.py:144–148`
 ```python
@@ -342,6 +347,12 @@ def forward(self, positions: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     emb = torch.cat((freqs, freqs), dim=-1)
     return emb.cos().to(self._dtype), emb.sin().to(self._dtype)
 ```
+> [!info] New functions in this code
+> - `.to(dtype or device)`: converts a tensor's number type or moves it. `x.to(torch.float32)` makes a float32 copy (from bfloat16); `x.to('cuda')` moves it to the GPU. In Triton code, `.to(tl.float32)` converts a loaded value. [[Function glossary#x.to|→ examples and figure]]
+> - `.unsqueeze(d)`: inserts a new axis of size 1 at position `d`. A `[3]` tensor → `.unsqueeze(1)` → `[3, 1]` (a column); `.unsqueeze(0)` → `[1, 3]` (a row). Needed so tensors broadcast against each other. [[Function glossary#x.unsqueeze|→ examples and figure]]
+> - `torch.cat((a, b), dim=d)`: joins tensors **along an existing axis**. `torch.cat(([1, 2], [3, 4]), dim=-1)` → `[1, 2, 3, 4]`; on `[3, 2]` tensors with `dim=-1` the result is `[3, 4]`. [[Function glossary#torch.cat|→ examples and figure]]
+> - `.cos()`: cosine of every element. [[Function glossary#x.cos|→ examples and figure]]
+> - `.sin()`: sine of every element. [[Function glossary#x.sin|→ examples]]
 
 - **In:** `positions [6]`. **Out:** `cos, sin [6, 64]`.
 - **How it works:** RoPE (rotary position embedding) encodes position by **rotating** pairs of features. There are 32 frequencies, `inv_freq[i] = 1 / base^(2i/64)` with `base = 500,000`. Token at position `p` gets angle `p × inv_freq[i]` for pair `i`. High-frequency pairs spin fast (they encode fine, local order); low-frequency pairs spin slowly (coarse, long-range order). Llama 3 additionally slows the lowest frequencies (`_apply_llama3_scaling`, `:124–142`) to handle long contexts.
@@ -371,6 +382,9 @@ for index, layer in enumerate(self.layers):
     residual = hidden
     x = input_norm(hidden)
 ```
+> [!info] New functions in this code
+> - `enumerate(xs)`: loops over a list and gives you each item **with its index**. `for i, x in enumerate(['a', 'b'])` gives `(0, 'a')`, then `(1, 'b')`. [[Function glossary#enumerate|→ examples]]
+> - `.shape`: the tensor's size along each axis. `x.shape == (6, 2048)` means 6 rows of 2048. [[Function glossary#x.shape|→ examples]]
 
 Steps 1.4–1.10 run **16 times**, once per decoder layer, with different weights each time. `residual = hidden` saves the layer's input for the skip connection in 1.9.
 
@@ -394,6 +408,11 @@ def forward(self, x: torch.Tensor) -> torch.Tensor:
     x = x * torch.rsqrt(variance + self.eps)
     return self.weight * x.to(dtype)
 ```
+> [!info] New functions in this code
+> - `.dtype`: the number type stored: `torch.bfloat16`, `torch.float32`, `torch.long` (64-bit integers), … [[Function glossary#x.dtype|→ examples]]
+> - `.pow(p)`: raises every element to the power `p`. `x.pow(2)` squares each element. [[Function glossary#x.pow|→ examples and figure]]
+> - `.mean(dim, keepdim=True)`: the average along an axis. On `[3, 8]` with `dim=-1` it averages each row's 8 numbers → `[3]`, or `[3, 1]` with `keepdim=True` (keeps the axis so the result broadcasts back over the row). [[Function glossary#x.mean|→ examples and figure]]
+> - `torch.rsqrt(x)`: **reciprocal** square root, 1 / √x, element by element. `torch.rsqrt(tensor([4.]))` → 0.5. [[Function glossary#torch.rsqrt|→ examples and figure]]
 
 - **In and out:** `[6, 2048]`. Shape unchanged.
 - **How it works**, per token (per row of 2048 numbers):
@@ -429,6 +448,8 @@ q = attn.q_proj(x).view(total_tokens, self.num_q_heads, self.head_dim)
 k = attn.k_proj(x).view(total_tokens, self.num_kv_heads, self.head_dim)
 v = attn.v_proj(x).view(total_tokens, self.num_kv_heads, self.head_dim)
 ```
+> [!info] New functions in this code
+> - `.view(shape)`: reinterprets the same numbers with a new shape, **no copy**. A `[6, 2048]` tensor `.view(6, 32, 64)` reads each row of 2048 as 32 heads × 64. [[Function glossary#x.view|→ examples and figure]]
 
 - **In:** `x [6, 2048]`.
 - `q_proj` is a `[2048 → 2048]` matrix: `[6, 2048] → [6, 2048]`, then `.view(6, 32, 64)`: **32 query heads of 64 features**.
@@ -516,6 +537,8 @@ for blocks, q_len, ctx_len in zip(block_tables, query_lens, context_lens):
     v = _repeat_kv_heads(v, num_q_heads)
     outputs.append(attention_scores(q, k, v, scale, compute_dtype))
 ```
+> [!info] New functions in this code
+> - `zip(a, b)`: walks several lists **in step**, pairing their items. `zip([1, 2], ['x', 'y'])` gives `(1, 'x')`, `(2, 'y')`. [[Function glossary#zip|→ examples]]
 
 It loops over the requests. For each one:
 
@@ -527,6 +550,8 @@ It loops over the requests. For each one:
 ```python
 return x.repeat_interleave(num_q_heads // num_kv_heads, dim=1)
 ```
+> [!info] New functions in this code
+> - `.repeat_interleave(n, dim)`: repeats **each** element `n` times in place: `[a, b].repeat_interleave(2)` → `[a, a, b, b]`. (Plain `.repeat(2)` would give `[a, b, a, b]`.) [[Function glossary#x.repeat_interleave|→ examples and figure]]
 
 `repeat_interleave(4)` turns KV heads `[0, 1, …, 7]` into `[0, 0, 0, 0, 1, 1, 1, 1, …]`, so query head `h` meets KV head `h // 4`. A: `[5, 32, 64]`. B: `[13, 32, 64]`.
 
@@ -545,6 +570,13 @@ weights = torch.softmax(scores, dim=-1)
 out = torch.matmul(weights, v)                       # [heads, q_len, dim]
 return out.transpose(0, 1).to(query.dtype)
 ```
+> [!info] New functions in this code
+> - `.transpose(a, b)`: swaps two axes. `[13, 32, 64].transpose(0, 1)` → `[32, 13, 64]` (heads first). [[Function glossary#x.transpose|→ examples and figure]]
+> - `torch.matmul(a, b) (also a @ b)`: matrix multiplication. For `[32, 1, 64] @ [32, 64, 13]`, it does 32 separate `[1, 64] × [64, 13]` products (one per head) → `[32, 1, 13]`. [[Function glossary#torch.matmul|→ examples and figure]]
+> - `.device`: where the tensor lives: `cpu` or `cuda:0` (a GPU). [[Function glossary#x.device|→ examples]]
+> - `.masked_fill(mask, value)`: replaces elements where `mask` is True with `value`. `scores.masked_fill(~allowed, -inf)` hides disallowed keys; `~` flips True/False. [[Function glossary#x.masked_fill|→ examples and figure]]
+> - `float(x)`: converts to a floating-point number. `float('-inf')` is minus infinity, a value smaller than every number (used to mask scores). [[Function glossary#float|→ examples]]
+> - `torch.softmax(x, dim=-1)`: softmax along an axis: each row becomes positive weights that sum to 1. `softmax([0, 0])` = `[0.5, 0.5]`. [[Function glossary#torch.softmax|→ examples and figure]]
 
 `src/mini_vllm/paged_attention.py:135–137`
 ```python
@@ -591,6 +623,8 @@ real model: 32 heads concatenated to `[T, 2048]`.
 out = out.reshape(total_tokens, self.num_q_heads * self.head_dim)
 hidden = residual + attn.o_proj(out)
 ```
+> [!info] New functions in this code
+> - `.reshape(shape)`: like `.view`, but copies if the memory layout requires it. `[6, 32, 64]` → `.reshape(6, 2048)` puts the heads side by side again. [[Function glossary#x.reshape|→ examples and figure]]
 
 - `reshape(6, 32 × 64)`: the 32 heads' outputs side by side → `[6, 2048]`.
 - `o_proj` (`[2048 → 2048]`) mixes information across heads.
@@ -618,6 +652,8 @@ hidden = residual + mlp.down_proj(
     nn.functional.silu(mlp.gate_proj(x)) * mlp.up_proj(x)
 )
 ```
+> [!info] New functions in this code
+> - `nn.functional.silu(x)`: SiLU, x · sigmoid(x), element by element: smooth ReLU. `silu(1)` = 0.73, `silu(-1)` = −0.27. [[Function glossary#nn.functional.silu|→ examples]]
 
 - `post_norm`: a second RMSNorm (same maths as 1.4).
 - `gate_proj(x)` and `up_proj(x)`: two `[2048 → 8192]` projections → both `[6, 8192]`.
@@ -654,6 +690,9 @@ return self.lm_head(hidden)
 sampled = logits.argmax(dim=-1).tolist()
 return self.scheduler.update(output, sampled)
 ```
+> [!info] New functions in this code
+> - `.argmax(dim=-1)`: the **index** of the largest value along an axis. `tensor([0.1, 2.1, 0.6]).argmax()` = 1. On logits it picks the most likely token (greedy decoding). [[Function glossary#x.argmax|→ examples and figure]]
+> - `.tolist()`: converts a tensor to a plain Python list (copies to the CPU). [[Function glossary#x.tolist|→ examples]]
 
 - `argmax` over 128,256 scores per row (greedy decoding) → **2 token ids**: A's first generated token and B's next one. `scheduler.update` appends them and decides who has finished (Day 2).
 
@@ -724,6 +763,18 @@ logits = mm([rmsnorm(H2, [1.0] * D)[2]], Wlm)[0]                        # 1.11 l
 nxt = max(range(len(VOCAB)), key=lambda i: logits[i])                   # 1.12 argmax
 print("logits", [round(v, 2) for v in logits], "-> next token:", VOCAB[nxt])
 ```
+> [!info] New functions in this code
+> - `random.seed(n)`: fixes Python's random generator, so the same `n` always produces the same "random" numbers. That's how the toy numbers are reproducible. [[Function glossary#random.seed|→ examples]]
+> - `round(x, n)`: rounds to `n` decimal places. `round(0.7183, 1)` = 0.7. [[Function glossary#round|→ examples]]
+> - `random.uniform(a, b)`: a random float between `a` and `b`. [[Function glossary#random.uniform|→ examples]]
+> - `range(start, stop, step)`: the integers from `start` up to (not including) `stop`. `range(0, 10, 4)` gives 0, 4, 8. `range(3)` gives 0, 1, 2. [[Function glossary#range|→ examples]]
+> - `sum(xs)`: adds up the items. `sum([1, 2, 3])` = 6. [[Function glossary#sum|→ examples]]
+> - `len(xs)`: how many items. `len([7, 8, 9])` = 3. [[Function glossary#len|→ examples]]
+> - `math.sqrt(x)`: the square root. `math.sqrt(16)` = 4. [[Function glossary#math.sqrt|→ examples]]
+> - `math.cos(x)`: cosine of an angle in **radians**. `math.cos(1)` = 0.540. [[Function glossary#math.cos|→ examples]]
+> - `math.sin(x)`: sine of an angle in radians. `math.sin(1)` = 0.841. [[Function glossary#math.sin|→ examples]]
+> - `max(xs) / max(a, b)`: the largest. `max([3, 9, 2])` = 9. With `key=f` it compares `f(x)` instead: `max(range(3), key=lambda i: s[i])` is the index of the largest `s[i]`. [[Function glossary#max|→ examples]]
+> - `math.exp(x)`: e to the power x. `math.exp(0)` = 1, `math.exp(-2.85)` = 0.058. [[Function glossary#math.exp|→ examples]]
 
 ### 2. Deep dive: the paged KV cache
 
@@ -919,6 +970,9 @@ def __init__(self, num_blocks: int) -> None:
     # working set hot rather than cycling through the whole pool.
     self._free_blocks = list(reversed(range(num_blocks)))
 ```
+> [!info] New functions in this code
+> - `list(xs)`: makes a new list from any iterable. `list(reversed(range(3)))` = `[2, 1, 0]`. `list(x)` on a list makes a **copy**. [[Function glossary#list|→ examples]]
+> - `reversed(xs)`: the items in reverse order. `list(reversed([0, 1, 2]))` = `[2, 1, 0]`. [[Function glossary#reversed|→ examples]]
 
 - `reversed(range(...))` + `pop()` from the end hands out block 0 first. It is **LIFO**: a block freed a moment ago is reused next, which keeps recently touched memory hot.
 
@@ -950,6 +1004,8 @@ def allocate_many(self, count: int) -> list[int]:
         )
     return [self.allocate() for _ in range(count)]
 ```
+> [!info] New functions in this code
+> - `.pop() / .pop(i) / .pop(key, default)`: removes and returns an item: on a list the last one (or index `i`); on a dict, the entry for `key` (or `default` if missing). `[0, 1, 2].pop()` returns 2. [[Function glossary#list.pop|→ examples]]
 
 - `allocate` is O(1): pop an id, set its refcount to 1.
 - `allocate_many` **checks the count before taking anything**. If it took blocks one by one and ran out halfway, the caller would hold half a sequence's blocks with no clean way to undo. This is the "all or nothing" rule (Day 1 Q7).
@@ -1065,6 +1121,8 @@ def slot_index(self, position: int) -> int:
     block_id, offset = self.locate(position)
     return block_id * self._block_size + offset
 ```
+> [!info] New functions in this code
+> - `divmod(a, b)`: the quotient **and** the remainder at once: `divmod(9, 4)` = `(2, 1)`, because 9 = 2 × 4 + 1. [[Function glossary#divmod|→ examples]]
 
 - `divmod(position, B)` gives (logical block, offset). The table maps the logical block to a physical id.
 - **slot = block_id × B + offset.** This is the one formula to know cold. Example: B = 4, table `[7, 2]`, position 5 → logical block 1, offset 1 → physical 2 → slot 9.
@@ -1132,6 +1190,8 @@ self._v = [
     for _ in range(config.num_layers)
 ]
 ```
+> [!info] New functions in this code
+> - `torch.zeros(shape, dtype, device)`: a tensor of the given shape filled with 0. `torch.zeros((2, 3))` → a 2 × 3 grid of zeros. The KV cache is pre-allocated this way. [[Function glossary#torch.zeros|→ examples]]
 
 - One tensor per layer for K and one for V, each `[num_blocks, block_size, kv_heads, head_dim]`. The block id is simply the **first index**. So the allocator owns ids, and this tensor owns the bytes they point to.
 
@@ -1185,6 +1245,9 @@ blocks = blocks[:needed]
 k = k_cache[blocks].reshape(-1, k_cache.shape[2], k_cache.shape[3])[:context_len]
 v = v_cache[blocks].reshape(-1, v_cache.shape[2], v_cache.shape[3])[:context_len]
 ```
+> [!info] New functions in this code
+> - `torch.as_tensor(xs, dtype, device)`: turns a Python list into a tensor (without copying if it already is one on the right device). [[Function glossary#torch.as_tensor|→ examples]]
+> - `.numel()`: the total number of elements. A `[3, 4]` tensor has 12. [[Function glossary#x.numel|→ examples]]
 
 - The read is a **gather**: index the block-shaped cache by the request's block ids, flatten to token order, cut off the empty tail of the last block (`[:context_len]`). Day 3's Triton kernel fuses this gather into attention so this intermediate tensor is never built.
 
@@ -1749,6 +1812,8 @@ the old code read it with a fallback, roughly:
 ```python
 base = getattr(config, "rope_theta", 10000)   # the attribute was gone, so this silently gave 10000
 ```
+> [!info] New functions in this code
+> - `getattr(obj, 'name', default)`: reads an attribute by name, returning `default` if it doesn't exist. `getattr(config, 'rope_theta', 10000)` is the exact pattern behind Day 1's RoPE bug: a missing attribute silently became 10000. [[Function glossary#getattr|→ examples]]
 
 So the model rotated Q and K with the **wrong speeds**:
 
@@ -2331,6 +2396,8 @@ if not outputs:
     return query.new_zeros((0, num_q_heads, query.shape[-1]))
 return torch.cat(outputs, dim=0)
 ```
+> [!info] New functions in this code
+> - `.new_zeros(shape)`: zeros with the same dtype and device as the tensor it's called on. [[Function glossary#x.new_zeros|→ examples]]
 
 - `query` holds every request's queries, concatenated: `[T, 32, 64]`. `offset` walks through it, request by request.
 - `gather_kv` collects **this** request's K and V from its scattered cache blocks: `[ctx_len, 8, 64]` (§2).

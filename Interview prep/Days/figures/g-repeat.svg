@@ -1,0 +1,61 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 330' width='800' height='330' font-family='Inter, Helvetica, Arial, sans-serif'><title>repeat_interleave</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='800' height='330' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>repeat_interleave vs repeat</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>GQA: 4 query heads share 2 KV heads; q0, q1 must see k0, and q2, q3 must see k1</text>
+<text x='68.0' y='154' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>kv heads</text>
+<rect x='30' y='162' width='76' height='42' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='35' y='167' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='51.0' y='187.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>k0</text>
+<rect x='69' y='167' width='32' height='32' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='85.0' y='187.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>k1</text>
+<text x='68.0' y='219' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[2]</text>
+<line x1='112' y1='170' x2='312' y2='120' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/><text x='200' y='125' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>repeat_interleave(2)</text>
+<text x='392.0' y='89' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>x.repeat_interleave(2)</text>
+<rect x='320' y='97' width='144' height='42' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='325' y='102' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='341.0' y='122.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>k0</text>
+<rect x='359' y='102' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='375.0' y='122.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>k0</text>
+<rect x='393' y='102' width='32' height='32' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='409.0' y='122.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>k1</text>
+<rect x='427' y='102' width='32' height='32' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='443.0' y='122.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>k1</text>
+<text x='392.0' y='154' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[4]: each repeated in place</text>
+<text x='392.0' y='174' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>query heads</text>
+<rect x='320' y='182' width='144' height='42' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='325' y='187' width='32' height='32' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='341.0' y='207.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>q0</text>
+<rect x='359' y='187' width='32' height='32' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='375.0' y='207.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>q1</text>
+<rect x='393' y='187' width='32' height='32' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='409.0' y='207.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>q2</text>
+<rect x='427' y='187' width='32' height='32' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='443.0' y='207.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>q3</text>
+<line x1='112' y1='195' x2='312' y2='262' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/><text x='195' y='255' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>repeat(2)</text>
+<text x='392.0' y='239' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>x.repeat(2)</text>
+<rect x='320' y='247' width='144' height='42' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='325' y='252' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='341.0' y='272.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>k0</text>
+<rect x='359' y='252' width='32' height='32' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='375.0' y='272.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>k1</text>
+<rect x='393' y='252' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='409.0' y='272.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>k0</text>
+<rect x='427' y='252' width='32' height='32' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='443.0' y='272.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>k1</text>
+<text x='392.0' y='304' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[4]: the whole thing twice</text>
+<text x='520' y='140' text-anchor='start' font-size='12' font-weight='600' fill='#1a7f37'>✓ q0 q1 → k0, q2 q3 → k1</text>
+<text x='520' y='285' text-anchor='start' font-size='12' font-weight='600' fill='#cf222e'>✗ q1 would read k1: wrong group</text>
+<rect x='325' y='102' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.2080;1.0000'/></rect>
+<rect x='359' y='102' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.3005;1.0000'/></rect>
+<rect x='393' y='102' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.3930;1.0000'/></rect>
+<rect x='427' y='102' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.4855;1.0000'/></rect>
+<rect x='325' y='252' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.5780;1.0000'/></rect>
+<rect x='359' y='252' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.6705;1.0000'/></rect>
+<rect x='393' y='252' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.7630;1.0000'/></rect>
+<rect x='427' y='252' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.8555;1.0000'/></rect>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0600;0.2080;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='35,167;35,167;325,102;325,102' keyTimes='0.0000;0.0600;0.2080;1.0000'/><rect width='32' height='32' rx='4' fill='#ffd8b5' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>k0</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.1525;0.3005;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='35,167;35,167;359,102;359,102' keyTimes='0.0000;0.1525;0.3005;1.0000'/><rect width='32' height='32' rx='4' fill='#ffd8b5' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>k0</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2450;0.3930;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='69,167;69,167;393,102;393,102' keyTimes='0.0000;0.2450;0.3930;1.0000'/><rect width='32' height='32' rx='4' fill='#c8e1ff' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>k1</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3375;0.4855;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='69,167;69,167;427,102;427,102' keyTimes='0.0000;0.3375;0.4855;1.0000'/><rect width='32' height='32' rx='4' fill='#c8e1ff' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>k1</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4300;0.5780;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='35,167;35,167;325,252;325,252' keyTimes='0.0000;0.4300;0.5780;1.0000'/><rect width='32' height='32' rx='4' fill='#ffd8b5' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>k0</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5225;0.6705;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='69,167;69,167;359,252;359,252' keyTimes='0.0000;0.5225;0.6705;1.0000'/><rect width='32' height='32' rx='4' fill='#c8e1ff' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>k1</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6150;0.7630;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='35,167;35,167;393,252;393,252' keyTimes='0.0000;0.6150;0.7630;1.0000'/><rect width='32' height='32' rx='4' fill='#ffd8b5' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>k0</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7075;0.8555;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='69,167;69,167;427,252;427,252' keyTimes='0.0000;0.7075;0.8555;1.0000'/><rect width='32' height='32' rx='4' fill='#c8e1ff' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>k1</text></g>
+<text x='20' y='316' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: each coloured cell slides to where it ends up</text></svg>

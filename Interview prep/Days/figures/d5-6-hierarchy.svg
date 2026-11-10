@@ -1,0 +1,316 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 420' width='900' height='420' font-family='Inter, Helvetica, Arial, sans-serif'><title>GPU hierarchy and occupancy</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='900' height='420' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>From grid to lane: who runs what</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>a kernel launch = a grid of blocks; a block runs on one SM; the SM issues 32 threads (a warp) at a time</text>
+<text x='30' y='82' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>grid = (4, 2) blocks</text>
+<rect x='30' y='92' width='56' height='44' rx='6' fill='#f6f8fa' stroke='#d0d7de' stroke-width='1'/>
+<text x='58' y='118' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>(0,0)</text>
+<rect x='92' y='92' width='56' height='44' rx='6' fill='#f6f8fa' stroke='#d0d7de' stroke-width='1'/>
+<text x='120' y='118' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>(1,0)</text>
+<rect x='154' y='92' width='56' height='44' rx='6' fill='#f6f8fa' stroke='#d0d7de' stroke-width='1'/>
+<text x='182' y='118' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>(2,0)</text>
+<rect x='216' y='92' width='56' height='44' rx='6' fill='#f6f8fa' stroke='#d0d7de' stroke-width='1'/>
+<text x='244' y='118' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>(3,0)</text>
+<rect x='30' y='144' width='56' height='44' rx='6' fill='#f6f8fa' stroke='#d0d7de' stroke-width='1'/>
+<text x='58' y='170' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>(0,1)</text>
+<rect x='92' y='144' width='56' height='44' rx='6' fill='#f6f8fa' stroke='#d0d7de' stroke-width='1'/>
+<text x='120' y='170' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>(1,1)</text>
+<rect x='154' y='144' width='56' height='44' rx='6' fill='#c8e1ff' stroke='#cf222e' stroke-width='2'/>
+<text x='182' y='170' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>(2,1)</text>
+<rect x='216' y='144' width='56' height='44' rx='6' fill='#f6f8fa' stroke='#d0d7de' stroke-width='1'/>
+<text x='244' y='170' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>(3,1)</text>
+<text x='30' y='214' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>blockIdx = (2, 1) is one block</text>
+<line x1='282' y1='140' x2='330' y2='140' stroke='#57606a' stroke-width='1.5' marker-end='url(#ah)'/>
+<text x='340' y='82' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>block = 256 threads = 8 warps</text>
+<text x='340' y='104' text-anchor='start' font-size='10' font-weight='400' fill='#57606a'>warp 0</text>
+<rect x='392.0' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='399.5' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='407.0' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='414.5' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='422.0' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='429.5' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='437.0' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='444.5' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='452.0' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='459.5' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='467.0' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='474.5' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='482.0' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='489.5' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='497.0' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='504.5' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='512.0' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='519.5' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='527.0' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='534.5' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='542.0' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='549.5' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='557.0' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='564.5' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='572.0' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='579.5' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='587.0' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='594.5' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='602.0' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='609.5' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='617.0' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='624.5' y='94' width='6' height='11' rx='1' fill='#eef1f4'/>
+<text x='340' y='119' text-anchor='start' font-size='10' font-weight='400' fill='#57606a'>warp 1</text>
+<rect x='392.0' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='399.5' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='407.0' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='414.5' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='422.0' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='429.5' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='437.0' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='444.5' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='452.0' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='459.5' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='467.0' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='474.5' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='482.0' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='489.5' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='497.0' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='504.5' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='512.0' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='519.5' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='527.0' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='534.5' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='542.0' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='549.5' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='557.0' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='564.5' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='572.0' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='579.5' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='587.0' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='594.5' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='602.0' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='609.5' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='617.0' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='624.5' y='109' width='6' height='11' rx='1' fill='#eef1f4'/>
+<text x='340' y='134' text-anchor='start' font-size='10' font-weight='400' fill='#57606a'>warp 2</text>
+<rect x='392.0' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='399.5' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='407.0' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='414.5' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='422.0' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='429.5' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='437.0' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='444.5' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='452.0' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='459.5' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='467.0' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='474.5' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='482.0' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='489.5' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='497.0' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='504.5' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='512.0' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='519.5' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='527.0' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='534.5' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='542.0' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='549.5' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='557.0' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='564.5' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='572.0' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='579.5' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='587.0' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='594.5' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='602.0' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='609.5' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='617.0' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<rect x='624.5' y='124' width='6' height='11' rx='1' fill='#c7f0d2'/>
+<text x='340' y='149' text-anchor='start' font-size='10' font-weight='400' fill='#57606a'>warp 3</text>
+<rect x='392.0' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='399.5' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='407.0' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='414.5' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='422.0' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='429.5' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='437.0' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='444.5' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='452.0' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='459.5' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='467.0' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='474.5' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='482.0' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='489.5' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='497.0' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='504.5' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='512.0' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='519.5' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='527.0' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='534.5' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='542.0' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='549.5' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='557.0' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='564.5' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='572.0' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='579.5' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='587.0' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='594.5' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='602.0' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='609.5' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='617.0' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='624.5' y='139' width='6' height='11' rx='1' fill='#eef1f4'/>
+<text x='340' y='164' text-anchor='start' font-size='10' font-weight='400' fill='#57606a'>warp 4</text>
+<rect x='392.0' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='399.5' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='407.0' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='414.5' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='422.0' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='429.5' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='437.0' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='444.5' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='452.0' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='459.5' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='467.0' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='474.5' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='482.0' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='489.5' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='497.0' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='504.5' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='512.0' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='519.5' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='527.0' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='534.5' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='542.0' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='549.5' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='557.0' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='564.5' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='572.0' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='579.5' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='587.0' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='594.5' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='602.0' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='609.5' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='617.0' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='624.5' y='154' width='6' height='11' rx='1' fill='#eef1f4'/>
+<text x='340' y='179' text-anchor='start' font-size='10' font-weight='400' fill='#57606a'>warp 5</text>
+<rect x='392.0' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='399.5' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='407.0' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='414.5' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='422.0' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='429.5' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='437.0' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='444.5' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='452.0' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='459.5' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='467.0' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='474.5' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='482.0' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='489.5' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='497.0' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='504.5' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='512.0' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='519.5' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='527.0' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='534.5' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='542.0' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='549.5' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='557.0' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='564.5' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='572.0' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='579.5' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='587.0' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='594.5' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='602.0' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='609.5' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='617.0' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='624.5' y='169' width='6' height='11' rx='1' fill='#eef1f4'/>
+<text x='340' y='194' text-anchor='start' font-size='10' font-weight='400' fill='#57606a'>warp 6</text>
+<rect x='392.0' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='399.5' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='407.0' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='414.5' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='422.0' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='429.5' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='437.0' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='444.5' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='452.0' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='459.5' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='467.0' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='474.5' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='482.0' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='489.5' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='497.0' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='504.5' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='512.0' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='519.5' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='527.0' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='534.5' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='542.0' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='549.5' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='557.0' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='564.5' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='572.0' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='579.5' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='587.0' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='594.5' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='602.0' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='609.5' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='617.0' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='624.5' y='184' width='6' height='11' rx='1' fill='#eef1f4'/>
+<text x='340' y='209' text-anchor='start' font-size='10' font-weight='400' fill='#57606a'>warp 7</text>
+<rect x='392.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='399.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='407.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='414.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='422.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='429.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='437.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='444.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='452.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='459.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='467.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='474.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='482.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='489.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='497.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='504.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='512.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='519.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='527.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='534.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='542.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='549.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='557.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='564.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='572.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='579.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='587.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='594.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='602.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='609.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='617.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<rect x='624.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
+<text x='392' y='232' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>a warp = 32 lanes that issue the SAME instruction together</text>
+<rect x='388' y='122' width='248' height='17' rx='3' fill='none' stroke='#cf222e' stroke-width='2' opacity='0'><animate attributeName='opacity' dur='6.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0500;0.9500;1.0000'/></rect>
+<text x='670' y='82' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>one SM (H200 has 132)</text>
+<text x='670' y='100' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>threads</text>
+<text x='870' y='100' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>1,024 / 2,048</text>
+<rect x='670' y='106' width='200' height='14' rx='3' fill='#eef1f4' stroke='#d0d7de' stroke-width='1'/>
+<rect x='670.0' y='106' width='24.0' height='14' rx='3' fill='#ffd8b5'/>
+<rect x='695.0' y='106' width='24.0' height='14' rx='3' fill='#c8e1ff'/>
+<rect x='720.0' y='106' width='24.0' height='14' rx='3' fill='#c7f0d2'/>
+<rect x='745.0' y='106' width='24.0' height='14' rx='3' fill='#f5c6e9'/>
+<text x='670' y='142' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>registers</text>
+<text x='870' y='142' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>65,536 / 65,536</text>
+<rect x='670' y='148' width='200' height='14' rx='3' fill='#eef1f4' stroke='#d0d7de' stroke-width='1'/>
+<rect x='670.0' y='148' width='49.0' height='14' rx='3' fill='#ffd8b5'/>
+<rect x='720.0' y='148' width='49.0' height='14' rx='3' fill='#c8e1ff'/>
+<rect x='770.0' y='148' width='49.0' height='14' rx='3' fill='#c7f0d2'/>
+<rect x='820.0' y='148' width='49.0' height='14' rx='3' fill='#f5c6e9'/>
+<text x='670' y='184' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>warps</text>
+<text x='870' y='184' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>32 / 64 = 50%</text>
+<rect x='670' y='190' width='200' height='14' rx='3' fill='#eef1f4' stroke='#d0d7de' stroke-width='1'/>
+<rect x='670.0' y='190' width='24.0' height='14' rx='3' fill='#ffd8b5'/>
+<rect x='695.0' y='190' width='24.0' height='14' rx='3' fill='#c8e1ff'/>
+<rect x='720.0' y='190' width='24.0' height='14' rx='3' fill='#c7f0d2'/>
+<rect x='745.0' y='190' width='24.0' height='14' rx='3' fill='#f5c6e9'/>
+<text x='670' y='232' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>4 blocks of mm_block2d&lt;64,4&gt; fit</text>
+<rect x='30' y='270' width='840' height='112' rx='8' fill='#fbfcfd' stroke='#d0d7de' stroke-width='1'/>
+<text x='48' y='296' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>Every thread computes its own global index from three built-in variables:</text>
+<text x='48' y='322' text-anchor='start' font-size='14' font-weight='600' fill='#0969da'>col = blockIdx.x · blockDim.x + threadIdx.x  =  2 · 32 + 5  =  69</text>
+<text x='48' y='348' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>Occupancy (block2d&lt;64,4&gt;): 62 regs → 64 per thread × 256 threads = 16,384 regs per block;</text>
+<text x='48' y='368' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>65,536 / 16,384 = 4 blocks per SM = 1,024 threads = 32 of 64 warps = 50%.</text>
+<text x='20' y='408' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated highlight: warp 2 is the unit that executes; the 32 lanes run in lock-step</text></svg>

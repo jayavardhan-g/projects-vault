@@ -197,6 +197,12 @@ with torch.inference_mode():
 sampled = logits.argmax(dim=-1).tolist()
 return self.scheduler.update(output, sampled)
 ```
+> [!info] New functions in this code
+> - `.extend(xs)`: adds **all** items of `xs` at the end. `a = [1]; a.extend([2, 3])` → `[1, 2, 3]`. [[Function glossary#list.extend|→ examples]]
+> - `.append(x)`: adds `x` at the end of a list. `[1].append(2)` → `[1, 2]`. [[Function glossary#list.append|→ examples]]
+> - `torch.inference_mode()`: a `with` block in which PyTorch records no gradients: less memory and faster, for inference only. [[Function glossary#torch.inference_mode|→ examples]]
+> - `.argmax(dim=-1)`: the **index** of the largest value along an axis. `tensor([0.1, 2.1, 0.6]).argmax()` = 1. On logits it picks the most likely token (greedy decoding). [[Function glossary#x.argmax|→ examples and figure]]
+> - `.tolist()`: converts a tensor to a plain Python list (copies to the CPU). [[Function glossary#x.tolist|→ examples]]
 
 - **Plan:** `schedule()` returns `output.scheduled`, one entry per request, each with its token ids, positions and slots (Day 1's `_prepare`).
 - **Flatten:** all requests' tokens are concatenated into one ragged batch. `query_lens` remembers where each request starts and ends. A 500-token prefill and twenty 1-token decodes share one forward pass. That's continuous batching at the tensor level.
@@ -213,6 +219,9 @@ assert not (set(id(r) for r in output.preempted) &
             set(id(s.request) for s in output.scheduled)), \
     "a request was both preempted and scheduled in one iteration"
 ```
+> [!info] New functions in this code
+> - `set(xs)`: a collection with no duplicates and fast membership tests: `3 in {1, 3}` is True, in constant time. [[Function glossary#set|→ examples]]
+> - `id(obj)`: a unique number for an object while it lives; used to put objects in a set without comparing their contents. [[Function glossary#id|→ examples]]
 
 - **Running requests first, then waiting ones**, both from one token budget (`max_num_batched_tokens`, 8192). A decode needs at most one new block; a new prefill can need hundreds. Serving arrivals first would starve requests that are nearly done.
 
@@ -278,6 +287,8 @@ while index < len(self.running):
     # so index now points at the next request.
 return budget
 ```
+> [!info] New functions in this code
+> - `len(xs)`: how many items. `len([7, 8, 9])` = 3. [[Function glossary#len|→ examples]]
 
 - `blocks_needed_for(num_new)` is 0 most steps and 1 when the request crosses a block boundary.
 - The inner `while` keeps freeing memory until the block fits. **Cheapest first:** evict cached blocks no live request uses. Only then preempt, which throws away real work.
@@ -307,6 +318,9 @@ def _preempt(self, request: Request) -> None:
     self.waiting.insert(0, request)  # keep it ahead of later arrivals
     self.stats.num_preemptions += 1
 ```
+> [!info] New functions in this code
+> - `.remove(x)`: deletes the first item equal to `x` from a list (an error if it isn't there). [[Function glossary#list.remove|→ examples]]
+> - `.insert(i, x)`: puts `x` at index `i` of a list, shifting the rest right. `waiting.insert(0, r)` puts `r` at the **front**. [[Function glossary#list.insert|→ examples]]
 
 - **Preemption by recompute:** free the blocks, set `num_computed_tokens = 0`, put the request at the **front** of the queue. When it's re-admitted, everything it has (prompt plus generated tokens) is uncomputed, so it simply re-prefills. With greedy decoding it produces exactly the tokens it would have.
 
@@ -389,6 +403,9 @@ while self.waiting:
     self.running.append(request)
     output.scheduled.append(self._prepare(request))
 ```
+> [!info] New functions in this code
+> - `.add(x)`: puts `x` into a set (no effect if it's already there). [[Function glossary#set.add|→ examples]]
+> - `.pop() / .pop(i) / .pop(key, default)`: removes and returns an item: on a list the last one (or index `i`); on a dict, the entry for `key` (or `default` if missing). `[0, 1, 2].pop()` returns 2. [[Function glossary#list.pop|→ examples]]
 
 Read it as **check, check, check, then commit**:
 - `num_uncomputed_tokens > budget → break`: FCFS. A big request at the head blocks smaller ones behind it (simple and fair, but head-of-line blocking).
@@ -435,6 +452,9 @@ def _blocks_of(self, token_ids: list[int]) -> list[tuple[int, ...]]:
         for i in range(full)
     ]
 ```
+> [!info] New functions in this code
+> - `tuple(xs)`: an immutable list. Tuples can be dictionary keys (lists can't), which is why token chunks are turned into tuples. [[Function glossary#tuple|→ examples]]
+> - `range(start, stop, step)`: the integers from `start` up to (not including) `stop`. `range(0, 10, 4)` gives 0, 4, 8. `range(3)` gives 0, 1, 2. [[Function glossary#range|→ examples]]
 
 - Only **full** blocks are keys. A half-full last block is still being written, so it can't be shared yet.
 
@@ -461,6 +481,8 @@ return PrefixMatch(
     nodes=nodes,
 )
 ```
+> [!info] New functions in this code
+> - `.get(key, default)`: a dict lookup that returns `default` (or None) instead of failing when `key` is missing. [[Function glossary#dict.get|→ examples]]
 
 - The tree is keyed by a whole 16-token tuple per level, so one dict lookup matches one block. Matching stops at the first chunk not in the tree. The result is a list of physical block ids.
 - `match` takes **no references**. That's what lets admission ask "how much would this save?" safely.
@@ -478,6 +500,10 @@ for node, block_id in zip(match.nodes, match.block_ids):
         parent = parent.parent
 return list(match.block_ids)
 ```
+> [!info] New functions in this code
+> - `time.monotonic()`: a clock that never goes backwards (unaffected by system time changes); used for "last used" timestamps. [[Function glossary#time.monotonic|→ examples]]
+> - `zip(a, b)`: walks several lists **in step**, pairing their items. `zip([1, 2], ['x', 'y'])` gives `(1, 'x')`, `(2, 'y')`. [[Function glossary#zip|→ examples]]
+> - `list(xs)`: makes a new list from any iterable. `list(reversed(range(3)))` = `[2, 1, 0]`. `list(x)` on a list makes a **copy**. [[Function glossary#list|→ examples]]
 
 - `acquire` commits: one `incref` per matched block (Day 1's allocator), and it refreshes the LRU timestamp of the node *and its ancestors*.
 
@@ -507,6 +533,8 @@ for index, chunk in enumerate(chunks):
 
 return newly_cached
 ```
+> [!info] New functions in this code
+> - `enumerate(xs)`: loops over a list and gives you each item **with its index**. `for i, x in enumerate(['a', 'b'])` gives `(0, 'a')`, then `(1, 'b')`. [[Function glossary#enumerate|→ examples]]
 
 - `insert` walks the same path. A **new** node gets the request's physical block and the **tree takes its own reference**. That reference keeps the block alive after the request finishes. Existing nodes are left alone, so other requests' matches stay valid.
 
@@ -520,6 +548,8 @@ return [
     and self.allocator.ref_count(node.block_id) == 1
 ]
 ```
+> [!info] New functions in this code
+> - `.values()`: all the values of a dict, without the keys. [[Function glossary#dict.values|→ examples]]
 
 `src/mini_vllm/prefix_cache.py:278–288`
 ```python
@@ -535,6 +565,8 @@ while freed < num_blocks:
         freed += 1
 return freed
 ```
+> [!info] New functions in this code
+> - `.sort(key=f)`: sorts a list **in place** (by `f(x)` if given). `nodes.sort(key=lambda n: n.last_accessed)` puts the least recently used first. [[Function glossary#list.sort|→ examples]]
 
 - Evictable = a **leaf** whose refcount is **exactly 1** (only the tree holds it). A running request adds a reference, so its blocks are never candidates.
 - Never an inner node: its children would become unreachable but still allocated.
@@ -574,6 +606,8 @@ for scheduled, token_id in zip(output.scheduled, sampled_token_ids):
         self._finish(request, now)
         just_finished.append(request)
 ```
+> [!info] New functions in this code
+> - `int(x)`: converts to an integer, dropping the fraction. `int(3.9)` = 3. [[Function glossary#int|→ examples]]
 
 `src/mini_vllm/scheduler.py:576–586`
 ```python

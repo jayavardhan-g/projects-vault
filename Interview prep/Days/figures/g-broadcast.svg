@@ -1,0 +1,62 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 840 320' width='840' height='320' font-family='Inter, Helvetica, Arial, sans-serif'><title>broadcasting</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='840' height='320' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Broadcasting: why unsqueeze is needed before multiplying</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>size-1 axes are stretched (copied) to match; [3, 1] × [1, 2] → [3, 2] (RoPE's angle table)</text>
+<text x='66.0' y='104' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>pos.unsqueeze(1)</text>
+<rect x='40' y='112' width='52' height='142' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='45' y='117' width='42' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='50' y='122' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='66.0' y='142.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>0</text>
+<rect x='45' y='162' width='42' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='50' y='167' width='32' height='32' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='66.0' y='187.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>1</text>
+<rect x='45' y='207' width='42' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='50' y='212' width='32' height='32' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='66.0' y='232.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<text x='66.0' y='269' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[3, 1]</text>
+<text x='168' y='165' text-anchor='middle' font-size='22' font-weight='700' fill='#1f2328'>×</text>
+<text x='243.0' y='144' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>inv_freq.unsqueeze(0)</text>
+<rect x='190' y='152' width='106' height='62' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='195' y='157' width='96' height='52' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='200' y='162' width='42' height='42' rx='4' fill='#f5c6e9' stroke='#ffffff'/>
+<text x='221.0' y='187.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>1</text>
+<rect x='244' y='162' width='42' height='42' rx='4' fill='#fff1a8' stroke='#ffffff'/>
+<text x='265.0' y='187.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>.001</text>
+<text x='243.0' y='229' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[1, 2]</text>
+<line x1='320' y1='165' x2='464' y2='165' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/><text x='395.0' y='156' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>broadcast</text><text x='395.0' y='183' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>rows × columns</text>
+<text x='543.0' y='104' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>pos × inv_freq = angles</text>
+<rect x='490' y='112' width='106' height='172' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='495' y='117' width='96' height='52' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='500' y='122' width='42' height='42' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='521.0' y='147.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>0</text>
+<rect x='544' y='122' width='42' height='42' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='565.0' y='147.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>0</text>
+<rect x='495' y='172' width='96' height='52' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='500' y='177' width='42' height='42' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='521.0' y='202.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>1</text>
+<rect x='544' y='177' width='42' height='42' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='565.0' y='202.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>.001</text>
+<rect x='495' y='227' width='96' height='52' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='500' y='232' width='42' height='42' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='521.0' y='257.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>2</text>
+<rect x='544' y='232' width='42' height='42' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='565.0' y='257.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>.003</text>
+<text x='543.0' y='299' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[3, 2]: every pair (p, f)</text>
+<rect x='47' y='119' width='38' height='38' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0800;0.3200;1.0000'/></rect>
+<rect x='497' y='119' width='92' height='48' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0800;0.3200;1.0000'/></rect>
+<rect x='197' y='159' width='48' height='48' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0800;0.2000;1.0000'/></rect>
+<rect x='500' y='122' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.1400;1.0000'/></rect>
+<rect x='241' y='159' width='48' height='48' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2000;0.3200;1.0000'/></rect>
+<rect x='544' y='122' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.2600;1.0000'/></rect>
+<rect x='47' y='164' width='38' height='38' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3400;0.5800;1.0000'/></rect>
+<rect x='497' y='174' width='92' height='48' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3400;0.5800;1.0000'/></rect>
+<rect x='197' y='159' width='48' height='48' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3400;0.4600;1.0000'/></rect>
+<rect x='500' y='177' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.4000;1.0000'/></rect>
+<rect x='241' y='159' width='48' height='48' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4600;0.5800;1.0000'/></rect>
+<rect x='544' y='177' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.5200;1.0000'/></rect>
+<rect x='47' y='209' width='38' height='38' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6000;0.8400;1.0000'/></rect>
+<rect x='497' y='229' width='92' height='48' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6000;0.8400;1.0000'/></rect>
+<rect x='197' y='159' width='48' height='48' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6000;0.7200;1.0000'/></rect>
+<rect x='500' y='232' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.6600;1.0000'/></rect>
+<rect x='241' y='159' width='48' height='48' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7200;0.8400;1.0000'/></rect>
+<rect x='544' y='232' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.7800;1.0000'/></rect>
+<text x='660' y='130' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>row = position</text>
+<text x='660' y='148' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>column = frequency</text>
+<text x='20' y='306' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: each output cell = (its row's position) × (its column's frequency)</text></svg>

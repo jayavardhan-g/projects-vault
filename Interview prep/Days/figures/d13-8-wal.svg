@@ -1,0 +1,24 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 420' width='900' height='420' font-family='Inter, Helvetica, Arial, sans-serif'><title>WAL</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='900' height='420' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Write-ahead log: log first, then apply; recovery = snapshot + replay</text>
+<text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>where can the process die, and what does recovery see?</text>
+<rect x='40' y='70' width='200' height='50' rx='8' fill='#ffffff' stroke='#8c959f' stroke-width='1.5'/><text x='140.0' y='89.0' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>1. copy cmd into</text><text x='140.0' y='108.0' text-anchor='middle' font-size='11' fill='#57606a'>the mmap'd segment</text>
+<rect x='270' y='70' width='200' height='50' rx='8' fill='#c8e1ff' stroke='#0969da' stroke-width='1.5'/><text x='370.0' y='89.0' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>2. release-store</text><text x='370.0' y='108.0' text-anchor='middle' font-size='11' fill='#57606a'>count = n + 1</text>
+<rect x='500' y='70' width='200' height='50' rx='8' fill='#c7f0d2' stroke='#1a7f37' stroke-width='1.5'/><text x='600.0' y='89.0' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>3. apply to the book</text><text x='600.0' y='108.0' text-anchor='middle' font-size='11' fill='#57606a'>Exchange.apply</text>
+<line x1='240' y1='95' x2='264' y2='95' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/>
+<line x1='470' y1='95' x2='494' y2='95' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/>
+<text x='255' y='148' text-anchor='middle' font-size='18' fill='#cf222e'>✕ A</text>
+<text x='40' y='180' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>A. die here: count not raised →</text>
+<text x='360' y='180' text-anchor='start' font-size='12' font-weight='400' fill='#1a7f37'>record invisible, never applied ✓</text>
+<text x='485' y='148' text-anchor='middle' font-size='18' fill='#cf222e'>✕ B</text>
+<text x='40' y='202' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>B. die here: logged, not applied →</text>
+<text x='360' y='202' text-anchor='start' font-size='12' font-weight='400' fill='#1a7f37'>replay applies it ✓</text>
+<text x='715' y='148' text-anchor='middle' font-size='18' fill='#cf222e'>✕ C</text>
+<text x='40' y='224' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>C. die here: both done →</text>
+<text x='360' y='224' text-anchor='start' font-size='12' font-weight='400' fill='#1a7f37'>replay of the log gives the same book ✓</text>
+<text x='40' y='268' text-anchor='start' font-size='13' font-weight='700' fill='#1f2328'>Recovery after kill -9 (snapshot every 20k commands):</text>
+<rect x='40' y='282' width='220' height='40' rx='5' fill='#fff1a8' stroke='#bf8700' stroke-width='1.3'/><text x='150.0' y='306.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>snapshot: book at seq 40,000</text>
+<rect x='270' y='282' width='260' height='40' rx='5' fill='#c8e1ff' stroke='#0969da' stroke-width='1.3'/><text x='400.0' y='306.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>segment 0: seq 40,000 … 52,345</text>
+<rect x='540' y='282' width='160' height='40' rx='5' fill='#f6f8fa' stroke='#d0d7de' stroke-width='1.3'/><text x='620.0' y='306.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>segment 1: empty</text>
+<text x='40' y='346' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>1. load the snapshot (state after 40,000 commands)</text>
+<text x='40' y='366' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2. replay records with seq ≥ 40,000 in order: 12,345 commands → the exact pre-crash book</text>
+<text x='40' y='386' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>3. a segment that starts after the current seq means records are missing → refuse (recover returns ok = false)</text>
+<text x='40' y='410' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>Numbers in the recovery picture are illustrative; the test kills at random points (40/40 exact recoveries).</text></svg>

@@ -1,0 +1,53 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 420' width='900' height='420' font-family='Inter, Helvetica, Arial, sans-serif'><title>online softmax</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='900' height='420' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Online softmax on one query row: 4 keys in 2 tiles of 2</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>scores s = [2, 1 | 3, 0], values v = [1, 3 | 2, 0]; exact answer Σ softmax(s)·v = 1.786</text>
+<text x='20' y='90' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'></text>
+<text x='70' y='90' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>tile scores</text>
+<text x='170' y='90' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>m_tile</text>
+<text x='240' y='90' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>p = e^(s−m_tile)</text>
+<text x='370' y='90' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>l_tile</text>
+<text x='440' y='90' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>Σ p·v</text>
+<text x='510' y='90' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>m_new</text>
+<text x='580' y='90' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>e_run</text>
+<text x='650' y='90' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>e_tile</text>
+<text x='720' y='90' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>l</text>
+<text x='800' y='90' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>o</text>
+<text x='20' y='120' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>start</text>
+<text x='70' y='120' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'></text>
+<text x='170' y='120' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'></text>
+<text x='240' y='120' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'></text>
+<text x='370' y='120' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'></text>
+<text x='440' y='120' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'></text>
+<text x='510' y='120' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>m = −∞</text>
+<text x='580' y='120' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'></text>
+<text x='650' y='120' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'></text>
+<text x='720' y='120' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>0</text>
+<text x='800' y='120' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>0</text>
+<text x='20' y='160' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>tile 1</text>
+<text x='70' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>[2, 1]</text>
+<text x='170' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<text x='240' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>[1, 0.368]</text>
+<text x='370' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>1.368</text>
+<text x='440' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2.104</text>
+<text x='510' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<text x='580' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>0</text>
+<text x='650' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>1</text>
+<text x='720' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>1.368</text>
+<text x='800' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2.104</text>
+<rect x='14' y='142' width='860' height='28' rx='5' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0500;0.4500;1.0000'/></rect>
+<text x='20' y='200' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>tile 2</text>
+<text x='70' y='200' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>[3, 0]</text>
+<text x='170' y='200' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>3</text>
+<text x='240' y='200' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>[1, 0.050]</text>
+<text x='370' y='200' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>1.050</text>
+<text x='440' y='200' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2.000</text>
+<text x='510' y='200' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>3</text>
+<text x='580' y='200' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>0.368</text>
+<text x='650' y='200' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>1</text>
+<text x='720' y='200' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>1.553</text>
+<text x='800' y='200' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2.774</text>
+<rect x='14' y='182' width='860' height='28' rx='5' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4500;0.8500;1.0000'/></rect>
+<rect x='20' y='250' width='860' height='120' rx='8' fill='#fbfcfd' stroke='#d0d7de' stroke-width='1'/>
+<text x='36' y='274' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>Update rules (per row):  m_new = max(m, m_tile),  e_run = e^(m − m_new),  e_tile = e^(m_tile − m_new)</text>
+<text x='36' y='296' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>l = e_run · l + e_tile · l_tile        o = e_run · o + e_tile · Σ p·v        answer = o / l</text>
+<text x='36' y='322' text-anchor='start' font-size='12' font-weight='400' fill='#0969da'>tile 2: l = 0.368 · 1.368 + 1 · 1.050 = 1.553,   o = 0.368 · 2.104 + 1 · 2.000 = 2.774</text>
+<text x='36' y='346' text-anchor='start' font-size='12' font-weight='600' fill='#1a7f37'>o / l = 2.774 / 1.553 = 1.786 = the exact softmax-weighted average. Never needed all 4 scores at once.</text>
+<text x='20' y='408' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: one tile at a time; the old state is rescaled by e_run when a bigger max appears</text></svg>

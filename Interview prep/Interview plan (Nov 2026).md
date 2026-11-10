@@ -56,6 +56,7 @@ Each project day has a **rebuild block**: rewrite the core mechanism yourself in
 - Each day is about 6.5–7 hours. **If you are behind,** cut the S blocks first, then shorten the trace. Never cut P.
 - Start every day with 15 minutes recalling yesterday's numbers and diagram, from memory.
 - **Detailed day notes** (`Days/`) are written a day or two ahead, one project at a time.
+- **[[Function glossary]]:** every library function used in the day notes' code, with run examples and animated shape figures. The *New functions in this code* boxes link into it.
 - **Prep packs** are in `Interview prep/Prep packs/`, one note per project. They are your question bank and map. Ready:
   [[Photo-Seek - prep]], [[CUDA kernels - prep]], [[Speculative decoding - prep]], [[Raft - prep]], [[Micro Exchange - prep]], [[DECS KV server - prep]], [[BountyBrain - prep]],
   [[Emotion steering - prep]], [[Seminar - prep]]. Each study day has its own note in `Interview prep/Days/`, with its lesson and your notes. Still to write, one at a time and just

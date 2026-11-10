@@ -1,0 +1,32 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 400' width='900' height='400' font-family='Inter, Helvetica, Arial, sans-serif'><title>order book</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='900' height='400' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Price-time priority: buy 70 @ 102 against the asks</text>
+<text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>each price level is a FIFO queue (oldest at the head); the best ask is the lowest sell price</text>
+<text x='200' y='78' text-anchor='middle' font-size='13' font-weight='700' fill='#1f2328'>before</text>
+<text x='60' y='113' text-anchor='end' font-size='13' font-weight='700' fill='#1f2328'>103</text>
+<text x='72' y='113' text-anchor='start' font-size='10' font-weight='400' fill='#57606a'>ask</text>
+<rect x='105' y='96' width='84' height='26' rx='5' fill='#ffd8d8' stroke='#d0d7de' stroke-width='1.3'/><text x='147.0' y='113.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>S3 50</text>
+<text x='60' y='149' text-anchor='end' font-size='13' font-weight='700' fill='#1f2328'>101</text>
+<text x='72' y='149' text-anchor='start' font-size='10' font-weight='400' fill='#57606a'>ask</text>
+<rect x='105' y='132' width='84' height='26' rx='5' fill='#ffd8d8' stroke='#d0d7de' stroke-width='1.3'/><text x='147.0' y='149.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>S1 40</text>
+<rect x='197' y='132' width='84' height='26' rx='5' fill='#ffd8d8' stroke='#d0d7de' stroke-width='1.3'/><text x='239.0' y='149.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>S2 20</text>
+<text x='295' y='149' text-anchor='start' font-size='11' font-weight='700' fill='#cf222e'>← best ask</text>
+<text x='60' y='185' text-anchor='end' font-size='13' font-weight='700' fill='#1f2328'>99</text>
+<text x='72' y='185' text-anchor='start' font-size='10' font-weight='400' fill='#57606a'>bid</text>
+<rect x='105' y='168' width='84' height='26' rx='5' fill='#d4f0dc' stroke='#d0d7de' stroke-width='1.3'/><text x='147.0' y='185.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>B1 30</text>
+<text x='203' y='185' text-anchor='start' font-size='11' font-weight='700' fill='#cf222e'>← best bid</text>
+<text x='650' y='78' text-anchor='middle' font-size='13' font-weight='700' fill='#1f2328'>after</text>
+<text x='510' y='113' text-anchor='end' font-size='13' font-weight='700' fill='#1f2328'>103</text>
+<text x='522' y='113' text-anchor='start' font-size='10' font-weight='400' fill='#57606a'>ask</text>
+<rect x='555' y='96' width='84' height='26' rx='5' fill='#ffd8d8' stroke='#d0d7de' stroke-width='1.3'/><text x='597.0' y='113.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>S3 50</text>
+<text x='653' y='113' text-anchor='start' font-size='11' font-weight='700' fill='#cf222e'>← best ask</text>
+<text x='510' y='149' text-anchor='end' font-size='13' font-weight='700' fill='#1f2328'>102</text>
+<text x='522' y='149' text-anchor='start' font-size='10' font-weight='400' fill='#57606a'>bid</text>
+<rect x='555' y='132' width='84' height='26' rx='5' fill='#c8e1ff' stroke='#1f2328' stroke-width='1.3'/><text x='597.0' y='149.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>new 10</text>
+<text x='653' y='149' text-anchor='start' font-size='11' font-weight='700' fill='#cf222e'>← best bid</text>
+<text x='510' y='185' text-anchor='end' font-size='13' font-weight='700' fill='#1f2328'>99</text>
+<text x='522' y='185' text-anchor='start' font-size='10' font-weight='400' fill='#57606a'>bid</text>
+<rect x='555' y='168' width='84' height='26' rx='5' fill='#d4f0dc' stroke='#d0d7de' stroke-width='1.3'/><text x='597.0' y='185.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>B1 30</text>
+<text x='30' y='262' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>1. best ask 101 ≤ 102 → trade with the head of 101: S1 (older). Fill min(70, 40) = 40 @ 101.</text>
+<text x='30' y='288' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2. S1 is empty → erase_order(S1). Next head: S2. Fill min(30, 20) = 20 @ 101. Erase S2.</text>
+<text x='30' y='314' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>3. Level 101 is empty → raise_best_ask scans up: 102 empty, 103 has S3 → best ask = 103 &gt; 102: stop.</text>
+<text x='30' y='340' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>4. 70 − 40 − 20 = 10 left → rest it at the TAIL of bid level 102. best bid = 102.</text>
+<text x='30' y='380' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>Trades happen at the resting (maker) price, 101, even though the buyer offered 102.</text></svg>

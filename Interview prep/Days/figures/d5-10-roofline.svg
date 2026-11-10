@@ -1,0 +1,53 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 460' width='900' height='460' font-family='Inter, Helvetica, Arial, sans-serif'><title>roofline</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='900' height='460' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>The roofline: attainable TFLOP/s = min(peak, intensity × bandwidth)</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>H200 FP32: peak 66.9 TFLOP/s, HBM 4.8 TB/s, ridge 66.9 / 4.8 ≈ 14 FLOP/B (log–log axes)</text>
+<rect x='90' y='70' width='520' height='320' rx='0' fill='#ffffff' stroke='#d0d7de' stroke-width='1'/>
+<line x1='90.0' y1='70' x2='90.0' y2='390' stroke='#eef1f4' stroke-width='1'/>
+<text x='90.0' y='408' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>0.1</text>
+<line x1='90' y1='390.0' x2='610' y2='390.0' stroke='#eef1f4' stroke-width='1'/>
+<text x='82' y='394.0' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>0.1</text>
+<line x1='263.3333333333333' y1='70' x2='263.3333333333333' y2='390' stroke='#eef1f4' stroke-width='1'/>
+<text x='263.3333333333333' y='408' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>1</text>
+<line x1='90' y1='283.33333333333337' x2='610' y2='283.33333333333337' stroke='#eef1f4' stroke-width='1'/>
+<text x='82' y='287.33333333333337' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>1</text>
+<line x1='436.66666666666663' y1='70' x2='436.66666666666663' y2='390' stroke='#eef1f4' stroke-width='1'/>
+<text x='436.66666666666663' y='408' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>10</text>
+<line x1='90' y1='176.66666666666669' x2='610' y2='176.66666666666669' stroke='#eef1f4' stroke-width='1'/>
+<text x='82' y='180.66666666666669' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>10</text>
+<line x1='610.0' y1='70' x2='610.0' y2='390' stroke='#eef1f4' stroke-width='1'/>
+<text x='610.0' y='408' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>100</text>
+<line x1='90' y1='70.0' x2='610' y2='70.0' stroke='#eef1f4' stroke-width='1'/>
+<text x='82' y='74.0' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>100</text>
+<text x='350.0' y='430' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>arithmetic intensity (FLOP per byte from HBM)</text>
+<text x='40' y='230.0' transform='rotate(-90 40 230.0)' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>TFLOP/s</text>
+<polyline points='90.0,317.33426801327073 461.6587126013208,88.6212141047655 610.0,88.6212141047655' fill='none' stroke='#1f2328' stroke-width='2.5'/>
+<text x='172.7010174847415' y='253.59961589836493' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>memory-bound: 4.8 × AI</text>
+<text x='505.64293483648646' y='80.6212141047655' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>compute-bound: 66.9</text>
+<line x1='461.6587126013208' y1='88.6212141047655' x2='461.6587126013208' y2='390' stroke='#8c959f' stroke-width='1' stroke-dasharray='4 3'/>
+<text x='465.6587126013208' y='382' text-anchor='start' font-size='10' font-weight='400' fill='#57606a'>ridge 14</text>
+<line x1='158.97626816981983' y1='315.44319953749135' x2='158.97626816981983' y2='274.88733375492' stroke='#cf222e' stroke-width='1.2' stroke-dasharray='3 3'/>
+<circle cx='158.97626816981983' cy='315.44319953749135' r='6' fill='#cf222e'/>
+<line x1='419.86893107860357' y1='183.43853413558475' x2='419.86893107860357' y2='114.3380027341301' stroke='#bf8700' stroke-width='1.2' stroke-dasharray='3 3'/>
+<circle cx='419.86893107860357' cy='183.43853413558475' r='6' fill='#bf8700'/>
+<line x1='472.04746366036034' y1='132.9224451580949' x2='472.04746366036034' y2='88.6212141047655' stroke='#0969da' stroke-width='1.2' stroke-dasharray='3 3'/>
+<circle cx='472.04746366036034' cy='132.9224451580949' r='6' fill='#0969da'/>
+<line x1='90' y1='184.96466373983824' x2='610' y2='184.96466373983824' stroke='#bf8700' stroke-width='1.2' stroke-dasharray='6 4'/>
+<text x='96' y='179.96466373983824' text-anchor='start' font-size='10' font-weight='400' fill='#bf8700'>shared-memory ceiling at 2 loads / FMA ≈ 8.4</text>
+<line x1='90' y1='120.66188724940321' x2='610' y2='120.66188724940321' stroke='#0969da' stroke-width='1.2' stroke-dasharray='6 4'/>
+<text x='96' y='115.66188724940321' text-anchor='start' font-size='10' font-weight='400' fill='#0969da'>shared-memory ceiling at 0.5 loads / FMA ≈ 33.5</text>
+<line x1='90' y1='99.08829836761737' x2='610' y2='99.08829836761737' stroke='#1a7f37' stroke-width='1.2' stroke-dasharray='2 3'/>
+<text x='604' y='112.08829836761737' text-anchor='end' font-size='10' font-weight='600' fill='#1a7f37'>cuBLAS 53.4</text>
+<text x='640' y='90' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>Measured at N = 32768:</text>
+<circle cx='646' cy='116' r='6' fill='#cf222e'/>
+<text x='658' y='120' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>naive</text>
+<text x='658' y='136' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>AI 0.25, roof 1.2, got 0.50</text>
+<circle cx='646' cy='162' r='6' fill='#bf8700'/>
+<text x='658' y='166' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>tiled 1-to-1</text>
+<text x='658' y='182' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>AI 8, roof 38, got 8.6</text>
+<circle cx='646' cy='208' r='6' fill='#0969da'/>
+<text x='658' y='212' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>block2d R=4</text>
+<text x='658' y='228' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>AI 16, roof 67, got 25.7</text>
+<text x='640' y='270' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>Gap between a dot and the HBM</text>
+<text x='640' y='288' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>roof = something else limits it.</text>
+<text x='640' y='312' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>For the tiled kernels that is</text>
+<text x='640' y='330' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>shared-memory bandwidth</text>
+<text x='640' y='348' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>(the dashed ceilings).</text>
+<text x='20' y='448' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>AI values are the textbook counts (no cache effects); shared ceilings are estimates from 128 B/clock/SM</text></svg>
