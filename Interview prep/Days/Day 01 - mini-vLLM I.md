@@ -607,6 +607,8 @@ The attention block only *adds* a correction to the stream; it doesn't replace w
 
 #### 1.10 The MLP: SwiGLU
 
+> [!tip] New to MLPs? [[#6. Deep dive: the SwiGLU MLP from scratch, on our three tokens|§6 builds the SwiGLU MLP from scratch]]: why a nonlinearity, ReLU vs SiLU, what gating does, where the parameters are, and "sat" number by number.
+
 `src/mini_vllm/model/llama.py:301–306`
 ```python
 residual = hidden
@@ -2463,6 +2465,209 @@ shrink 4×.
 3. **Scaling and mask:** ÷√d keeps softmax soft; −∞ on future keys keeps the model causal.
 4. **Output:** a weighted average of value vectors; the weights come from query–key matches.
 5. **Heads and GQA:** several heads learn different relationships. Llama-3.2-1B shares 8 KV heads among 32 query heads, making the KV cache 4× smaller. The code expands them with `repeat_interleave` (naive path) or indexes `h // 4` (Triton).
+
+---
+
+### 6. Deep dive: the SwiGLU MLP from scratch, on our three tokens
+
+Step 1.10 is the MLP ("multi-layer perceptron", also called the feed-forward network). Order:
+
+1. what the MLP is for;
+2. a plain MLP on tiny numbers;
+3. why it needs a nonlinearity;
+4. ReLU vs SiLU;
+5. gating: what the "GLU" in SwiGLU means;
+6. SwiGLU in Llama, and where most of the parameters live;
+7. our token "sat", number by number;
+8. the residual add;
+9. the code, line by line;
+10. common questions, a check, and the five things to remember.
+
+> [!important] The one sentence to hold on to
+> The MLP processes **each token on its own**: it widens the vector 4× (2048 → 8192), lets a learned **gate** decide how
+> much of each wide feature passes, and projects back to 2048. Its output is **added** to the residual stream.
+
+#### 6.1 What the MLP is for
+
+Attention **moves** information between tokens (§5). The MLP then **transforms** each token's vector, one token at a
+time, with no mixing between tokens. A common way to think about it: attention decides *what to look at*, and the MLP
+holds much of *what the model knows*. It's where learned associations ("Paris" → "France") are thought to live.
+
+#### 6.2 A plain MLP on tiny numbers
+
+A classic MLP is: **widen, apply a nonlinearity, narrow back**.
+
+$$\text{MLP}(x) = W_{\text{down}}\ \text{act}(W_{\text{up}}\,x)$$
+
+Tiny example: 2 features in, 3 hidden, 2 out, with ReLU.
+- $x = (1, 2)$;
+- $W_{\text{up}}$ (3 × 2) = $\begin{bmatrix} 1 & 0 \\ 0 & 1 \\ 1 & -1 \end{bmatrix}$, so $W_{\text{up}}x = (1,\ 2,\ -1)$;
+- ReLU sets negatives to 0: $(1,\ 2,\ 0)$;
+- $W_{\text{down}}$ (2 × 3) = $\begin{bmatrix} 1 & 1 & 1 \\ 0 & 1 & 2 \end{bmatrix}$, so the output is $(1 + 2 + 0,\ 0 + 2 + 0) = (3,\ 2)$.
+
+The hidden layer is where the work happens: each hidden unit is a "detector" that fires (positive) or stays off
+(clipped to 0) depending on the input.
+
+#### 6.3 Why the nonlinearity matters
+
+Without it, two matrices in a row are just **one** matrix: $W_{\text{down}}(W_{\text{up}}x) = (W_{\text{down}}W_{\text{up}})\,x$.
+Stacking linear layers adds no power at all. The nonlinearity in the middle (clipping, bending) is what lets the MLP
+represent things a single matrix can't.
+
+#### 6.4 ReLU vs SiLU
+
+| x | −3 | −1 | −0.5 | 0 | 0.5 | 1 | 3 |
+|---|---|---|---|---|---|---|---|
+| ReLU(x) = max(0, x) | 0 | 0 | 0 | 0 | 0.5 | 1 | 3 |
+| SiLU(x) = x · sigmoid(x) | −0.14 | −0.27 | −0.19 | 0 | 0.31 | 0.73 | 2.86 |
+
+![[d1t-16-silu.svg]]
+
+$\text{sigmoid}(x) = 1/(1 + e^{-x})$ goes smoothly from 0 (very negative x) to 1 (very positive x). So SiLU behaves like
+ReLU far from 0, but it's **smooth** around 0, and it lets **small negative** values through (lowest −0.28). Smoothness
+gives better gradients during training; it's the activation Llama uses.
+
+#### 6.5 Gating: what "GLU" means
+
+A **gated linear unit** uses **two** widening projections of the same input and multiplies them element by element:
+
+$$\text{SwiGLU}(x) = W_{\text{down}}\Big(\text{SiLU}(W_{\text{gate}}\,x)\ \odot\ W_{\text{up}}\,x\Big)$$
+
+- $W_{\text{up}}x$ proposes the **content** of each wide feature;
+- $\text{SiLU}(W_{\text{gate}}x)$ is the **gate**: near 0 → that feature is mostly blocked; large → it passes, scaled up;
+- $\odot$ multiplies them feature by feature.
+
+Tiny example: gate scores $(2, -2)$, up values $(3, 3)$:
+- $\text{SiLU}(2) = 1.76$, $\text{SiLU}(-2) = -0.24$;
+- product: $(1.76 \times 3,\ -0.24 \times 3) = (5.28,\ -0.72)$.
+
+Same content, very different outputs: the gate decided feature 1 should pass and feature 2 should almost vanish. And
+because the gate depends on the token, **each token chooses its own** features. "Swi" is for Swish, another name for
+SiLU. Shazeer (2020, *GLU Variants Improve Transformer*) found this beats a plain ReLU MLP at the same cost.
+
+#### 6.6 SwiGLU in Llama, and where the parameters are
+
+In Llama-3.2-1B: 2048 → **8192** → 2048, with three matrices per layer: `gate_proj` and `up_proj` (2048 × 8192 each)
+and `down_proj` (8192 × 2048).
+
+| part | parameters | share |
+|---|---|---|
+| MLPs: 3 × 2048 × 8192 × 16 layers | 805 M | **65%** |
+| attention: (q 2048² + k 2048·512 + v 2048·512 + o 2048²) × 16 | 168 M | 14% |
+| token embedding (shared with lm_head): 128,256 × 2048 | 263 M | 21% |
+| RMSNorm weights | 0.07 M | ~0% |
+| **total** | **1.236 B** | |
+
+So most of the model's weights, and most of the arithmetic per token, are in the MLPs.
+
+#### 6.7 Our token "sat", number by number
+
+The toy MLP is 16 wide (2 × 8 instead of 4 × 2048). After the second RMSNorm, "sat" goes through both projections.
+The first 6 of its 16 wide features:
+
+| wide feature | gate | SiLU(gate) | up | SiLU(gate) × up |
+|---|---|---|---|---|
+| 0 | −1.54 | −0.27 | −0.09 | 0.02 |
+| 1 | 1.14 | 0.86 | 1.64 | **1.41** |
+| 2 | 1.20 | 0.92 | −0.30 | −0.27 |
+| 3 | 1.45 | 1.18 | −0.37 | −0.43 |
+| 4 | −2.59 | −0.18 | −3.44 | 0.62 |
+| 5 | 0.75 | 0.51 | 1.87 | 0.95 |
+
+- Feature 1: the gate is open (0.86) and up is large (1.64), so a big value passes: **1.41**.
+- Feature 4: up is large (−3.44) but the gate is nearly closed (−0.18), so only **0.62** passes.
+- Feature 0: both small, so almost nothing.
+
+All 16 products then go through `down_proj` (16 → 8), giving "sat"'s MLP output
+`[6.25, 9.80, −9.02, 2.83, −6.63, −5.54, −5.34, 9.15]` (the MLP figure in step 1.10 shows every value).
+
+#### 6.8 The residual add
+
+The MLP output is **added** to the stream, never put in its place:
+
+$$H_2 = H_1 + \text{MLP}\big(\text{RMSNorm}(H_1)\big)$$
+
+For "sat": $H_1 = [4.76, -2.37, 2.00, 0.47, \dots]$, plus the MLP output, gives
+$H_2 = [11.01, 7.43, -7.02, 3.30, \dots]$, the end of the layer. Each layer makes a **correction** on top of what's
+there, which is why information from earlier layers survives (the residual-stream figure in step 1.3).
+
+#### 6.9 The code, line by line
+
+`src/mini_vllm/model/llama.py:301–306`
+```python
+residual = hidden
+x = post_norm(hidden)
+mlp = layer.mlp
+hidden = residual + mlp.down_proj(
+    nn.functional.silu(mlp.gate_proj(x)) * mlp.up_proj(x)
+)
+```
+
+| line | code | shape (real model, T tokens) |
+|---|---|---|
+| 301 | `residual = hidden` | `[T, 2048]`: keep the stream for the add |
+| 302 | `x = post_norm(hidden)` | `[T, 2048]`: RMSNorm (§4) |
+| 305 | `mlp.gate_proj(x)` | `[T, 8192]`: the gate scores |
+| 305 | `nn.functional.silu(…)` | `[T, 8192]`: SiLU of each gate score |
+| 305 | `mlp.up_proj(x)` | `[T, 8192]`: the content |
+| 305 | `silu(gate) * up` | `[T, 8192]`: element by element |
+| 304 | `mlp.down_proj(…)` | `[T, 2048]`: back to model width |
+| 304 | `residual + …` | `[T, 2048]`: the residual add |
+
+Every operation is **per token**: row $i$ of the output depends only on row $i$ of the input. That's why the MLP can
+run on the flattened, ragged batch (step 1.0) with no knowledge of which request a token belongs to.
+
+#### 6.10 Questions people usually ask next
+
+##### "Why widen to 8192 and then come back?"
+
+A wider hidden layer means more "detectors". The 4× ratio is a long-standing Transformer convention. With gating
+there are three matrices instead of two, so some models shrink the width to about 8/3 × d to keep the same parameter
+count; Llama-3.2-1B keeps 8192 (= 4 × 2048).
+
+##### "Why two up-projections? Isn't that wasteful?"
+
+It costs one extra matrix, but the multiplicative gate lets each token switch features on and off smoothly, and
+experiments show it trains better per parameter than a plain ReLU MLP (Shazeer, 2020).
+
+##### "Do tokens interact inside the MLP?"
+
+No. Each token's row is processed independently. All interaction between tokens happens in attention.
+
+##### "Why does the MLP dominate inference cost?"
+
+Per token, it does three 2048 × 8192 matrix–vector products: about 50 M multiply-adds per layer, against about 10 M for
+the attention projections. In decode, the GPU must also **read** all those weights from memory every step, which is a
+big part of why decode is memory-bound.
+
+#### 6.11 Check your understanding
+
+1. What does the MLP do that attention doesn't, and vice versa?
+2. Why is a nonlinearity required between the two matrices?
+3. SiLU(0)? Roughly SiLU(5)? Roughly SiLU(−5)?
+4. In SwiGLU, what does the gate do?
+5. Gate score −3, up value 4: what passes? (SiLU(−3) = −0.14.)
+6. Which three matrices make up a Llama MLP, and what are their shapes?
+7. Roughly what share of Llama-3.2-1B's parameters are in the MLPs?
+8. Is the MLP output put in place of the stream, or added to it?
+
+> [!success]- Answers
+> 1. The MLP transforms each token on its own; attention moves information between tokens.
+> 2. Two linear maps in a row collapse into one linear map; the nonlinearity is what adds expressive power.
+> 3. 0; about 5 (4.97); about 0 (−0.03).
+> 4. Scales each wide feature by SiLU(gate score): near 0 blocks it, large lets it through.
+> 5. −0.14 × 4 = −0.56.
+> 6. gate_proj and up_proj, 2048 × 8192 each, and down_proj, 8192 × 2048.
+> 7. About 65% (805 M of 1.236 B).
+> 8. Added: H₂ = H₁ + MLP(RMSNorm(H₁)).
+
+#### 6.12 The five things to remember
+
+1. **Role:** per-token transformation, where much of the model's knowledge lives; no mixing between tokens.
+2. **Shape:** 2048 → 8192 → 2048, three matrices: gate, up, down.
+3. **SwiGLU:** `down(silu(gate(x)) * up(x))`; the gate chooses, feature by feature, how much content passes.
+4. **SiLU:** x · sigmoid(x), a smooth ReLU that lets small negatives through.
+5. **Weight and cost:** ~65% of all parameters, and most per-token arithmetic; its output is added to the residual stream.
 
 ## C. Rebuild it yourself (block 7, 75 min)
 
