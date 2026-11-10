@@ -383,6 +383,8 @@ from the embedding survives all 16 layers.
 
 #### 1.4 RMSNorm: rescale each token's vector
 
+> [!tip] New to normalisation? [[#4. Deep dive: RMSNorm from scratch, on our three tokens|§4 builds RMSNorm from scratch]]: why normalise, what RMS means, RMSNorm vs LayerNorm, "the" number by number, and the code line by line.
+
 `src/mini_vllm/model/llama.py:60–65`
 ```python
 def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -1669,6 +1671,251 @@ the distance"; each adds a signal, and the model learns to combine them.
 5. **Code:** positions × inv_freq → cos, sin → `rotate_half` → `x·cos + rotate_half(x)·sin` for Q and K. V is untouched.
 
 Before moving on, make sure you can explain **3.3, 3.4, 3.5 and 3.9** without looking.
+
+---
+
+### 4. Deep dive: RMSNorm from scratch, on our three tokens
+
+Step 1.4 (and again in 1.10 and 1.11) uses **RMSNorm**. This section builds it from zero on the same tokens. Order:
+
+1. why a network needs normalisation at all;
+2. the simplest idea: divide by the size of the vector;
+3. what "RMS" is, on a 2-D example;
+4. RMSNorm vs LayerNorm, and why Llama uses RMSNorm;
+5. the two small extras: ε and the learned weight;
+6. RMSNorm on our token "the", number by number;
+7. all three tokens, and the "scale doesn't matter" property;
+8. where Llama uses it (pre-norm);
+9. the code, line by line, with shapes;
+10. common questions;
+11. a check, and the five things to remember.
+
+> [!important] The one sentence to hold on to
+> RMSNorm divides each token's vector by that vector's own **root-mean-square** size, then multiplies each feature by a
+> learned weight. It changes the **scale** of a token's vector, never its **direction**.
+
+#### 4.1 Why normalise at all?
+
+Every layer adds its output to the residual stream (picture in 1.3). Over 16 layers, the numbers in a token's vector
+can drift: grow large for some tokens and small for others. That's a problem for the next step:
+- **attention** multiplies q and k. If a vector is 10× bigger, its scores are 10× (or 100×) bigger, and softmax then picks one token almost blindly;
+- **training** becomes unstable when the scale of the inputs keeps changing.
+
+So before each block, we bring every token's vector back to a **standard size**, and let the block work on that.
+
+#### 4.2 The simplest idea: divide by the size
+
+To make a vector "size 1", divide it by its length. For $x = (3, 4)$:
+- length $= \sqrt{3^2 + 4^2} = \sqrt{25} = 5$;
+- $x / 5 = (0.6,\ 0.8)$, which has length 1.
+
+The **direction** is unchanged: $(0.6, 0.8)$ points exactly where $(3, 4)$ pointed. Only the size changed.
+
+#### 4.3 What "RMS" means
+
+RMS stands for **root mean square**. Read it right to left:
+1. **square** each number;
+2. take the **mean** (average);
+3. take the square **root**.
+
+$$\text{RMS}(x) = \sqrt{\frac{1}{d}\sum_{j=1}^{d} x_j^2}$$
+
+For $x = (3, 4)$ (so $d = 2$):
+1. squares: $9,\ 16$;
+2. mean: $(9 + 16)/2 = 12.5$;
+3. root: $\sqrt{12.5} = 3.54$.
+
+Divide by it: $x / 3.54 = (0.85,\ 1.13)$. Its RMS is now exactly 1: $\sqrt{(0.85^2 + 1.13^2)/2} = 1$.
+
+**RMS vs length.** They differ by a fixed factor: $\text{length} = \text{RMS} \times \sqrt{d}$. Here $3.54 \times \sqrt{2} = 5$.
+Why use RMS rather than length? RMS doesn't depend on how many features there are. Dividing by RMS gives numbers around
+±1 whether a vector has 2 features or 2048. Dividing by length would make the numbers smaller and smaller as $d$ grows.
+
+#### 4.4 RMSNorm vs LayerNorm
+
+Older Transformers (BERT, GPT-2) use **LayerNorm**:
+
+$$\text{LayerNorm}(x) = \gamma \odot \frac{x - \mu}{\sigma} + \beta$$
+
+It first **subtracts the mean** $\mu$ of the features, then divides by their standard deviation $\sigma$, then scales
+by $\gamma$ and shifts by $\beta$ (both learned).
+
+**RMSNorm** (Zhang & Sennrich, 2019) drops the mean and the shift:
+
+$$\text{RMSNorm}(x) = w \odot \frac{x}{\sqrt{\text{mean}(x^2) + \varepsilon}}$$
+
+On $(3, 4)$ the two give different results:
+- **RMSNorm:** $(0.85, 1.13)$, the **same direction** as $(3, 4)$;
+- **LayerNorm:** mean = 3.5, so $(3 - 3.5,\ 4 - 3.5) = (-0.5,\ 0.5)$; std = 0.5; result $(-1,\ 1)$, a **different direction**.
+
+![[d1t-11-norms.svg]]
+
+**Why does Llama use RMSNorm?**
+- The paper found that the re-centring (subtracting the mean) isn't what makes normalisation work; the re-scaling is. Dropping it costs nothing in quality.
+- It's cheaper: one reduction (the mean of squares) instead of two (mean, then variance), and no bias.
+- It keeps the direction of the vector, which is where the meaning lives.
+
+#### 4.5 Two small extras: ε and the learned weight
+
+**ε (epsilon)** is a tiny constant ($10^{-5}$ here) added under the square root:
+$\sqrt{\text{mean}(x^2) + \varepsilon}$. If a vector were all zeros, $\text{mean}(x^2) = 0$ and we'd divide by 0.
+With ε, we divide by $\sqrt{0.00001} \approx 0.003$ instead, and 0 stays 0. For normal vectors ε is far too small to
+matter.
+
+**The learned weight $w$** (one number per feature). After dividing by RMS, every token has RMS 1: we've thrown away
+each token's own scale. $w$ lets the model put scale back **per feature**: if feature 2 should matter more going into
+attention, its weight grows during training. In the toy, $w = [1.0, 0.8, 1.2, 1.0, 0.9, 1.1, 1.0, 0.7]$. The real model
+learns 2048 of them, separately for every norm in every layer.
+
+#### 4.6 RMSNorm on "the", number by number
+
+Token "the" has 8 features (its embedding row from step 1.1).
+
+| feature | x | x² | x ÷ rms | × w | result |
+|---|---|---|---|---|---|
+| f0 | −0.70 | 0.49 | −0.65 | × 1.0 | **−0.65** |
+| f1 | −1.40 | 1.96 | −1.31 | × 0.8 | **−1.04** |
+| f2 | 0.60 | 0.36 | 0.56 | × 1.2 | **0.67** |
+| f3 | −1.70 | 2.89 | −1.59 | × 1.0 | **−1.59** |
+| f4 | 0.10 | 0.01 | 0.09 | × 0.9 | **0.08** |
+| f5 | −0.50 | 0.25 | −0.47 | × 1.1 | **−0.51** |
+| f6 | −1.80 | 3.24 | −1.68 | × 1.0 | **−1.68** |
+| f7 | 0.00 | 0.00 | 0.00 | × 0.7 | **0.00** |
+
+1. **Square** each feature: the x² column.
+2. **Mean** of the squares: $(0.49 + 1.96 + 0.36 + 2.89 + 0.01 + 0.25 + 3.24 + 0.00) / 8 = 9.20 / 8 = \mathbf{1.15}$.
+3. **Root** (plus ε): $\text{rms} = \sqrt{1.15 + 0.00001} = \mathbf{1.072}$.
+4. **Divide** every feature by 1.072: the "x ÷ rms" column. Check: the RMS of that column is exactly 1.000.
+5. **Multiply** by $w$: the result column, the "the" row of `RMSNorm(X)` in step 1.4.
+
+The animation in step 1.4 plays these same five steps on the same token.
+
+#### 4.7 All three tokens, and why scale doesn't matter
+
+Each token is divided by **its own** RMS:
+
+| token | mean(x²) | rms |
+|---|---|---|
+| the | 1.15 | 1.07 |
+| cat | 1.80 | 1.34 |
+| sat | 1.65 | 1.28 |
+
+"cat" had the biggest numbers, so it was divided the most. Afterwards all three sit on the same scale.
+
+**Scale invariance.** Double every feature of "cat" and normalise again: you get **exactly** the same vector,
+`x ÷ rms = [−1.417, −0.224, −1.268, …]` (before × w) both times. Because $\text{RMS}(2x) = 2\,\text{RMS}(x)$, the 2 cancels:
+
+$$\frac{2x}{\text{RMS}(2x)} = \frac{2x}{2\,\text{RMS}(x)} = \frac{x}{\text{RMS}(x)}$$
+
+That's the whole point. The block after the norm sees **what direction** the token points in, not how loud it is.
+
+#### 4.8 Where Llama uses it: "pre-norm"
+
+Each decoder layer has **two** RMSNorms, and there's one at the very end:
+1. `input_layernorm`: before attention (step 1.4);
+2. `post_attention_layernorm`: before the MLP (step 1.10);
+3. the final `norm`, after the last layer (step 1.11).
+
+That's 2 × 16 + 1 = **33** RMSNorms in the 1B model, each with its own 2048 weights.
+
+They sit **before** each block, not after. This is called **pre-norm**:
+
+$$h \leftarrow h + \text{Attention}(\text{RMSNorm}(h)) \qquad h \leftarrow h + \text{MLP}(\text{RMSNorm}(h))$$
+
+The block reads a normalised **copy**, and its output is **added** to the un-normalised stream $h$. The stream itself is
+never normalised in place, so information from the embedding travels untouched through all 16 layers. This makes deep
+models much easier to train than the original "post-norm" design, which normalised the stream itself after every
+block. The figure in step 1.3 shows this shape.
+
+#### 4.9 The code, line by line
+
+`src/mini_vllm/model/llama.py:60–65`
+```python
+def forward(self, x: torch.Tensor) -> torch.Tensor:
+    dtype = x.dtype
+    x = x.to(torch.float32)
+    variance = x.pow(2).mean(-1, keepdim=True)
+    x = x * torch.rsqrt(variance + self.eps)
+    return self.weight * x.to(dtype)
+```
+
+With our 3 tokens, `x` has shape `[3, 8]` (the real model: `[T, 2048]`).
+
+| line | code | what happens | shape |
+|---|---|---|---|
+| 61 | `dtype = x.dtype` | remember the input type (bfloat16 in the real model) | |
+| 62 | `x = x.to(torch.float32)` | do the maths in float32 | `[3, 8]` |
+| 63 | `variance = x.pow(2).mean(-1, keepdim=True)` | square every number, average **across the 8 features** of each token | `[3, 1]` |
+| 64 | `x = x * torch.rsqrt(variance + self.eps)` | `rsqrt` = 1 / √; each row times its own 1/rms | `[3, 8]` |
+| 65 | `return self.weight * x.to(dtype)` | back to bfloat16, then × w per feature | `[3, 8]` |
+
+Three details worth understanding:
+- **`mean(-1)`** averages over the **last** axis, the features. One number per token: `[3, 1]` = `[[1.15], [1.80], [1.65]]`. Normalisation is **per token**; tokens never mix here.
+- **`keepdim=True`** keeps that axis as size 1. Multiplying `[3, 8]` by `[3, 1]` then **broadcasts**: each row is scaled by its own number. Without `keepdim` the shape would be `[3]`, and the multiply would fail or pair the wrong numbers.
+- **The name `variance` is loose.** It's the mean of squares, not a true variance (no mean is subtracted); it's the Hugging Face naming.
+- **`self.weight`** has shape `[8]` (`[2048]` in the real model), and broadcasts over the token axis: every token is scaled by the same per-feature weights.
+
+**Why float32?** bfloat16 keeps only about 3 significant digits. Summing 2048 squares in bf16 loses enough precision to
+change results. The project needed an exact layer-by-layer match with Hugging Face, which also computes this in
+float32 (the class docstring, lines 48–53).
+
+#### 4.10 Questions people usually ask next
+
+##### "Doesn't dividing by the RMS throw away information about how big the vector was?"
+
+For the **input of the block**, yes, on purpose. But the residual stream keeps the original vector (pre-norm, 4.8),
+so nothing is lost overall. The block just works on a well-scaled copy. And $w$ puts back a learned per-feature scale.
+
+##### "Why normalise per token, not across the batch (like BatchNorm)?"
+
+With per-token normalisation, a token's result doesn't depend on which other requests happen to be in the batch.
+That matters for an inference server like this one: the same prompt must give the same answer whether it runs alone
+or alongside 31 others. BatchNorm also behaves badly with variable-length sequences.
+
+##### "Why RMS and not simply the length?"
+
+Length grows with $\sqrt{d}$. Dividing by RMS keeps the normalised values around ±1 for any $d$ (4.3).
+
+##### "What do the weights w actually learn?"
+
+How strongly each feature should enter the next block. A feature the attention heads rely on gets a large weight; a
+feature that only matters later can be turned down for this block. Each of the 33 norms learns its own weights.
+
+##### "Is RMSNorm expensive?"
+
+Very cheap: per token, one pass to sum squares and one to scale. It's tiny next to the matrix multiplications. That's
+why the code can afford float32 here.
+
+#### 4.11 Check your understanding
+
+1. What three operations does "RMS" stand for, in order?
+2. Compute the RMS of $(1, 1, 1, 1)$ and of $(2, 0, 0, 0)$.
+3. What does LayerNorm do that RMSNorm doesn't?
+4. What is ε for?
+5. RMSNorm of "cat" and of "2 × cat": same or different? Why?
+6. Over which axis does `mean(-1)` average, and what shape comes out for `[3, 8]`?
+7. Why `keepdim=True`?
+8. How many RMSNorms are in Llama-3.2-1B, and where?
+9. What does "pre-norm" mean, and why is it easier to train?
+
+> [!success]- Answers
+> 1. Square, then mean, then square root.
+> 2. Both are 1: √((1+1+1+1)/4) = 1 and √(4/4) = 1. Same RMS, very different vectors; RMSNorm leaves both as they are (before w).
+> 3. It subtracts the mean of the features first (and adds a learned bias).
+> 4. To avoid dividing by zero when a vector is (almost) all zeros.
+> 5. The same: RMS(2x) = 2·RMS(x), so the factor 2 cancels.
+> 6. The last axis, the 8 features of each token; the result is `[3, 1]`, one number per token.
+> 7. So the `[3, 1]` result broadcasts against `[3, 8]`, scaling each row by its own number.
+> 8. 33: two per layer (before attention, before the MLP) × 16 layers, plus one final norm.
+> 9. The norm is applied to the block's input copy, and the block's output is added to the un-normalised stream. The stream carries information untouched through every layer, so gradients flow easily.
+
+#### 4.12 The five things to remember
+
+1. **Purpose:** give every token's vector a standard size before each block, so attention and the MLP see stable inputs.
+2. **Formula:** $w \odot x / \sqrt{\text{mean}(x^2) + \varepsilon}$, per token, over its features.
+3. **Versus LayerNorm:** no mean subtraction and no bias; cheaper, keeps the direction, works as well.
+4. **Scale invariance:** multiplying a token's vector by any positive number doesn't change the output.
+5. **Placement:** pre-norm. Normalise a copy going **into** each block; the residual stream is never normalised in place. In code: float32, `mean(-1, keepdim=True)`, `rsqrt`, × weight.
 
 ## C. Rebuild it yourself (block 7, 75 min)
 

@@ -1,0 +1,15 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 820 440' width='820' height='440' font-family='Inter, Helvetica, Arial, sans-serif'><title>RMSNorm vs LayerNorm in 2-D</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='820' height='440' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='410' y='28' text-anchor='middle' font-size='15' font-weight='700' fill='#1f2328'>Two ways to normalise the 2-D vector (3, 4)</text>
+<text x='410' y='48' text-anchor='middle' font-size='12' fill='#57606a'>green circle = every vector with RMS 1 (length √2 in 2-D); normalised arrows drawn 2× larger</text>
+<line x1='40' y1='230' x2='380' y2='230' stroke='#d0d7de'/><line x1='210' y1='60' x2='210' y2='400' stroke='#d0d7de'/><circle cx='210' cy='230' r='48.1' fill='none' stroke='#1a7f37' stroke-dasharray='5 4'/>
+<line x1='210' y1='230' x2='312.0' y2='94.0' stroke='#8c959f' stroke-width='3' stroke-linecap='round'/><circle cx='312.0' cy='94.0' r='4' fill='#8c959f'/><text x='320.0' y='98.0' font-size='12' font-weight='600' fill='#8c959f'>(6, 8) = 2 × (3, 4)</text>
+<line x1='210' y1='230' x2='261.0' y2='162.0' stroke='#0969da' stroke-width='4' stroke-linecap='round'/><circle cx='261.0' cy='162.0' r='5' fill='#0969da'/><text x='269.0' y='166.0' font-size='12' font-weight='600' fill='#0969da'>(3, 4)</text>
+<line x1='210' y1='230' x2='238.8' y2='191.5' stroke='#cf222e' stroke-width='4' stroke-linecap='round'/><circle cx='238.8' cy='191.5' r='5' fill='#cf222e'/><text x='248.8' y='209.5' font-size='12' font-weight='600' fill='#cf222e'>RMSNorm → (0.85, 1.13)</text>
+<text x='210' y='400' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>RMSNorm: same direction, shrunk onto the circle</text>
+<text x='210' y='419' text-anchor='middle' font-size='12' fill='#57606a'>(3, 4) and (6, 8) both land on (0.85, 1.13)</text>
+<line x1='440' y1='230' x2='780' y2='230' stroke='#d0d7de'/><line x1='610' y1='60' x2='610' y2='400' stroke='#d0d7de'/><circle cx='610' cy='230' r='48.1' fill='none' stroke='#1a7f37' stroke-dasharray='5 4'/>
+<line x1='610' y1='230' x2='661.0' y2='162.0' stroke='#0969da' stroke-width='4' stroke-linecap='round'/><circle cx='661.0' cy='162.0' r='5' fill='#0969da'/><text x='669.0' y='166.0' font-size='12' font-weight='600' fill='#0969da'>(3, 4)</text>
+<line x1='669.5' y1='170.5' x2='610' y2='230' stroke='#8c959f' stroke-dasharray='3 3'/>
+<text x='677.5' y='184.5' font-size='11' fill='#57606a'>− mean (3.5, 3.5)</text>
+<line x1='610' y1='230' x2='576.0' y2='196.0' stroke='#cf222e' stroke-width='4' stroke-linecap='round'/><circle cx='576.0' cy='196.0' r='5' fill='#cf222e'/><text x='446.0' y='188.0' font-size='12' font-weight='600' fill='#cf222e'>LayerNorm → (−1, 1)</text>
+<text x='610' y='400' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>LayerNorm: subtract the mean first, so the direction changes</text>
+<text x='610' y='419' text-anchor='middle' font-size='12' fill='#57606a'>(3 − 3.5, 4 − 3.5) = (−0.5, 0.5), ÷ std 0.5 → (−1, 1)</text></svg>
