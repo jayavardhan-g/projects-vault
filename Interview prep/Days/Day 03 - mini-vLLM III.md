@@ -133,6 +133,10 @@ request 1 has **40**. Block size 16.
 
 ### 1. Choosing the attention path, once per step
 
+**The same step with the real shapes** (animated; blocks are sized by their real dimensions, no values):
+
+![[d03s-path.svg]]
+
 `src/mini_vllm/model/llama.py:271–273`
 ```python
 decode_meta = None
@@ -174,6 +178,12 @@ def can_use_decode_kernel(query_lens: list[int], device: torch.device) -> bool:
 ---
 
 ### 2. The kernel: one program per (sequence, query head)
+
+**One program and one tile, at real sizes** (animated; blocks are sized by their real dimensions, no values):
+
+![[d03s-grid.svg]]
+
+![[d03s-gather.svg]]
 
 > [!tip] Concept from scratch: [[#6. Deep dive: online softmax and the fused decode kernel from scratch|online softmax on 4 numbers, the kernel's loop on a toy block table, and where the 7.49× comes from]]
 
@@ -451,6 +461,10 @@ idx = ratios.index(median_ratio) if len(ratios) % 2 else min(
 ---
 
 ### 4. The server: one loop, many waiters
+
+**The server's data flow** (animated; blocks are sized by their real dimensions, no values):
+
+![[d03s-server.svg]]
 
 > [!tip] Concept from scratch: [[#8. Deep dive: the async server from scratch|asyncio in five ideas and the one-loop design]]
 
@@ -779,6 +793,14 @@ The only memory used is one number `m`, one number `l` and one 64-vector `acc`, 
 
 #### 6.5 The kernel's loop on a toy block table
 
+**The loop at real sizes: tiles, scores, running state** (animated; blocks are sized by their real dimensions, no values):
+
+![[d03s-tiles.svg]]
+
+![[d03s-scores.svg]]
+
+![[d03s-online.svg]]
+
 The kernel runs this loop with real paging. Toy: block size **B = 4**, `ctx_len = 10`, tiles of **BLOCK_N = 8**,
 block table **[7, 2, 5]** (logical block 0 is physical block 7, and so on).
 
@@ -857,6 +879,10 @@ below float32's smallest number, so it rounds to 0. Then $l = 0$ and the output 
 lane can never be the max.
 
 #### 6.7 Where the 7.49× really comes from
+
+**Launches per decode step, naive vs fused** (animated; blocks are sized by their real dimensions, no values):
+
+![[d03s-launches.svg]]
 
 The README measured (32 requests, up to 96 new tokens each, five paired rounds): naive **379.1** tok/s in 5.58 s,
 fused **2,839.9** tok/s in 0.74 s.

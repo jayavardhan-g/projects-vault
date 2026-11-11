@@ -1,0 +1,153 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 980 430' width='980' height='430' font-family='Inter, Helvetica, Arial, sans-serif'><title>admission shapes</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='980' height='430' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Admission: free blocks − needed ≥ watermark (1% of the pool)</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>the pool has 4,096 blocks (one cell = 32 blocks); 1% ≈ 41 blocks stays in reserve for running requests' growth</text>
+<rect x='40' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='47' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='54' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='61' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='68' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='75' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='82' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='89' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='96' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='103' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='110' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='117' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='124' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='131' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='138' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='145' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='152' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='159' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='166' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='173' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='180' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='187' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='194' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='201' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='208' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='215' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='222' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='229' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='236' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='243' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='250' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='257' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='264' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='271' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='278' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='285' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='292' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='299' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='306' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='313' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='320' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='327' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='334' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='341' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='348' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='355' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='362' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='369' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='376' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='383' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='390' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='397' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='404' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='411' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='418' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='425' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='432' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='439' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='446' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='453' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='460' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='467' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='474' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='481' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='488' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='495' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='502' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='509' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='516' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='523' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='530' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='537' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='544' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='551' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='558' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='565' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='572' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='579' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='586' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='593' y='110' width='6' height='30' fill='#c8e1ff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='600' y='110' width='6' height='30' fill='#fff1a8' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='607' y='110' width='6' height='30' fill='#fff1a8' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='614' y='110' width='6' height='30' fill='#fff1a8' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='621' y='110' width='6' height='30' fill='#fff1a8' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='628' y='110' width='6' height='30' fill='#fff1a8' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='635' y='110' width='6' height='30' fill='#fff1a8' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='642' y='110' width='6' height='30' fill='#fff1a8' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='649' y='110' width='6' height='30' fill='#fff1a8' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='656' y='110' width='6' height='30' fill='#fff1a8' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='663' y='110' width='6' height='30' fill='#fff1a8' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='670' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='677' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='684' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='691' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='698' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='705' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='712' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='719' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='726' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='733' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='740' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='747' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='754' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='761' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='768' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='775' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='782' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='789' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='796' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='803' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='810' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='817' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='824' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='831' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='838' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='845' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='852' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='859' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='866' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='873' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='880' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='887' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='894' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='901' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='908' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='915' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='922' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='929' y='110' width='6' height='30' fill='#ffffff' stroke='#d0d7de' stroke-width='0.5'/>
+<rect x='927.0' y='106' width='9.0' height='38' fill='#ffc9c9' stroke='#cf222e' stroke-width='1.2'/>
+<text x='927.04' y='100' text-anchor='middle' font-size='10' font-weight='600' fill='#cf222e'>watermark</text>
+<rect x='40' y='148' width='560' height='3' fill='#57606a'/><text x='320.0' y='164' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>held by running requests</text>
+<rect x='600' y='148' width='70' height='3' fill='#57606a'/><text x='635.0' y='164' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>cached, unused (evictable)</text>
+<rect x='670' y='148' width='266' height='3' fill='#57606a'/><text x='803.0' y='164' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>free</text>
+<text x='40' y='220' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>request W1 needs:</text>
+<rect x='170' y='207' width='98' height='20' rx='3' fill='#ffd8b5' stroke='#57606a' stroke-width='1.2'/>
+<g><animate attributeName='opacity' dur='12.0s' repeatCount='indefinite' calcMode='discrete' values='1.0;0.0;1.0;1.0' keyTimes='0.0000;0.0200;0.2500;1.0000'/><rect x='670' y='110' width='97' height='30' fill='#ffd8b5'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='12.0s' repeatCount='indefinite' calcMode='discrete' values='0.0;1.0;0.0;0.0' keyTimes='0.0000;0.0800;0.2200;1.0000'/><rect x='170' y='207' width='98' height='20' rx='3' fill='#ffd8b5' stroke='#24292f' stroke-width='1.6' fill-opacity='0.92'><animate attributeName='x' dur='12.0s' repeatCount='indefinite'  values='170.0;170.0;670.0;670.0' keyTimes='0.0000;0.0800;0.2200;1.0000'/><animate attributeName='y' dur='12.0s' repeatCount='indefinite'  values='207.0;207.0;110.0;110.0' keyTimes='0.0000;0.0800;0.2200;1.0000'/><animate attributeName='width' dur='12.0s' repeatCount='indefinite'  values='98.0;98.0;98.0;98.0' keyTimes='0.0000;0.0800;0.2200;1.0000'/><animate attributeName='height' dur='12.0s' repeatCount='indefinite'  values='20.0;20.0;30.0;30.0' keyTimes='0.0000;0.0800;0.2200;1.0000'/></rect></g>
+<g opacity='0'><animate attributeName='opacity' dur='12.0s' repeatCount='indefinite' calcMode='discrete' values='0.0;1.0;0.0;0.0' keyTimes='0.0000;0.2200;0.9800;1.0000'/><text x='400' y='222' text-anchor='start' font-size='11' font-weight='600' fill='#1a7f37'>38 − 14 = 24 cells left ≥ reserve → admitted</text></g>
+<text x='40' y='280' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>request W2 needs:</text>
+<rect x='170' y='267' width='210' height='20' rx='3' fill='#f5c6e9' stroke='#57606a' stroke-width='1.2'/>
+<g opacity='0'><animate attributeName='opacity' dur='12.0s' repeatCount='indefinite' calcMode='discrete' values='0.0;1.0;0.0;0.0' keyTimes='0.0000;0.3500;0.5500;1.0000'/><text x='400' y='282' text-anchor='start' font-size='11' font-weight='600' fill='#cf222e'>24 − 30 &lt; reserve → first evict cached blocks</text></g>
+<g><animate attributeName='opacity' dur='12.0s' repeatCount='indefinite' calcMode='discrete' values='1.0;0.0;1.0;1.0' keyTimes='0.0000;0.0200;0.5500;1.0000'/><rect x='600' y='110' width='69' height='30' fill='#ffffff' stroke='#1a7f37'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='12.0s' repeatCount='indefinite' calcMode='discrete' values='0.0;1.0;0.0;0.0' keyTimes='0.0000;0.4500;0.6000;1.0000'/><rect x='598' y='108' width='74' height='34' rx='4' fill='none' stroke='#1a7f37' stroke-width='2.5'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='12.0s' repeatCount='indefinite' calcMode='discrete' values='0.0;1.0;0.0;0.0' keyTimes='0.0000;0.6000;0.7500;1.0000'/><text x='400' y='282' text-anchor='start' font-size='11' font-weight='600' fill='#1a7f37'>after evicting: 34 cells free − 30 = 4 ≥ reserve → admitted</text></g>
+<text x='40' y='340' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>request W3 needs:</text>
+<rect x='170' y='327' width='84' height='20' rx='3' fill='#d8d0ff' stroke='#57606a' stroke-width='1.2'/>
+<g><animate attributeName='opacity' dur='12.0s' repeatCount='indefinite' calcMode='discrete' values='1.0;0.0;1.0;1.0' keyTimes='0.0000;0.0200;0.7500;1.0000'/><rect x='600' y='110' width='69' height='30' fill='#f5c6e9'/><rect x='768' y='110' width='139' height='30' fill='#f5c6e9'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='12.0s' repeatCount='indefinite' calcMode='discrete' values='0.0;1.0;0.0;0.0' keyTimes='0.0000;0.6200;0.7400;1.0000'/><rect x='170' y='267' width='210' height='20' rx='3' fill='#f5c6e9' stroke='#24292f' stroke-width='1.6' fill-opacity='0.92'><animate attributeName='x' dur='12.0s' repeatCount='indefinite'  values='170.0;170.0;768.0;768.0' keyTimes='0.0000;0.6200;0.7400;1.0000'/><animate attributeName='y' dur='12.0s' repeatCount='indefinite'  values='267.0;267.0;110.0;110.0' keyTimes='0.0000;0.6200;0.7400;1.0000'/><animate attributeName='width' dur='12.0s' repeatCount='indefinite'  values='210.0;210.0;140.0;140.0' keyTimes='0.0000;0.6200;0.7400;1.0000'/><animate attributeName='height' dur='12.0s' repeatCount='indefinite'  values='20.0;20.0;30.0;30.0' keyTimes='0.0000;0.6200;0.7400;1.0000'/></rect></g>
+<g opacity='0'><animate attributeName='opacity' dur='12.0s' repeatCount='indefinite' calcMode='discrete' values='0.0;1.0;0.0;0.0' keyTimes='0.0000;0.8000;0.9800;1.0000'/><rect x='168' y='325' width='88' height='24' rx='4' fill='none' stroke='#cf222e' stroke-width='2.5'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='12.0s' repeatCount='indefinite' calcMode='discrete' values='0.0;1.0;0.0;0.0' keyTimes='0.0000;0.8000;0.9800;1.0000'/><text x='400' y='342' text-anchor='start' font-size='11' font-weight='600' fill='#cf222e'>4 − 12 &lt; reserve, nothing left to evict → break (FCFS)</text></g>
+<text x='40' y='385' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>The reserve is what lets running requests keep taking their one-block-per-16-tokens without an immediate preemption.</text>
+<text x='20' y='416' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: W1 takes free blocks; W2 first triggers eviction of cached blocks, then fits; W3 stops admission (and everyone behind it)</text></svg>
