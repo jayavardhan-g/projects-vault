@@ -51,6 +51,9 @@ microexchange and raftkv. Read that branch. The numbers in the upgraded docs rep
   - Day 5 §3 mermaid says F = 4; the contiguous loader really runs as `mm_tiled_contiguous<64,32>`, so F = 2.
   - Day 4 §7.6: the 23.6 ms iteration ("0.33 ms of 23.6 ms") is the 1.5B-draft run, not the 0.5B one.
   - Day 2 eviction, said precisely: `evict()` frees as many leaf candidates as it needs from one scan before re-scanning, so a parent becomes a candidate only when the current leaves can't cover the request.
+  - Day 7 A1: Whisper's stem has two convolutions but only the second has stride 2 (not "two strided convolutions").
+  - Day 9 A2: the 2019 lottery-ticket paper resets weights to their original initial values; "rewinding" to an early iteration came in later work.
+- **11-11: section A of every day stands alone:** each reading has a "What it says" summary (own words), and each Concepts list links to its deep dives. Days that lacked Concepts lists got them.
 - **11-11: Days 2–5 also have shape animations** (`d02s-`…`d05s-*.svg`, real sizes, no values) under their code headings, like Day 1's `d1s-*`.
 - **11-10: [[Function glossary]]** (`Interview prep/Function glossary.md`) is generated from scripts in the session scratch dir (glossary.py, glossary_ext.py, gen_glossary.py, gloss_figs.py → figures `g-*.svg`). Each day note's code excerpts get a *New functions in this code* box (first use per note) linking to it. Add new functions there, not inline.
 - 11-05: Day 1 started. 11 prep packs (all except CS728, LeNet-5 and welfare) were launched as background agents. DECS CPU-saturation question resolved: the claim holds (see plan).

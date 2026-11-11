@@ -59,12 +59,32 @@ Part of [[Interview plan (Nov 2026)]]. Two course projects, half a day each. Abo
 - Wu et al., *"Retrieval Head Mechanistically Explains Long-Context Factuality"* (2024): §1–3. The retrieval score: a head "hits" at a decode step when its attention argmax lands on the context token being copied. About 30 min.
 - Liu et al., *"Lost in the Middle"* (2023): §1–2 and Figure 1 (the U-shaped accuracy vs position curve). About 15 min.
 
+> [!abstract] What it says: Wu et al., Retrieval Head (2024), §1–3
+> - **Question:** how does a long-context model find and copy a fact from far back in its input?
+> - **Retrieval score:** in needle-in-a-haystack tests, each time the model copies a needle token, check each head: does its strongest attention point at that same token? A head's score is the fraction of copied tokens where it does.
+> - **Findings:** fewer than 5% of heads score high, so retrieval is sparse. These heads appear in every model family tested, exist already in base models and survive long-context training. They switch on depending on the context.
+> - **Causal test:** masking the retrieval heads makes needle tests fail and the model invent facts; masking the same number of random heads barely matters.
+> - **Main figure:** a head whose attention jumps onto the needle token at the moment it is copied into the output.
+> - **For this project:** Hit Count is the same idea, scored on whether the head's top attention lands on the right tool instead of on a copied token.
+
+> [!abstract] What it says: Liu et al., Lost in the Middle (2023), §1–2
+> - **Setup:** multi-document question answering. The model gets 10, 20 or 30 retrieved documents, one of which holds the answer, and the answer's position is moved.
+> - **Second task:** key-value retrieval from a JSON list of random ID pairs, which tests pure copying.
+> - **Main figure (Figure 1):** accuracy against the relevant document's position, for 20 documents. It is high at the start, fairly high at the end and lowest in the middle: a U shape.
+> - **Striking claim:** with the answer in the middle, GPT-3.5-Turbo can do worse than with no documents at all (closed-book).
+> - **Also:** models with longer context windows are not better at using the middle.
+> - **For this project:** tool descriptions in the middle of a long prompt are the ones a plain LLM is most likely to miss.
+
+
 **Concepts:**
 - A few heads (under 5%) do most of the copying from long context. They are sparse, universal across tasks and present in base models.
 - **Hit Count selection:** run probe queries, count per head how often its top attention lands on the correct item, keep the top-k heads.
 - **Using heads as a retriever:** for a query, sum the selected heads' attention mass over each tool's description, and rank tools by it. No training.
 - **Recall@k:** the fraction of queries whose correct tool is in the top k. Recall@1 = top-1 accuracy.
 - **Lost in the middle:** models use information at the start and end of the context best. Aggregating heads that attend by content rather than position flattens the U curve.
+
+> [!tip] Explained from scratch: [[#4. Deep dive: retrieval heads, Hit Count and Recall@k, from scratch|§4 retrieval heads, Hit Count, Recall@k]]
+
 
 ### A2. Compression and robustness (block 5, 60 min)
 
@@ -74,12 +94,46 @@ Part of [[Interview plan (Nov 2026)]]. Two course projects, half a day each. Abo
 - Madry et al., *"Towards Deep Learning Models Resistant to Adversarial Attacks"* (2018), §2 (the PGD attack). About 15 min.
 - Skim: Mu & Gilmer, *MNIST-C* (2019), the list of 15 corruptions.
 
+> [!abstract] What it says: Frankle & Carbin, The Lottery Ticket Hypothesis (2019), §1–2
+> - **Claim:** a dense, randomly initialised network contains a small subnetwork (a "winning ticket"). Trained alone from the same initial values, it matches the full network's accuracy in a similar number of steps.
+> - **How to find it:** train, prune the smallest-magnitude p% of weights, reset the survivors to their original initial values, and repeat. This is iterative magnitude pruning.
+> - **Numbers:** winning tickets are often under 10–20% of the original size, for fully-connected and convolutional networks on MNIST and CIFAR-10 (LeNet-300-100 among them).
+> - **Control:** the same sparse structure with fresh random weights learns more slowly and ends worse, so the initial values matter.
+> - **Main figure:** test accuracy and early-stopping step against the fraction of weights left, for winning tickets vs random reinitialisation.
+> - **Later twist:** for bigger networks, later work resets to an early training step ("rewinding") instead of step 0.
+> - **For this project:** your IMP to 3.75% remaining follows this loop. Know whether you reset, rewound or simply fine-tuned.
+
+> [!abstract] What it says: Han et al., Learning both Weights and Connections (2015), §3
+> - **Three steps:** train normally to learn which connections matter, remove connections whose weights fall below a threshold, then retrain the rest.
+> - **Iterate:** pruning and retraining several times removes more weights than one big cut, at the same accuracy.
+> - **Details:** L2 regularisation works best when you retrain; dropout should be lowered after pruning, because the layer is smaller; keep the surviving weights instead of reinitialising them.
+> - **Numbers:** AlexNet shrinks 9× (61M → 6.7M) and VGG-16 13× (138M → 10.3M) with no accuracy loss; the LeNet models shrink about 12×.
+> - **Also:** convolutional layers are more sensitive to pruning than fully-connected ones.
+> - **For this project:** this is the prune-retrain loop behind your LeNet-5 numbers, and conv sensitivity supports the conv1 story.
+
+> [!abstract] What it says: Madry et al., Towards Deep Learning Models Resistant to Adversarial Attacks (2018), §2
+> - **Idea:** write robustness as a min-max problem. The attacker picks the worst perturbation inside a set (an ε-ball); the trainer picks weights that minimise that worst-case loss.
+> - **The attack, PGD:** start at a random point in the ball, step in the sign of the input gradient, project back into the ball, and repeat.
+> - **Claim:** PGD is the strongest attack that uses only gradients, so a model robust to PGD should resist that whole class.
+> - **Defence:** adversarial training: train on PGD examples instead of clean ones.
+> - **Numbers (the paper's results):** on MNIST with L∞ ε = 0.3, about 89% accuracy against its strongest attack; on CIFAR-10 with ε = 8/255, about 46%.
+> - **For this project:** your robust accuracy is a PGD attack in this sense. Know your ε, step size and number of steps.
+
+> [!abstract] What it says: Mu & Gilmer, MNIST-C (2019)
+> - **Idea:** MNIST test digits with 15 kinds of corruption, to test robustness to shifts the model never trained on.
+> - **The 15:** shot noise, impulse noise, glass blur, motion blur, shear, scale, rotate, brightness, translate, stripe, fog, spatter, dotted line, zigzag and Canny edges.
+> - **Finding:** CNNs that reach about 99% on clean MNIST lose much more accuracy on these, so clean accuracy hides fragility.
+> - **For this project:** "corruption accuracy" in A2 means accuracy on these corrupted test sets.
+
+
 **Concepts:**
 - **Iterative magnitude pruning (IMP):** train → remove the smallest-magnitude p% of weights → retrain (or rewind) → repeat. 3.75% remaining = 96.25% sparsity.
 - **Layer-wise vs global:** layer-wise prunes the same fraction from every layer; global ranks all weights together. LeNet's **conv1 has very few weights** (6 filters × 5×5 = 150 + biases), so a uniform fraction strips it to almost nothing ("starved"). Global pruning keeps more of conv1, because its weights are large.
 - **The p = 0.83:** a statistical test across 5 seeds says global pruning's corruption accuracy is not significantly different from the dense model's. Know which test (paired t-test?) and what p = 0.83 means: *no evidence of a difference*, not proof of equality.
 - **PGD:** iterated gradient steps on the input, each projected back into an ε-ball. Robust accuracy = accuracy under that attack.
 - **INT8 post-training quantisation:** map each tensor's float range onto 256 levels with a scale (and zero-point). 4× smaller weights, small accuracy loss.
+
+> [!tip] Explained from scratch: [[#5. Deep dive: magnitude pruning, layer-wise vs global, from scratch|§5 pruning]], [[#6. Deep dive: PGD adversarial attacks from scratch|§6 PGD]], [[#7. Deep dive: INT8 quantisation from scratch, and why 3.27× not 4×|§7 INT8]]
 
 ## B. Code
 

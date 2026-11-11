@@ -53,14 +53,68 @@ field numbers §5.2, claims to fix §5.3, 50 questions §7). This day also sets 
 ### A1. Audio basics (block 2, 45 min)
 
 **Read:** the Whisper paper (Radford et al., 2022), §2.1–2.3 only. **Watch** (optional): Hugging Face Audio Course, Unit 1 ("Working with audio data"), about 30 min.
+
+> [!abstract] What it says: Whisper (Radford et al., 2022), §2.1–2.3
+> - **Idea:** train one plain encoder-decoder Transformer on a huge, messy set of web audio and its transcripts. The robustness comes from the scale and variety of the data, not from a clever model.
+> - **Data (§2.1):** 680,000 hours of labelled audio from the internet. About 117,000 hours cover 96 languages other than English, and 125,000 hours are speech-to-English translation. Heuristics remove machine-made transcripts.
+> - **Front end (§2.2):** resample to 16 kHz, then an 80-channel log-mel spectrogram from 25 ms windows every 10 ms. The audio is cut into 30-second pieces.
+> - **Encoder stem:** two convolutions with filter width 3; the second has stride 2, which halves the frame rate. Transformer blocks with sinusoidal positions follow.
+> - **Decoder:** writes text with a byte-level BPE tokenizer, like GPT-2's.
+> - **Multitask format (§2.3):** special tokens at the start of the decoder choose the task: the language, transcribe or translate, timestamps or not, and "no speech". Timestamps are tokens on a 20 ms grid.
+> - **Main figure (Figure 1):** the kinds of training data, then the encoder-decoder (log-mel in, tokens out), then the token sequence that encodes the task.
+> - **For this project:** the A1 numbers below (100 frames/s, 50 Hz encoder states, 1,500 states per 30 s) come straight from §2.2.
+
+> [!abstract] What it says: Hugging Face Audio Course, Unit 1
+> - **Idea:** audio is a long list of amplitude samples. Every model first turns it into something shorter and more structured.
+> - **Sampling rate:** samples per second. All audio must match the model's rate (16 kHz for Whisper), so you resample.
+> - **Bit depth:** how precisely each sample is stored: 16 or 24 bits, or float32.
+> - **Spectrum:** the discrete Fourier transform shows which frequencies are present in a short piece of signal.
+> - **Spectrogram:** repeat that on short, overlapping windows (the STFT) to see the frequencies change over time.
+> - **Mel spectrogram:** squash the frequency axis onto the mel scale, which follows human hearing, then take the log (decibels).
+> - **Hands-on:** loading, resampling and plotting audio with 🤗 Datasets and librosa.
+> - **For this project:** it is the visual version of the first three A1 bullets.
+
+**Concepts:**
+
 - **Sampling:** 16 kHz = 16,000 samples per second. 24 kHz × 16-bit = **384 kbps** raw.
 - **Frames and hops:** a 25 ms window every 10 ms → **100 frames/s**. Each frame → an STFT → a magnitude spectrum.
 - **Log-mel:** project the spectrum onto 80 (or 128) mel filters, take the log. This is Whisper's input.
 - **Whisper encoder:** two strided convolutions halve the rate to 50 Hz, then transformer layers. 30 s of audio → 1500 encoder states.
 
+> [!tip] Explained from scratch: [[#5. Deep dive: from waveform to log-mel to tokens, from scratch|§5 audio to tokens]]
+
+
 ### A2. Quantisers and bitrates (block 3, 75 min)
 
 **Read:** your report ch. 2–3. Then FSQ (Mentzer et al., 2023), §1–3, about 20 min. For RVQ: the SoundStream paper (Zeghidour et al., 2021), §3.2.
+
+> [!abstract] What it says: your report, chapters 2–3
+> - **Ch. 2, why tokens:** discrete tokens let an LLM reuse its usual machinery: a vocabulary, softmax, cross-entropy and sampling (§2.1). The cost is lost information, which a separate decoder must restore.
+> - **Ch. 2, multilingual limits:** cross-lingual leakage and weak low-resource coverage are named as open issues (§2.3).
+> - **Ch. 3, the quantisers:** VQ, RVQ and FSQ in turn. RVQ's many codebooks force extra machinery in the LM, such as a non-autoregressive split or delay patterns (§3.2).
+> - **FSQ's cost:** each dimension is rounded on its own, so correlations must be learned by the projections around it (§3.3).
+> - **WavTokenizer (§3.4):** one 4,096-code codebook at 40 or 75 tokens/s: one flat stream that looks like text.
+> - **For the interview:** these chapters are where your bitrate table and the VQ → RVQ → FSQ story come from.
+
+> [!abstract] What it says: FSQ (Mentzer et al., 2023), §1–3
+> - **Idea:** replace VQ's learned codebook with a fixed grid. Project to a few dimensions, squash each into a small range, and round it to one of L levels.
+> - **Codes:** the codebook is implicit. Its size is the product of the level counts: 3 levels in each of 8 dimensions gives 3⁸ = 6,561.
+> - **Training:** rounding has no gradient, so the straight-through estimator passes gradients around it. No commitment loss, no EMA and no code restarts are needed.
+> - **Main claim:** every grid point is reachable, so codebook use stays near 100% and collapse cannot happen. Quality is close to VQ in the image models tested (MaskGIT and UViM).
+> - **Main figure (Figure 1):** VQ maps a vector to its nearest learned code; FSQ bounds each coordinate and snaps it to the grid.
+> - **Rule of thumb:** the paper lists small, roughly equal level counts per dimension for each target codebook size.
+> - **For this project:** CosyVoice 2's speech tokenizer uses FSQ; that is where the 6,561 codes below come from.
+
+> [!abstract] What it says: SoundStream (Zeghidour et al., 2021), §3.2 (RVQ)
+> - **Problem:** at 24 kHz and 75 frames/s, 6 kbps leaves 80 bits per frame. One VQ would need 2⁸⁰ codes: impossible to store or train.
+> - **Fix, residual VQ:** quantise the frame with codebook 1, subtract, quantise what is left with codebook 2, and so on. Eight codebooks of 1,024 codes give 8 × 10 = 80 bits.
+> - **Codebook training:** EMA updates, k-means initialisation on the first batch, and replacing codes that stop being used.
+> - **Quantiser dropout:** in training, only the first n_q codebooks are used, with n_q drawn at random. One model then serves several bitrates (the paper spans 3 to 18 kbps).
+> - **Main figure:** encoder → RVQ → decoder, with the residual chain drawn as stacked quantisers.
+> - **For this project:** EnCodec's 75 × 8 × 10 = 6,000 bps in A2 is exactly this design.
+
+**Concepts:**
+
 - **VQ:** replace a vector by its nearest of K learned codes. The risk is **codebook collapse**: only a few codes get used. Training tricks: k-means init, EMA updates, dead-code restarts.
 - **RVQ:** quantise, subtract, quantise the residual again, N times. **N tokens per frame**: the flattened sequence grows **linearly** in N, while the number of code combinations grows as K^N. (Your slide 5 says "exponentially larger sequences": wrong.)
 - **FSQ:** bound each dimension (tanh), round it to L levels. Codes = Π levels. No codebook to learn, so no collapse. CosyVoice 2's tokens: 6,561 = 3⁸ codes.
@@ -71,28 +125,89 @@ field numbers §5.2, claims to fix §5.3, 50 questions §7). This day also sets 
   - compression vs raw: 384 / 0.9 ≈ 427×.
 - **Sequence-length cost:** 6,000 EnCodec tokens vs 250 S3 v2 tokens for 10 s = **24× longer**, so about **576×** the attention FLOPs. An AR model must emit at least the token rate per second to be real-time.
 
+> [!tip] Explained from scratch: [[#6. Deep dive: VQ, RVQ and FSQ, from scratch|§6 VQ, RVQ and FSQ]]
+
+
 ### A3. Semantic vs acoustic tokens (block 4, 45 min)
 
 **Read:** your report §3.4 (WavTokenizer) and ch. 4 (SpeechGPT). Skim the SpeechGPT paper (Zhang et al., 2023), §2–3.
+
+> [!abstract] What it says: your report, §3.4 and chapter 4
+> - **§3.4, WavTokenizer:** one codebook of 4,096 codes for 24 kHz audio, at 40 or 75 tokens/s. Its tricks: k-means initialisation, random "awakening" of unused codes, a longer context window, attention in the decoder and an inverse-STFT decoder.
+> - **The verdict:** a single flat stream suits an LM. With no text supervision, though, it is better at rebuilding audio than at lining up with text.
+> - **Ch. 4, SpeechGPT:** speech units join an LLM's vocabulary, trained in three stages with LoRA in the last (§4.2). Simply adding speech tokens to a text vocabulary is not enough.
+> - **Limits (§4.3):** the model writes text before it speaks, so latency stays close to a cascade's. Paralinguistics are weak, and long dialogues hit the context limit.
+
+> [!abstract] What it says: SpeechGPT (Zhang et al., 2023), §2–3
+> - **Idea:** one LLM that can hear and speak, by turning speech into discrete units and treating them as extra words.
+> - **Units:** mHuBERT features clustered by k-means into 1,000 units; repeated units are merged. A unit HiFi-GAN vocoder turns units back into audio.
+> - **Data (SpeechInstruct):** cross-modal instruction pairs (speech ↔ text tasks) and chain-of-modality data (question speech → question text → answer text → answer speech).
+> - **Training in three stages:** (1) modality-adaptation pre-training on unlabelled speech units; (2) cross-modal instruction fine-tuning; (3) chain-of-modality fine-tuning with LoRA.
+> - **Backbone:** LLaMA-13B, with its vocabulary extended by the units.
+> - **Main figure:** a spoken dialogue, speech in and speech out, with the model's intermediate text shown.
+> - **For this project:** the seminar's one truly unified model, and the reason "chain of modality" costs latency.
+
+**Concepts:**
+
 - **Acoustic tokens** are trained to rebuild the waveform (EnCodec, DAC, WavTokenizer). They keep voice and detail but align poorly with text.
 - **Semantic tokens** keep content. Self-supervised: HuBERT features + k-means (SpeechGPT's 1,000 units). Supervised by ASR: CosyVoice's S3 tokens (a VQ inserted after 6 Conformer encoder layers; 4,096 codes).
 - **WavTokenizer:** one codebook, 40 or 75 tokens/s. The report says it lacks the ASR-like understanding of supervised semantic tokens. Use that version.
 - **SpeechGPT:** speech units added to LLaMA-13B's vocabulary; "chain of modality" (transcribe to text first, answer in text, then speak). The only truly unified model in your seminar.
 
+> [!tip] Explained from scratch: [[#6. Deep dive: VQ, RVQ and FSQ, from scratch|§6 (6.8: semantic vs acoustic tokens)]], [[#5.6 Token rate sets the sequence length|§5.6 token rate]]
+
+
 ### A4. The CosyVoice line and Spark-TTS (block 5, 60 min)
 
 **Read:** your report ch. 5–7. Skim the CosyVoice 2 paper (Du et al., Dec 2024), §2 and its Figure 1.
+
+> [!abstract] What it says: your report, chapters 5–7
+> - **Ch. 5, CosyVoice 1:** supervised semantic tokens from a VQ inside an ASR encoder give better content consistency and speaker similarity than unsupervised tokens (§5.1). §5.4's line: the LM can only generate what the token space makes available.
+> - **Ch. 6, CosyVoice 2:** streaming by interleaving text and speech (§6.2); 25 Hz tokens, so the LM takes half as many steps per second (§6.3); one flow model trained with several masks (§6.4); one chunk plays while the next is made (§6.5).
+> - **Ch. 7, newer models:** Spark-TTS's BiCodec and attribute control (§7.2); CosyVoice 3's multi-task tokenizer, which tries to put identity and emotion back into the tokens (§7.3).
+> - **For this project:** chapter 6 describes the model you fine-tune on Day 8.
+
+> [!abstract] What it says: CosyVoice 2 (Du et al., Dec 2024), §2 and Figure 1
+> - **Idea:** one TTS model that works both offline and streaming, with streaming quality close to offline, built on a pretrained text LLM.
+> - **Tokenizer:** FSQ inserted into the encoder of a large ASR model (SenseVoice-Large), so the tokens are trained with an ASR loss. 25 tokens per second, with much better codebook use than v1's VQ.
+> - **Text–speech LM:** Qwen2.5-0.5B. v1's separate text encoder and its speaker embedding are removed. Text is plain BPE, with no grapheme-to-phoneme step.
+> - **Streaming:** text and speech tokens are interleaved at a fixed N:M = 5:15, so speech can start before the whole text exists.
+> - **Flow matching:** chunk-aware and causal, trained with several masks (non-causal, full-causal, chunk-M, chunk-2M), so one model serves every latency budget.
+> - **Main figure (Figure 1):** three panels: (a) the supervised speech tokenizer, (b) the unified text-speech LM, (c) the chunk-aware causal flow-matching model.
+> - **Check before quoting:** the prep pack recalls "VQ used about 23% of its codes, FSQ 100%". Confirm the exact numbers in the paper.
+
+**Concepts:**
+
 - **CosyVoice 1:** text → LM → S3 tokens (50 Hz) → conditional flow matching → mel → HiFi-GAN. Voice comes from an x-vector speaker embedding plus a prompt mel, **not** from the tokens.
 - **CosyVoice 2:** FSQ tokens at **25 Hz**; the LM is **Qwen2.5-0.5B**; text and speech interleaved **5:15** for streaming; chunk-aware causal flow matching. **This is the model you fine-tuned tomorrow.**
 - **CosyVoice 3:** a multi-task tokenizer, 1M hours, 9 languages, a 1.5B LM, DiffRO.
 - **Spark-TTS:** BiCodec = fixed global tokens (voice) + 50 Hz semantic tokens. Qwen2.5-0.5B with attribute chain-of-thought. The semantic stream averages wav2vec 2.0 layers 11, 14 and 16 (not the ASR middle-layer trick).
 
+> [!tip] Explained from scratch: [[#7. Deep dive: cascade vs end-to-end, and CosyVoice 2's streaming, from scratch|§7 CosyVoice 2's streaming]]
+
+
 ### A5. Cascaded vs end-to-end (block 6, 30 min)
 
 Report §1.1 and ch. 8. Prep pack §5.2 "Latency anchors" and "Error propagation".
+
+> [!abstract] What it says: your report, §1.1 and chapter 8
+> - **§1.1 and Figure 1.1:** the cascade (ASR → LLM → TTS) and what it loses: tone, sarcasm, hesitation and laughter disappear at the ASR step.
+> - **§1.3:** the four research questions that frame the report.
+> - **Ch. 8:** a comparison table of the models (Table 8.1) instead of a ranking. §8.3 names open problems, such as how to evaluate control; §8.5 notes low-resource and cross-lingual limits.
+> - **For this project:** this is your "why end-to-end?" answer.
+
+> [!abstract] What it says: prep pack §5.2, latency anchors and error propagation
+> - **Target:** humans leave about 200 ms between turns.
+> - **Cascades add up:** each stage adds its delay, and errors compound; the 0.9²⁰ ≈ 12% sketch assumes independent word errors.
+> - **Vendor numbers** (GPT-4o's 320 ms) are claims, not measurements. Say so when you quote them.
+
+**Concepts:**
+
 - **Cascade (ASR → LLM → TTS):** modular, debuggable, reuses text LLMs and data. Latencies add up. Prosody and emotion are lost at the ASR step. Errors propagate: at 10% WER, a 20-word question is fully right only 0.9²⁰ ≈ **12%** of the time (an independence sketch).
 - **Anchors:** humans leave about 200 ms between turns. The cascaded ChatGPT Voice Mode averaged 2.8–5.4 s; GPT-4o 320 ms (vendor numbers); Moshi about 200 ms.
 - **End-to-end:** lower latency and keeps paralinguistics, but needs paired speech data and is harder to debug. The text–speech gap your M.Tech project studies starts here (don't go into the thesis).
+
+> [!tip] Explained from scratch: [[#7. Deep dive: cascade vs end-to-end, and CosyVoice 2's streaming, from scratch|§7 cascade vs end-to-end]]
 
 ## Code, explained
 

@@ -65,6 +65,28 @@ Builds on [[Day 07 - Seminar and speech basics]] (the CosyVoice 2 pipeline). Pro
 
 **Read:** Hu et al., *LoRA* (2021), §1, §4 (method) and §7.1–7.2 (which weights, what rank). About 35 min.
 **Optional:** Sebastian Raschka's blog post *"Practical Tips for Finetuning LLMs Using LoRA"*.
+
+> [!abstract] What it says: LoRA (Hu et al., 2021), §1, §4, §7.1–7.2
+> - **Problem (§1):** full fine-tuning of a huge model (GPT-3, 175B) needs a full copy of the weights per task. Storing and serving those copies is the bottleneck.
+> - **Idea (§4):** keep W frozen and learn its update as a product of two thin matrices, ΔW = BA, with rank r much smaller than the width. A starts random (Gaussian), B starts at zero, and the update is scaled by α/r.
+> - **No extra latency:** after training, BA can be added into W, so inference costs exactly what the base model costs.
+> - **Headline numbers:** on GPT-3 175B, about 10,000× fewer trainable parameters and about 3× less GPU memory than full fine-tuning, at similar quality.
+> - **§7.1, which weights:** with a fixed parameter budget, adapting both W_q and W_v beat spending it all on one matrix.
+> - **§7.2, which rank:** very small ranks (even r = 1 for W_q and W_v) already work well. The useful update seems to live in a tiny subspace.
+> - **Main figure (Figure 1):** the frozen W on one path, A then B on a side path, and the two outputs added.
+> - **For this project:** you used r = 16 on all seven projections, not just q and v; the parameter formula below is §4's.
+
+> [!abstract] What it says: Raschka, "Practical Tips for Finetuning LLMs Using LoRA"
+> - **Format:** many small experiments fine-tuning a 7B model with LoRA, changing one setting at a time.
+> - **Consistency:** repeating a run gave nearly the same scores, despite GPU randomness.
+> - **QLoRA:** 4-bit base weights save a lot of memory, at the cost of slower training.
+> - **Which layers:** LoRA on all linear layers, not only q and v, helped, but it adds parameters and memory.
+> - **r and α:** a common rule of thumb is α = 2r; your α = 32 with r = 16 follows it. A very large r can overfit.
+> - **Epochs:** more passes over a small, fixed dataset can make results worse.
+> - **For this project:** it backs your "all seven projections, α = 2r" choices.
+
+**Concepts:**
+
 - Freeze `W` (d_out × d_in). Learn `ΔW = B·A`, with `A` (r × d_in) and `B` (d_out × r). Output = `Wx + (α/r)·BAx`.
 - `B` starts at zero, so training starts exactly from the base model.
 - Parameters per adapted matrix = `r·(d_in + d_out)`.
@@ -76,10 +98,16 @@ Builds on [[Day 07 - Seminar and speech basics]] (the CosyVoice 2 pipeline). Pro
 - per layer = 366,592; × 24 layers = **8,798,208**. ✓
 - In bf16 that's 8.8M × 2 B ≈ **17.6 MB**, the "17 MB" on resume 5.
 
+> [!tip] Explained from scratch: [[#6. Deep dive: LoRA from scratch, down to 8,798,208|§6 LoRA]]
+
+
 ### A2. BF16 and forgetting (block 6, first 15 min)
 
 - **BF16** keeps FP32's 8 exponent bits (same range) and has only 7 mantissa bits. FP16 has 5 exponent bits, so it needs loss scaling to avoid underflow. BF16 doesn't. Your training uses `torch.autocast(..., dtype=torch.bfloat16)` (`phase4b_train_lora.py:235`).
 - **Catastrophic forgetting:** fine-tuning on new data degrades old skills. LoRA limits it, because the base weights never change and the adapter is small. **How you tested it:** look at `generate_crosslingual_parallel.sh` and `compile_results.py`, and write down which languages and conditions were scored with the adapter on. If no base-language (English or Chinese) score with the adapter exists, say "no forgetting on the languages I tested".
+
+> [!tip] Explained from scratch: [[#7. Deep dive: the TTS training loss, from scratch|§7 the training step (bf16 in 7.6)]]
+
 
 ### A3. Evaluating TTS with ASR (block 6, last 15 min)
 
@@ -87,6 +115,8 @@ Builds on [[Day 07 - Seminar and speech basics]] (the CosyVoice 2 pipeline). Pro
 - **It can exceed 1**, because insertions are unbounded. A zero-shot model reading Hindi it doesn't know can babble long, wrong speech, which the ASR transcribes as many extra words. So **1.99 means "mostly garbage, much longer than the reference"**, not a bug.
 - Your ASR judge is **AI4Bharat IndicConformer** (`phase5_eval_wer.py:40`), with Hindi text normalisation (`:30`) and `jiwer` (`:111`). The reported WER is the **mean of per-clip WERs** (`:169`), not a corpus WER, so a few babbling clips can pull the mean above 1.
 - The ASR has its own error rate on *real* Hindi speech. That floor bounds how low TTS WER can go.
+
+> [!tip] Explained from scratch: [[#8. Deep dive: WER from scratch, and why 1.99 is possible|§8 WER]]
 
 ## B. Code
 
