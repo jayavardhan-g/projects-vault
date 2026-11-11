@@ -111,6 +111,10 @@ flowchart TB
 
 ### The flow, step by step
 
+**Who owns which part of C, at real size** (animated; blocks are sized by their real dimensions, no values):
+
+![[d05s-grid.svg]]
+
 > [!tip] Concept from scratch: [[#6. Deep dive: the GPU execution model from scratch|the GPU execution model and occupancy from scratch (§6)]]
 
 Follow **one thread** of the final kernel, `mm_block2d<64, 4>`, at N = 32768. TILE = 64 and R = 4, so each block
@@ -132,6 +136,12 @@ transaction) or 32 scattered ones (**uncoalesced**: up to 32 transactions).
 ---
 
 ### 1. Naive vs coalesced: the same maths, a transposed mapping
+
+**One thread's walk, then one warp's 32 addresses** (animated; blocks are sized by their real dimensions, no values):
+
+![[d05s-naive.svg]]
+
+![[d05s-warp.svg]]
 
 > [!tip] Concept from scratch: [[#7. Deep dive: memory coalescing from scratch|memory coalescing from scratch (§7)]]
 
@@ -195,6 +205,12 @@ __global__ void mm_coalesced(const float* A, const float* B, float* C, int N)
 
 ### 2. Shared-memory tiling: load once, use TILE times
 
+**Tiles marching along K, then the reuse inside one tile** (animated; blocks are sized by their real dimensions, no values):
+
+![[d05s-march.svg]]
+
+![[d05s-reuse.svg]]
+
 > [!tip] Concept from scratch: [[#8. Deep dive: tiling and register blocking from scratch|tiling and reuse from scratch (§8)]]
 
 ```mermaid
@@ -247,6 +263,10 @@ for (int k = 0; k < TILE; ++k) ...`: asks the compiler to copy the loop body onc
 ---
 
 ### 3. More outputs per thread: strided vs contiguous
+
+**The two loaders, one warp instruction at a time** (animated; blocks are sized by their real dimensions, no values):
+
+![[d05s-loaders.svg]]
 
 > [!tip] Concept from scratch: [[#7. Deep dive: memory coalescing from scratch|strided vs contiguous loaders, counted (§7.5)]]
 
@@ -307,6 +327,10 @@ int c = tx * F + u;
 ---
 
 ### 4. 2D register blocking: the final kernel
+
+**One k step of mm_block2d in registers** (animated; blocks are sized by their real dimensions, no values):
+
+![[d05s-regblock.svg]]
 
 > [!tip] Concept from scratch: [[#8. Deep dive: tiling and register blocking from scratch|register blocking from scratch (§8.6)]]
 
@@ -918,6 +942,10 @@ $$132 \times 128 \times 2 \times 1.98\ \text{GHz} = 66.9\ \text{TFLOP/s}$$
 - tiled: TILE / 4 → T = 32: **8**; T = 64: **16**.
 
 #### 9.4 Placing each kernel
+
+**Intensity as shapes, and the dots on the roofline** (animated; blocks are sized by their real dimensions, no values):
+
+![[d05s-intensity.svg]]
 
 ![[d5-10-roofline.svg]]
 
