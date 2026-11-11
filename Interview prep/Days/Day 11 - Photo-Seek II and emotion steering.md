@@ -55,6 +55,25 @@ prep pack [[Emotion steering - prep]]).
 ### A1. Faces (block 1, 45 min)
 
 **Read:** Deng et al., *ArcFace* (2019), §1 and §3.1 (the additive angular margin, Figure 2). About 25 min. Skim the SCRFD abstract (Guo et al., 2021).
+
+> [!abstract] What it says: the ArcFace paper (Deng et al., 2019)
+> **Key idea:** make same-person face vectors point in nearly the same direction, with a clear angular gap between people.
+> **How:** normalise both the feature and each identity's weight vector, so the logit is just $s\cos\theta$ (θ = angle to that identity).
+> Then add a margin $m$ to the angle of the *correct* identity only: its logit becomes $s\cos(\theta_y + m)$. The model must beat the others by m.
+> **Figure 2, in words:** feature and weights are normalised → cosines → arccos gives angles → add m to the target angle → cos again → scale by s → softmax cross-entropy.
+> **Why "additive angular":** the margin is a fixed arc length on the unit sphere. The paper contrasts it with SphereFace (multiply the angle) and CosFace (subtract from the cosine).
+> **Settings people quote:** $s = 64$ and $m = 0.5$ (about 28.6°).
+> **In this project:** you only use the trained network. Its 512-d unit vectors are why cosine distance and a fixed threshold (0.75) work for clustering.
+
+> [!abstract] What it says: SCRFD abstract (Guo et al., 2021)
+> **Key idea:** an efficient face detector, built by spending training samples and compute where small faces need them.
+> **Sample redistribution:** crop training images over a wider range of scales, so the detector sees many more small faces.
+> **Computation redistribution:** search how to split a fixed FLOP budget across backbone, neck and head.
+> **Claim:** on the WIDER FACE *hard* set it beats the previous best detector (TinaFace) while running several times faster.
+> **In this project:** SCRFD is the first stage: boxes plus 5 landmarks, which drive the alignment to 112×112 before ArcFace.
+
+**Concepts:**
+
 - **Pipeline:** SCRFD detects faces and 5 landmarks → align to 112×112 → ArcFace gives a 512-d unit vector. Same person → high cosine.
 - **ArcFace loss:** softmax over identities with an additive margin m on the angle: `cos(θ_y + m)`. This forces tight clusters per identity.
 - **Clustering:**
@@ -63,13 +82,32 @@ prep pack [[Emotion steering - prep]]).
   - **k-means** needs k (unknown here).
 - **BCubed F1:** per face, precision = the share of its cluster with the same true identity; recall = the share of its identity in its cluster. Average over faces. It suits clustering because it doesn't need to match cluster IDs to identities.
 
+> [!tip] Explained from scratch: [[#7. Deep dive: face embeddings and ArcFace from scratch|§7 face embeddings and ArcFace]], [[#8. Deep dive: clustering faces and scoring it with BCubed from scratch|§8 clustering and BCubed]]
+
+
 ### A2. Active learning (block 4, 25 min)
 
 **Read:** Settles, *Active Learning Literature Survey*, §3.1 (uncertainty sampling, margin). 15 min.
+
+> [!abstract] What it says: Settles, Active Learning Literature Survey, §3.1
+> **Key idea:** a model learns faster if *it* chooses which examples a human labels. Uncertainty sampling picks the ones it is least sure about.
+> **Three ways to measure "unsure":**
+> - **least confident:** the top class has the lowest probability;
+> - **margin:** the top two classes are closest, $P(y_1\mid x) - P(y_2\mid x)$ smallest;
+> - **entropy:** the whole probability spread is most uniform.
+> **Main figure, in words:** heatmaps over a three-class probability triangle. All three measures avoid the corners (sure) and focus near the middle and the edges between classes.
+> **Known weakness:** it can keep picking outliers, which are uncertain but rare and not very useful.
+> **In this project:** your "uncertainty" is distance to the own centroid, and your "margin" is $d_2 - d_1$ between the two nearest identities. Margin won (41% error cut).
+
+**Concepts:**
+
 - **Uncertainty:** ask about the faces farthest from their own centroid.
 - **Margin:** ask about the faces where the nearest two identities are almost tied (`d2 − d1` smallest). Margin won: error cut **41%**, vs 32% for uncertainty and 7% for random.
 - **Corrections as constraints:** a confirm *pins* a face to an identity; a reject becomes a *cannot-link*.
 - **Metric learning** (the adapter head): a SupCon-style loss on pinned faces, initialised at W ≈ I. It added nothing. Propagation to unreviewed faces was **≤ +0.09 points**.
+
+> [!tip] Explained from scratch: [[#9. Deep dive: active learning with corrections from scratch|§9 active learning with corrections]]
+
 
 ### A3. Activation steering (block 7, 40 min)
 
@@ -77,12 +115,31 @@ prep pack [[Emotion steering - prep]]).
 - Turner et al., *"Activation Addition"* (2023), §1–3. About 20 min.
 - Rimsky et al., *"Steering Llama 2 via Contrastive Activation Addition"* (2024), §2. About 15 min.
 
+> [!abstract] What it says: Activation Addition (Turner et al., 2023)
+> **Key idea:** steer a language model at inference time, with no training, by adding a vector to its residual stream.
+> **How the vector is made:** run two contrasting prompts (for example "Love" and "Hate"), take the difference of their activations at one layer.
+> **How it is used:** add that difference, times a coefficient, to the activations of a new prompt at the same layer, at the first positions.
+> **Main example:** GPT-2-XL; the output's topic or sentiment shifts toward the positive prompt.
+> **Claims:** it changes the target property while mostly keeping performance on unrelated text; no gradients or fine-tuning are needed.
+> **In this project:** you use averages over 15 sentences per pole instead of one prompt pair, and you add at the last position on every step.
+
+> [!abstract] What it says: Contrastive Activation Addition (Rimsky et al., 2024), §2
+> **Key idea:** make the steering vector more reliable by averaging over many contrastive pairs instead of one.
+> **Data:** multiple-choice questions where answer A shows a behaviour and B does not (for example sycophancy or refusal).
+> **Vector:** the mean residual-stream difference at the answer-letter position, positive minus negative examples, at one layer.
+> **Use:** add it, scaled by a positive or negative coefficient, at all token positions after the prompt.
+> **Model and findings:** Llama 2 Chat (7B and 13B); middle layers steer best, and it still works on top of fine-tuning or few-shot prompting.
+> **In this project:** your difference of means over 15 sentences per pole is the same recipe; your best layer (9) is also a middle layer.
+
+
 **Concepts:**
 - The **residual stream** carries a vector per token through the layers. Directions in it can encode concepts.
 - **Difference of means:** run contrastive sentences (15 per pole), take the last token's hidden state, `v = mean(pos) − mean(neg)`, normalise. Your 4 Plutchik axes give 4 vectors per layer.
 - **Inject:** a forward hook adds `α·v` to one layer's output at the **last position, every step**.
 - **Middle layers work best** (layer 9 here): early layers hold token identity, late layers are committed to output.
 - **Over-steering** breaks fluency before it shifts the mood. Hence the guard: perplexity of the steered text under the unsteered model, as a ratio to a same-seed baseline. Accept if ≤ 1.75×; otherwise retry at 75%, 50%, 25%, then fall back.
+
+> [!tip] Explained from scratch: [[#10. Deep dive: activation steering from scratch|§10 activation steering]]
 
 ## B. Code
 

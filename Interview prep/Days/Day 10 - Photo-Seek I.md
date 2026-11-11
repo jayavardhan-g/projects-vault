@@ -52,25 +52,83 @@ Faces (part 1) are tomorrow ([[Day 11 - Photo-Seek II and emotion steering]]).
 ### A1. CLIP (block 2, 50 min)
 
 **Read:** Radford et al., *CLIP* (2021), §2.1–2.3 and Figure 1. About 35 min. **Optional:** OpenAI's CLIP blog post.
+
+> [!abstract] What it says: the CLIP paper (Radford et al., 2021)
+> **Key idea:** learn images from plain captions, not fixed labels. Text on the web is free supervision.
+> **Data (§2.2):** a new set of about 400 million (image, text) pairs collected from the internet.
+> **Method (§2.3):** predicting the exact caption word by word learned slowly. Predicting a bag of words was about 3× faster. Just asking "which caption goes with which image" (contrastive) was about 4× faster again.
+> **Figure 1, in words:** (1) an image encoder and a text encoder fill an N×N grid of similarities; the diagonal pairs are the true matches. (2) Class names become captions like "a photo of a dog". (3) A new image is labelled by its most similar caption.
+> **Loss:** cross-entropy over each row (image → texts) plus each column (text → images), with a learned temperature.
+> **Numbers people quote:** zero-shot ImageNet accuracy matches the original ResNet-50, without using its 1.28M labelled images.
+> **In this project:** you use the same idea in reverse: one text query against all image vectors. The open_clip checkpoint `laion2b_s34b_b79k` is CLIP retrained on the public LAION-2B data.
+
+> [!abstract] What it says: OpenAI's CLIP blog post (optional)
+> **Key idea:** the same model as the paper, told for a general reader, with an interactive set of examples.
+> **Main claims:** zero-shot CLIP is more robust than ImageNet-trained models when the image style shifts (sketches, renditions, adversarial photos).
+> **Limits it admits:** weak at abstract or systematic tasks such as counting objects, and at very fine-grained classes.
+> It also notes that results depend on how the text prompt is worded ("prompt engineering").
+> **In this project:** your queries are free text, so wording matters too; "a photo of …" style phrasing can help.
+
+**Concepts:**
+
 - Two encoders (image ViT, text transformer). For a batch of N pairs, the N×N cosine-similarity matrix is trained with a **symmetric cross-entropy**: each image should pick its own caption and vice versa. That InfoNCE loss pulls matching pairs together in one shared space.
 - **Zero-shot retrieval:** embed the query text, take cosine similarity against all image embeddings, rank.
 - Your model: **open_clip ViT-B-32, `laion2b_s34b_b79k`**, 512-d. You didn't train it; R@1 39.4 on COCO-5k is off-the-shelf CLIP and should sit near open_clip's published number.
 
+> [!tip] Explained from scratch: [[#4. Deep dive: CLIP and cosine similarity from scratch|§4 CLIP and cosine similarity]]
+
+
 ### A2. FAISS (block 4, 40 min)
 
 **Read:** the FAISS wiki page *"Guidelines to choose an index"* (github.com/facebookresearch/faiss/wiki). About 20 min. Optional: the Pinecone *"Faiss: The Missing Manual"* chapters on IVF and HNSW.
+
+> [!abstract] What it says: FAISS wiki, "Guidelines to choose an index"
+> **Key idea:** pick the index by answering a few questions in order: how many searches, exact or approximate, how much memory, how many vectors.
+> **Exact results needed →** a Flat index. It is the only kind that guarantees the true nearest neighbours.
+> **Memory no concern →** HNSW (a graph; fast, high recall, but uses the most memory).
+> **Memory tight →** compress with PQ codes, trading accuracy for size.
+> **Many vectors →** IVF: cluster into K lists and search only a few; the page suggests K between about $4\sqrt{N}$ and $16\sqrt{N}$.
+> **IVF needs training** on sample vectors (k-means); Flat needs none.
+> **Custom IDs:** wrap an index in `IndexIDMap` (or `IndexIDMap2`) to add vectors with your own IDs.
+> **In this project:** one person's library is thousands of vectors, so exact Flat search is already milliseconds. Exactness also makes the eval numbers clean.
+
+> [!abstract] What it says: Pinecone, "Faiss: The Missing Manual" (optional, IVF and HNSW chapters)
+> **IVF chapter:** the space is cut into Voronoi cells around k-means centroids. A query searches its nearest `nprobe` cells.
+> Raising `nprobe` raises recall and cost; a true neighbour just across a cell edge is the classic miss.
+> **HNSW chapter:** a stack of graphs, sparse on top and dense at the bottom. Search greedily walks down the layers.
+> Its knobs are `M` (links per node), `efConstruction` (build effort) and `efSearch` (search effort). More of each means better recall, more memory or time.
+> **In this project:** neither is needed at this size; they are the answer to "what changes at 100 million photos?".
+
+**Concepts:**
+
 - **Flat (exact):** brute-force inner product. O(N·d) per query. At 5k–100k vectors it takes milliseconds.
 - **IVF:** k-means into lists; probe `nprobe` lists. Approximate; needs training.
 - **HNSW:** a layered proximity graph. Fast and high recall; more memory.
 - **PQ:** compress vectors into codes. Saves memory, loses accuracy.
 - **Your choice:** `IndexIDMap2(IndexFlatIP)`, inner product on unit vectors = cosine. Exact, needs no training, supports deletes by ID, and is fast enough for one person's library. **Prefiltering:** `IDSelectorBatch(candidates)` makes FAISS score only the IDs the SQL filters allow.
 
+> [!tip] Explained from scratch: [[#5. Deep dive: FAISS indexes and pre-filtering from scratch|§5 FAISS and pre-filtering]]
+
+
 ### A3. Structured output (block 6, 25 min)
 
 **Read:** the Ollama docs on **structured outputs** (`format` = a JSON schema). 10 min.
+
+> [!abstract] What it says: Ollama docs, structured outputs
+> **Key idea:** pass `format` either as `"json"` or as a full JSON schema, and the reply is forced into that shape.
+> **How it is forced:** during decoding, tokens that would break the schema are not allowed. So the output always parses.
+> **Typical use:** build the schema from a Pydantic model (`Model.model_json_schema()`), then validate the reply with the same model.
+> **Tips it gives:** also describe the expected JSON in the prompt, and use temperature 0 for steadier answers.
+> **What it does not do:** it guarantees the *shape*, not the *truth*. A field can be valid JSON and still wrong.
+> **In this project:** the schema keeps the parser from crashing; the wrong-date failures (story 4.5) are why the rules still own dates.
+
+**Concepts:**
+
 - The schema constrains decoding, so the model can only emit valid JSON of that shape. Values can still be wrong (story 4.5: dates).
 - Ollama is a local server (`127.0.0.1:11534` here) running `qwen2.5:7b` (4.4 GB quantised). Temperature 0, 200 tokens max.
 - **Why hybrid:** the LLM is better at people (97 vs 83) and places (95 vs 85); the rules are better at dates (87 vs 82). So the rules' dates win whenever the rules match a date phrase.
+
+> [!tip] Explained from scratch: [[#6. Deep dive: turning a sentence into filters from scratch|§6 sentence → filters]]
 
 ## B. Code
 

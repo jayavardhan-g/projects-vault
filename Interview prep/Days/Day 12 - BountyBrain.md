@@ -55,6 +55,30 @@ Also: "cited explanations" means **54.5%** of sentences carry a citation and **3
 - Cormack et al., *"Reciprocal Rank Fusion outperforms Condorcet…"* (2009): the 2-page paper. 10 min.
 - The Sentence-Transformers docs page *"Retrieve & Re-Rank"* (bi-encoder vs cross-encoder). 15 min.
 
+> [!abstract] What it says: MITRE's CWE and CAPEC "About" pages
+> **CWE (Common Weakness Enumeration):** a community list of *types* of software and hardware weakness, such as "missing authorization".
+> Entries form a hierarchy, from broad pillars and classes down to bases and narrow variants, so one weakness can have parents and children.
+> **CAPEC (Common Attack Pattern Enumeration and Classification):** a list of *how attackers exploit* weaknesses. Each pattern links to the CWEs it uses.
+> **CVE:** one concrete vulnerability in one product; databases such as NVD tag CVEs with the CWE they belong to.
+> **The chain to remember:** CVE (an instance) → CWE (its weakness class) → CAPEC (attacks on that class).
+> **In this project:** these links are the graph tables in SQLite; the 1–3 hop queries walk exactly this chain.
+
+> [!abstract] What it says: Reciprocal Rank Fusion (Cormack, Clarke and Büttcher, SIGIR 2009)
+> **Key idea:** to merge several ranked lists, score each document by $\sum_{\text{lists}} \frac{1}{k + \text{rank}}$ and sort.
+> **Why ranks:** raw scores from different systems are on different scales; ranks need no calibration and no training.
+> **The constant:** $k = 60$, fixed from a small pilot study. It stops one first place from outweighing many good ranks.
+> **Claim:** this simple rule beat the Condorcet method, CombMNZ and the best single systems on TREC test collections and a learning-to-rank benchmark.
+> **In this project:** BM25 and the dense retriever each give a ranked list; RRF with k = 60 merges them before the reranker.
+
+> [!abstract] What it says: Sentence-Transformers, "Retrieve & Re-Rank"
+> **Key idea:** a two-stage search. A fast retriever finds candidates, then a slow, accurate model reorders them.
+> **Bi-encoder (stage 1):** query and passage are embedded *separately*. Passage vectors are computed once and indexed, so search over millions is fast.
+> **Cross-encoder (stage 2):** reads query and passage *together* in one forward pass and outputs a relevance score. More accurate, but nothing can be precomputed.
+> **So:** run the cross-encoder only on the top candidates from stage 1; the page also shows BM25 as a stage-1 option.
+> **The trade-off in one line:** recall is set by stage 1, precision at the top by stage 2.
+> **In this project:** BM25 + bge-small dense (fused by RRF) are stage 1, and the cross-encoder reranks the top 40.
+
+
 **Concepts:**
 - **BM25:** a lexical score from term frequency (saturated by k1), inverse document frequency and length normalisation (b). It's good at exact identifiers ("CWE-639", "SSRF").
 - **Dense:** a bi-encoder embeds the query and the passages separately (bge-small-en-v1.5; the query gets an instruction prefix, passages don't). It's good at paraphrase.
@@ -62,11 +86,18 @@ Also: "cited explanations" means **54.5%** of sentences carry a citation and **3
 - **Cross-encoder rerank:** reads (query, passage) together. More accurate, but O(candidates) model calls, so only the top 40 fused candidates are reranked.
 - **Why SQLite and not Neo4j** (decision 3.2): typed relational tables, simple joins, one file, no server. The graph queries you need are 1–3 hops.
 
+> [!tip] Explained from scratch: [[#5. Deep dive: BM25 from scratch|§5 BM25]], [[#6. Deep dive: dense retrieval from scratch|§6 dense retrieval]], [[#7. Deep dive: fusion (RRF) and cross-encoder reranking from scratch|§7 RRF and reranking]]
+
+
 ### A2. Evaluation (block 5, 30 min)
+
+**Concepts:**
 
 - **R@k:** the gold chunk is in the top k. **MRR:** the mean of 1/rank of the first relevant hit. **nDCG@k:** a graded, position-discounted gain over the ideal (story 4.3: your first nDCG was 1.113, which is impossible).
 - **Your retrieval eval:** 200 LLM-generated known-item queries. hybrid+rerank **R@5 0.965, MRR 0.861**; dense 0.885/0.759; BM25 0.850/0.735; hybrid 0.910/0.773. Caveat: the source chunk *stays* in the index, and queries can reuse its words.
 - **Faithfulness:** split the answer into sentences; for each cited sentence an LLM judge checks support; reweight by hand labels. **Cohen's κ** measures judge–label agreement beyond chance. Caveats: the judge is the same model as the generator, and the "blind hand labels" were made by Claude.
+
+> [!tip] Explained from scratch: [[#8. Deep dive: retrieval metrics from scratch (R@k, MRR, nDCG)|§8 retrieval metrics]], [[#9. Deep dive: measuring faithfulness, and Cohen's κ, from scratch|§9 faithfulness and κ]]
 
 ## B. Code
 
