@@ -50,24 +50,79 @@ reducing peak activation memory **13.3%** through gradient checkpointing."
 **Read:** NVIDIA blog *"How to Overlap Data Transfers in CUDA C/C++"* (Mark Harris), and the "Streams" part of the
 CUDA Programming Guide (§6.2.8 "Asynchronous Concurrent Execution").
 
+> [!abstract] What it says: Mark Harris, *How to Overlap Data Transfers in CUDA C/C++* (NVIDIA blog)
+> **Key idea:** copies and kernels can run at the same time only if they sit in **different non-default streams** and the host memory is **pinned** (page-locked).
+> **Main figure:** timelines of copy-in, kernel and copy-out. Run one after another they form a long chain; split into chunks across streams they overlap like a pipeline.
+> **Claims to know:** the legacy default stream waits for all other work, so using it breaks the overlap.
+> `cudaMemcpyAsync` from pageable memory is not truly asynchronous. How much overlaps depends on the GPU's **copy engines** (one for one direction at a time, or two for both).
+> The order in which you issue the calls mattered on older GPUs with a single hardware queue.
+> **In your project:** your streams overlapped kernels, not copies. The blog's condition still applies: overlap only helps when something is idle.
+
+> [!abstract] What it says: CUDA Programming Guide, *Asynchronous Concurrent Execution*
+> **Key idea:** the guide lists what can run concurrently: host code with device work, copies with kernels, and kernels with kernels (on capable GPUs).
+> Within one stream, work runs in order; across streams, order is only what events and syncs impose.
+> **Claims to know:** concurrent kernels need **free resources**. A kernel that already fills every SM leaves nothing for a second stream.
+> Some calls (for example a device-wide sync or work on the legacy default stream) synchronise implicitly and kill overlap.
+> **In your project:** that is why the batch split didn't help and the column split's 1.73× is more likely L2 locality.
+
+**Concepts:**
+
 - A **stream** is an ordered queue of work. Kernels in different streams *may* run concurrently, but only if the GPU has spare SMs.
 - **When streams help:** small kernels that leave SMs idle, or overlapping copies with compute.
 - **When they don't:** a single kernel already fills all 132 SMs. Then extra streams add launches and host syncs.
 - **Your case** (story S6): with batch 32, a **batch split** gives each stream 8 rows, but each stream still reads all of W1 and W2 (N² floats vs 32·N for X). So it multiplies weight traffic and launches. A **column split** gives each stream a quarter of W. At N = 32768 the baseline already launches about 4 waves of blocks, so the 1.73× is most likely **locality** (each stream's W slice stays in L2), not concurrency. Prep pack exercise 2 has the one experiment that would settle it.
 
+> [!tip] Explained from scratch: [[#5. Deep dive: CUDA streams from scratch|§5 CUDA streams]]
+
 ### A2. Gradient checkpointing (block 3, 25 min)
 
 **Read:** Chen et al., *"Training Deep Nets with Sublinear Memory Cost"* (2016), §1–3. Or the PyTorch docs for `torch.utils.checkpoint` (10 min).
+
+> [!abstract] What it says: Chen, Xu, Zhang and Guestrin (2016), *Training Deep Nets with Sublinear Memory Cost*
+> **Key idea:** store activations only at a few **checkpoints**, and recompute the rest during backward.
+> With $n$ layers split into $\sqrt{n}$ segments, activation memory falls from $O(n)$ to $O(\sqrt{n})$, for about one extra forward pass.
+> **Main figure:** a computation graph where some nodes are kept and others are dropped and rebuilt, with memory shared between the rebuilt pieces.
+> **Claims to know:** the abstract's example is a 1,000-layer residual network whose training memory falls from **48 GB to 7 GB**, for about **30% more time**.
+> Applying the idea recursively reaches $O(\log n)$ memory, at a higher compute cost.
+> **In your project:** your +26.1% backward time matches the "about one extra forward" cost; your arena reuse is the paper's memory-sharing idea.
+
+> [!abstract] What it says: PyTorch docs, `torch.utils.checkpoint`
+> **Key idea:** wrap a function; its inner activations are not saved, and it is re-run during backward.
+> **Claims to know:** the RNG state is saved by default, so dropout gives the same mask when recomputed.
+> There is a reentrant and a non-reentrant version; current docs recommend passing `use_reentrant=False`.
+> Recomputed work costs one extra forward per checkpointed segment, the same trade as your C++ version.
+
+**Concepts:**
 
 - Backward needs every layer's activations. **Checkpointing** keeps only a few (the checkpoints), and recomputes the rest from the nearest checkpoint during backward.
 - Cost: one extra forward pass over each segment. Your measurement: **+35.5 ms on a 136 ms backward (+26.1%)**. That equals the recomputed forward FLOPs (prep pack §5).
 - **Your checkpoints are A2 and Z4** (assignment-prescribed). Z4 is the output MSE needs, and A2 splits the network into two 2-layer segments.
 - **The key trick** (story S3): backward runs layer 4 → 1. So segment B (Z3, A3) is fully consumed before segment A (Z1, A1, Z2) is rebuilt. One arena of `max(2·n3, 2·n1+n2)` floats serves both. Separate buffers per recomputed tensor save **nothing**, which was the first version's 0 MB result.
 
+> [!tip] Explained from scratch: [[#6. Deep dive: gradient checkpointing from scratch|§6 gradient checkpointing]]
+
 ### A3. FlashAttention (block 5, 60 min)
 
 **Read:** Dao et al., *FlashAttention* (2022), §1–3.1 (Algorithm 1). Optional: the FlashAttention-2 paper's §3.1 (the work-partitioning change).
 **Video:** Umar Jamil, *"Flash Attention derived and coded from first principles"* (YouTube). Watch the online-softmax part.
+
+> [!abstract] What it says: Dao et al. (2022), *FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness*
+> **Key idea:** attention is slow because of **memory traffic**, not FLOPs. So compute it in tiles that stay in on-chip SRAM, and never write the $N \times N$ score matrix to HBM.
+> It uses **online softmax** to combine tiles exactly, and **recomputes** the scores in backward instead of storing them.
+> **Main figure:** left, the memory pyramid (fast, small SRAM; slower, larger HBM; much slower CPU DRAM); centre, the tiling loops over K/V blocks and Q blocks; right, a time bar where the fused kernel beats PyTorch attention on GPT-2 by several times.
+> **Claims to know:** memory is **linear** in sequence length, not quadratic; the result is **exact**, not an approximation.
+> They report about **3×** faster GPT-2 training (1K tokens) and about **15%** faster BERT-large than the MLPerf 1.1 record.
+> **In your project:** your kernel does the same thing; its win is memory (no 34.4 GB score matrix), even though it is 1.5× slower than PyTorch at 8K.
+
+> [!abstract] What it says: FlashAttention-2 (Dao, 2023), §3.1
+> **Key idea:** keep the same algorithm, but split the work better across thread blocks and warps, and cut non-matmul FLOPs.
+> It parallelises over the **sequence** as well as batch and heads, and splits **Q** (not K) across the warps of a block, which avoids sharing partial results through shared memory.
+> **Claims to know:** about **2×** faster than FlashAttention-1, reaching roughly **50–73%** of the A100's peak matmul throughput.
+> **In your project:** this is the "what would you do next" answer for your kernel's speed gap.
+
+> [!abstract] What it says: Umar Jamil's video
+> A from-first-principles derivation of online softmax and the FlashAttention loops, then code.
+> I haven't checked its exact content; use it for the derivation, and the paper for every number.
 
 **Online softmax, derive on paper.** Keep for each query row a running max `m`, a running sum `l`, and an output accumulator `o`.
 For a new tile of scores `s`:
@@ -81,6 +136,14 @@ This equals the exact softmax, because every term was rescaled to the same final
 **Why it matters:** standard attention writes the N×N score matrix to HBM. At N = 8192, B = 8, 16 heads, that is
 8·16·8192²·4 B = **34.4 GB**. That's why your PyTorch baseline is batch-chunked. FlashAttention keeps scores in shared memory and never writes them out.
 Its value is **memory, not raw speed**: your kernel is 1.5× slower than PyTorch's explicit path at 8K (prep pack §8).
+
+**Concepts:**
+- **IO-aware.** At long sequence lengths attention is limited by HBM traffic; keep tiles in shared memory and never write the score matrix.
+- **Online softmax.** A running max, sum and output, rescaled tile by tile, give exactly the full softmax.
+- **Recompute in backward.** Storing scores is $O(N^2)$; recomputing them from Q, K, V is cheaper than reading them back.
+- **Memory, not speed, in your kernel.** No 34.4 GB score matrix at N = 8192, but 1.5× slower than PyTorch's explicit path.
+
+> [!tip] Explained from scratch: [[#7. Deep dive: online softmax and FlashAttention from scratch|§7 online softmax and FlashAttention]], [[#8. Deep dive: shared-memory bank conflicts from scratch|§8 bank conflicts in your kernel]]
 
 ## B. Code
 

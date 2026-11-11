@@ -47,6 +47,33 @@ Part of [[Interview plan (Nov 2026)]]. Repo `speculative_decoding` (branch `main
 - Jay Mody's blog post *"Speculative Sampling"* (jaykmody.com): a short NumPy implementation, perfect before block 4;
 - a 20-minute explainer video: search YouTube for *"Speculative Decoding: When Two LLMs are Faster than One"* (Efficient NLP channel).
 
+> [!abstract] What it says: Leviathan, Kalman and Matias (ICML 2023), *Fast Inference from Transformers via Speculative Decoding*
+> **Key idea:** a small, fast model guesses several tokens; the big model checks all of them in one parallel pass.
+> A special accept/reject rule (*speculative sampling*) makes the output distribution **exactly** the big model's. Nothing is approximated.
+> **Main figure:** a sentence being generated. Each line is one big-model call. Green tokens are accepted guesses, red ones rejected, blue ones the big model's corrections.
+> **Claims to know:** the expected tokens per call is $(1 - \alpha^{\gamma+1})/(1 - \alpha)$, where $\alpha$ is the acceptance rate.
+> The wall-time gain is that number divided by $\gamma c + 1$, with $c$ the draft-to-target cost ratio. These are your A2 formulas.
+> They report about **2×–3×** faster T5-XXL (11B) decoding, with identical outputs and no retraining.
+> Appendix A proves the output follows $p$, the same proof as A2.
+> **In your project:** `verify_and_correct` is this rule; your 0.88× → 2.25× story is the $c$ term.
+
+> [!abstract] What it says: Chen et al. (DeepMind, 2023), *Accelerating Large Language Model Decoding with Speculative Sampling*
+> **Key idea:** the same method, found independently. Draft $K$ tokens, score them in one target pass, then use **modified rejection sampling**.
+> **Algorithm 2** is the step to read. Accept a token with probability $\min(1, p/q)$. On a rejection, resample from the normalised $\max(0, p - q)$.
+> **Claims to know:** Chinchilla 70B with a 4B draft decodes about **2–2.5×** faster in their distributed setup, with no change to the samples' distribution.
+> They stress that the draft must be cheap **relative to** the target. Draft latency, not quality alone, sets the gain.
+> **In your project:** your `residual` code is Algorithm 2's resampling line.
+
+> [!abstract] What it says: Jay Mody, *Speculative Sampling* (blog)
+> **Key idea:** the whole method in a few dozen lines of NumPy.
+> It puts plain autoregressive sampling next to speculative sampling, so you can see exactly what changes.
+> It is useful as a model for your block 4 rebuild: the draft loop, one target call, then the accept/resample loop.
+> I haven't checked its exact model choices or timings, so don't quote numbers from it. Use the papers for numbers.
+
+> [!abstract] What it says: the Efficient NLP video
+> A visual recap of the same algorithm: draft, verify in parallel, accept or resample.
+> I haven't checked its exact content; use it only for intuition, and the papers for every number or claim.
+
 One iteration, with draft distribution `q` and target distribution `p`:
 1. The draft model generates γ tokens autoregressively: `x₁ … x_γ`, each from `q(·|prefix)`.
 2. The target model scores **all γ+1 positions in one forward pass**, giving `p₁ … p_{γ+1}`.
@@ -55,6 +82,14 @@ One iteration, with draft distribution `q` and target distribution `p`:
 4. If all γ are accepted, sample one **bonus** token from `p_{γ+1}`.
 
 So each iteration yields between 1 and γ+1 tokens, for one target forward pass.
+
+**Concepts:**
+- **Draft and target.** The draft proposes $\gamma$ tokens one by one; the target checks all $\gamma + 1$ positions in **one** forward pass.
+- **Lossless.** Accept with probability $\min(1, p/q)$; on rejection, resample from the leftover $\max(0, p - q)$. The output follows $p$ exactly.
+- **Always progress.** Every iteration yields at least 1 token (the correction) and at most $\gamma + 1$ (all accepted plus a bonus).
+- **Acceptance rate.** $\alpha = 1 - \mathrm{TV}(p, q)$: the closer the draft is to the target, the more tokens per iteration.
+
+> [!tip] Explained from scratch: [[#5. Deep dive: speculative sampling from scratch|§5 speculative sampling]], [[#6. Deep dive: the speedup maths from scratch|§6 the speedup maths]]
 
 ### A2. The maths (75 min with A1; do it on paper)
 
@@ -83,16 +118,28 @@ So each iteration yields between 1 and γ+1 tokens, for one target forward pass.
 - **Best γ:** maximise `E(γ)/(γc + 1)`. A higher α (code) favours a larger γ (8 → 2.60×). A lower α (chat) favours a
   small γ; at γ = 16, chat runs at 0.82×.
 
+> [!tip] Explained from scratch: [[#6. Deep dive: the speedup maths from scratch|§6 the speedup maths]], [[#5. Deep dive: speculative sampling from scratch|§5 the correctness proof]]
+
 ### A3. Why decode was launch-bound (block 6, 30 min)
 
 **Read:** the PyTorch blog *"Accelerating Generative AI with PyTorch II: GPT, Fast"* (gpt-fast). It covers the static KV cache,
 `torch.compile(mode="reduce-overhead")` and speculative decoding, the same three ideas as your fix.
+
+> [!abstract] What it says: PyTorch blog, *Accelerating Generative AI with PyTorch II: GPT, Fast* (gpt-fast, 2023)
+> **Key idea:** plain PyTorch, under 1,000 lines, can decode fast if you remove CPU overhead first.
+> **Main figure:** a GPU trace where the GPU sits idle between tiny kernels, because the CPU can't launch them fast enough.
+> **The steps, in order:** `torch.compile` with `mode="reduce-overhead"` (CUDA graphs), a **static KV cache** so shapes never change, then int8/int4 weight quantisation, speculative decoding and tensor parallelism.
+> **Claims to know:** on Llama-2-7B at batch 1, compile plus the static cache takes decoding from about **25 to about 107 tokens/s**.
+> Quantisation and speculation add more on top. The lesson is that small-batch decode is **overhead-bound** before it is memory-bound.
+> **In your project:** the same three ideas, StaticCache, `reduce-overhead` and a draft model, fixed your 0.88×.
 
 **Concepts:**
 - **Eager mode** launches each small kernel from Python. At batch 1, the GPU finishes each kernel faster than the CPU can launch the next, so time ≈ layers × per-layer launch cost, whatever the model width (0.81 ms per layer for 0.5B *and* 14B).
 - **A StaticCache** gives fixed tensor shapes, so a compiled graph can be reused.
 - **`reduce-overhead`** captures **CUDA graphs**: the whole kernel sequence is replayed with one launch.
 - Because of this, the target moved to 14B, with **48 layers vs the draft's 24**: speculation pays only when `c` is small.
+
+> [!tip] Explained from scratch: [[#7. Deep dive: launch-bound decode and CUDA graphs from scratch|§7 launch-bound decode and CUDA graphs]], [[#6. Deep dive: the speedup maths from scratch|§6 why a small c matters]]
 
 ### A4. Why not Medusa, EAGLE or tree drafting (block 8, 30 min)
 
@@ -101,9 +148,34 @@ Read the abstract and first figure of each:
 - **EAGLE** (Li et al., 2024): a small draft head on the target's features; needs training.
 - **Tree drafting / SpecInfer** (Miao et al., 2024): verify several candidate branches at once with a tree attention mask.
 
+> [!abstract] What it says: Medusa (Cai et al., 2024)
+> **Key idea:** no separate draft model. Extra **decoding heads** on the target's last hidden state each guess one future token (+1, +2, …).
+> Their guesses form a **tree** of candidates, checked in one pass with a tree attention mask.
+> **Claims to know:** the abstract reports over **2.2×** for Medusa-1 (heads trained on a frozen model) and **2.3–3.6×** for Medusa-2 (trained jointly).
+> The cost: the heads must be trained, and the usual acceptance scheme isn't exactly lossless for sampling.
+
+> [!abstract] What it says: EAGLE (Li et al., 2024)
+> **Key idea:** draft at the **feature level**. A one-layer head predicts the target's next hidden feature, then reads off a token from it.
+> It feeds the head the token sampled one step ahead, so the guess knows which branch was taken.
+> **Claims to know:** lossless (uses the speculative-sampling rule); the abstract reports about **2.7–3.5×** lower latency on LLaMA2-Chat 70B.
+> The cost: the draft head must be trained for each target model.
+
+> [!abstract] What it says: SpecInfer (Miao et al., 2024)
+> **Key idea:** use one or more small models to build a **token tree** of guesses, then verify the whole tree in one target pass.
+> A tree attention mask lets every branch see only its own ancestors.
+> **Claims to know:** a tree raises the chance that *some* branch matches, so more tokens are accepted per target call.
+> They report gains for both distributed and CPU-offloading serving. The main cost is engine work: tree masks and branch-aware KV handling.
+
 **Your honest answer:** these need training, or bigger engine changes for tree masks. A separate off-the-shelf draft
 from the same family (shared tokenizer) needs neither, and it isolates the systems question. Tree drafting is the
 listed next step (PROGRESS §7).
+
+**Concepts:**
+- **Trained drafters** (Medusa heads, the EAGLE head) live inside the target and guess better, but need training for each target.
+- **Tree drafting** checks many candidate continuations at once, so more tokens are accepted per target pass.
+- **Your choice:** an off-the-shelf draft from the same family (shared tokenizer) needs no training and no engine changes.
+
+> [!tip] Explained from scratch: [[#5. Deep dive: speculative sampling from scratch|§5 the base algorithm all of these extend]], [[#6. Deep dive: the speedup maths from scratch|§6 why acceptance rate drives the gain]]
 
 ## B. Code
 

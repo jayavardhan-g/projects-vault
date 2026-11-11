@@ -50,12 +50,34 @@ Today covers this bullet. Streams, checkpointing and FlashAttention are tomorrow
 - NVIDIA *CUDA C++ Programming Guide*: §5 "Programming Model" (grids, blocks, threads) and the "Shared Memory" part of §5.3 "Memory Hierarchy" (banks). About 30 min, skimmed.
 - Optional video: the CUDA MODE lecture series (YouTube, "GPU MODE"), lecture 1 or 2 for the execution model.
 
+> [!abstract] What it says: Simon Boehm, *How to Optimize a CUDA Matmul Kernel for cuBLAS-like Performance* (2022)
+> **Key idea:** start from the simplest SGEMM kernel and fix one bottleneck at a time, measuring after each step.
+> **Main figure:** a table of kernels with their speed as a share of cuBLAS: naive → coalescing → shared-memory tiling → 1D blocktiling → 2D blocktiling → vectorised loads → autotuning → warptiling.
+> **Claims to know** (FP32, 4092×4092 on an RTX A6000, roughly): naive is about **1%** of cuBLAS, coalescing about **8%**, shared-memory tiling about **13%**.
+> 1D blocktiling reaches about **37%**, 2D blocktiling about **69%**, and the final warptiled kernel over **90%**.
+> His lesson: after coalescing, the limit moves from global memory to **shared-memory traffic**. More results per thread, held in registers, is what breaks it.
+> **In your project:** your kernels follow kernels 1–5 exactly; your 2D block kernel at 48.2% of cuBLAS on an H200 sits where his kernel 5 sits.
+
+> [!abstract] What it says: NVIDIA *CUDA C++ Programming Guide*, Programming Model and Memory Hierarchy
+> **Key idea:** you write one function for one thread. A launch runs it on a **grid of blocks**, each block a group of threads that can share memory and sync.
+> **Main figures:** a grid of blocks, each block a grid of threads (`blockIdx`, `threadIdx`); and the memory picture.
+> In that picture, each thread has registers, each block has **shared memory**, and all blocks see **global memory**.
+> **Claims to know:** a block holds at most **1,024 threads**; blocks must be independent and may run in any order.
+> Shared memory is split into **32 banks** of 4-byte words; lanes hitting the same bank at different addresses wait in turn.
+> **In your project:** every kernel's index line (`blockIdx.y * blockDim.y + threadIdx.y`) is the guide's model in one line.
+
+> [!abstract] What it says: the GPU MODE lectures (video)
+> A lecture-style tour of the CUDA execution model: grids, blocks, warps, memory and a first kernel.
+> I haven't checked which lecture covers what, so use it for intuition and the guide or Boehm for facts and numbers.
+
 **Concepts:**
 - **SM → block → warp → thread.** An H200 has **132 SMs**. A block runs on one SM and is split into **warps of 32** threads that issue one instruction together. Per SM: at most 2048 threads, 64K registers, up to 228 KB shared memory.
 - **Memory hierarchy, fastest to slowest:** registers → shared memory (per block, on-chip) → L1/L2 → HBM (global). Shared memory is about 100× faster than HBM.
 - **Coalescing.** When the 32 threads of a warp read 32 consecutive floats, the hardware merges them into a few 128-byte transactions. If consecutive threads read addresses N floats apart, each needs its own transaction.
 - **Shared-memory banks.** 32 banks of 4 bytes. Word address `a` is in bank `a mod 32`. Two lanes of a warp hitting the same bank at different addresses serialise (a **bank conflict**). Same address = broadcast, no conflict.
 - **Occupancy** = active warps per SM / the maximum (64). It's limited by registers per thread, shared memory per block and threads per block. More occupancy hides latency, but it isn't the goal in itself: register blocking *lowers* occupancy and still wins.
+
+> [!tip] Explained from scratch: [[#6. Deep dive: the GPU execution model from scratch|§6 the execution model]], [[#7. Deep dive: memory coalescing from scratch|§7 coalescing]], [[#8. Deep dive: tiling and register blocking from scratch|§8 tiling, banks and register blocking]]
 
 ### A2. Maths (block 3, 30 min, on paper)
 
@@ -67,6 +89,8 @@ Today covers this bullet. Streams, checkpointing and FlashAttention are tomorrow
   - naive, no reuse: each FMA loads 2 floats = 8 B for 2 FLOPs → **0.25 FLOP/B**;
   - tiled with tile T: each loaded element is reused T times → about **T/4 FLOP/B** (T = 32 → 8; T = 64 → 16).
 - **Roofline ridge** = peak FLOP/s ÷ HBM bandwidth = 66.9 TFLOP/s ÷ 4.8 TB/s ≈ **14 FLOP/B**. Below it you are memory-bound. So tiling with T ≥ 64 moves the bottleneck from HBM to **shared memory**. Register blocking then attacks the shared-memory bottleneck: each value loaded into a register feeds R FMAs.
+
+> [!tip] Explained from scratch: [[#9. Deep dive: the roofline and the headline numbers from scratch|§9 the roofline and the headline numbers]], [[#8. Deep dive: tiling and register blocking from scratch|§8 why tiles raise intensity]]
 
 ## B. Code
 
