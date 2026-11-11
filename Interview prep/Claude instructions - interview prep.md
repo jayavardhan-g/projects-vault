@@ -48,6 +48,10 @@ microexchange and raftkv. Read that branch. The numbers in the upgraded docs rep
   - Day 12 A2: R@k counts any chunk of the gold **document** (`eval/retrieval.py:170`), not the gold chunk. `lru_cache` also caches a failed reranker load.
   - Day 11: the guard's NaN probably needs an empty continuation, not one "under 2 tokens"; check against the notebook.
   - Day 13: the follower reads about 800 records per 200 µs batch at 4M/s, not about 1,000.
+  - Day 5 §3 mermaid says F = 4; the contiguous loader really runs as `mm_tiled_contiguous<64,32>`, so F = 2.
+  - Day 4 §7.6: the 23.6 ms iteration ("0.33 ms of 23.6 ms") is the 1.5B-draft run, not the 0.5B one.
+  - Day 2 eviction, said precisely: `evict()` frees as many leaf candidates as it needs from one scan before re-scanning, so a parent becomes a candidate only when the current leaves can't cover the request.
+- **11-11: Days 2–5 also have shape animations** (`d02s-`…`d05s-*.svg`, real sizes, no values) under their code headings, like Day 1's `d1s-*`.
 - **11-10: [[Function glossary]]** (`Interview prep/Function glossary.md`) is generated from scripts in the session scratch dir (glossary.py, glossary_ext.py, gen_glossary.py, gloss_figs.py → figures `g-*.svg`). Each day note's code excerpts get a *New functions in this code* box (first use per note) linking to it. Add new functions there, not inline.
 - 11-05: Day 1 started. 11 prep packs (all except CS728, LeNet-5 and welfare) were launched as background agents. DECS CPU-saturation question resolved: the claim holds (see plan).
 - Upgrades: Photo-Seek, BountyBrain, microexchange and raftkv are done. DECS, mini-vLLM, speculative decoding, CUDA
