@@ -41,6 +41,52 @@ Part of [[Interview plan (Nov 2026)]]. Repo `vLLMmini` (branch `main`). About 6.
 - the *Flash-Decoding for long-context inference* blog post (Tri Dao et al., Oct 2023), about 10 min;
 - optional video: Umar Jamil, *"Flash Attention derived and coded from first principles with Triton"*. Watch only the online-softmax derivation (about 30 min of a long video).
 
+> [!abstract] What it says: the Triton tutorials (Vector Addition, Fused Softmax)
+> **Vector addition.** A kernel is one Python function run by many **programs** at once.
+> Each program asks `tl.program_id(0)` which block it owns and builds offsets `pid · BLOCK + tl.arange(0, BLOCK)`.
+> It loads with a mask (`offsets < n`) so the last, partial block reads nothing out of range. The grid has `ceil(n / BLOCK)` programs.
+>
+> **Fused softmax.** One program handles one whole row, kept in fast on-chip memory. It loads the row once, subtracts the max, exponentiates, sums, divides and stores once.
+> Masked lanes load −∞ so they add nothing. `BLOCK_SIZE` is the next power of two above the row length.
+>
+> **Claim to know.** The tutorial counts memory traffic. Plain PyTorch softmax reads and writes the matrix several times (one pass per operation).
+> The fused kernel reads it once and writes it once, so it expects a few times the speed on large rows. Its benchmark plot shows that.
+>
+> **In this project.** The decode kernel uses these exact tools: `program_id`, `tl.arange`, masked `tl.load`, and −∞ for padding lanes.
+
+> [!abstract] What it says: the Flash-Decoding blog (Oct 2023)
+> **Problem.** During decode each request has one query token. FlashAttention parallelises over batch × heads only.
+> With a small batch and a long context, few programs run and most of the GPU sits idle.
+>
+> **Key idea.** Also split the keys and values into chunks. Each chunk's partial attention runs in parallel and keeps its own max and sum (log-sum-exp).
+> A small final step rescales and combines the chunks: the same maths as online softmax, done across programs instead of in one loop.
+>
+> **Main figure.** An animation: K and V cut into chunks, partial results computed side by side, then reduced into one output.
+>
+> **Claim to know.** The post reports up to 8× faster generation for very long sequences (CodeLlama-34B, contexts up to 64k).
+>
+> **In this project.** Your kernel is one program per (sequence, head) looping over all tiles. It has no split along the context, so it is the "before" picture.
+
+> [!abstract] What it says: Umar Jamil's online-softmax derivation (video)
+> **Key idea.** It derives online softmax step by step, starting from the plain formula.
+> 1. Naive softmax can overflow, so subtract the max: three passes (find the max, sum the exponentials, divide).
+> 2. Fuse the first two passes: keep a running max $m$ and a running sum $\ell$. When the max grows, multiply the old sum by $e^{m_{old} - m_{new}}$.
+> 3. Apply the same correction to a running output, and the final pass disappears too. That is the FlashAttention loop.
+>
+> **Main picture.** A row of scores processed block by block, with $m$ and $\ell$ updated after each block.
+>
+> **In this project.** This is the `m`, `l`, `acc` update inside `paged_decode_attention`; it gives exactly the same result as full softmax.
+
+**Concepts:**
+- **Program and grid.** A Triton kernel runs as many programs; `tl.program_id` says which one. Here the grid is `(num_seqs, 32)`: one program per sequence and query head.
+- **Masked loads.** A block always has a power-of-two size. The mask stops it reading past the context, and masked scores become −∞.
+- **Paged reads in place.** Each program reads the block table and loads K and V straight from the scattered cache blocks. Nothing is copied first.
+- **Online softmax.** A running max, sum and output make one pass over the context exact, whatever its length.
+- **Fused vs naive.** The naive path runs many small operations per sequence and per layer; the fused path is one launch per layer. Deep dive §6 shows that most of the 7.49× comes from fewer launches.
+
+> [!tip] Explained from scratch: [[#5. Deep dive: the GPU and Triton execution model from scratch|§5 the GPU and Triton execution model]], [[#6. Deep dive: online softmax and the fused decode kernel from scratch|§6 online softmax and the fused decode kernel]]
+
+
 **Online softmax.** Process the scores in chunks, keeping a running max `m`, denominator `ℓ` and output `acc`:
 
 ```
@@ -69,6 +115,8 @@ again on the CUDA day, in FlashAttention.
 - **Your confounds** (README *Phase 6*, line 224):
   - an arrival-time bug once flattered the baseline, so the 4.4× was corrected to **3.82×**;
   - varied lengths score lower than uniform ones (249).
+
+> [!tip] Explained from scratch: [[#7. Deep dive: benchmarking a server honestly from scratch|§7 benchmarking a server honestly (paired rounds, the arrival bug)]], [[#8. Deep dive: the async server from scratch|§8 the async server]]
 
 ## B. Code
 

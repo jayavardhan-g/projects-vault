@@ -43,6 +43,33 @@ Part of [[Interview plan (Nov 2026)]]. Repo `vLLMmini` (branch `main`). About 7 
 - the Anyscale blog *"How continuous batching enables 23x throughput in LLM inference while reducing p50 latency"* (2023), about 20 min;
 - Orca (Yu et al., OSDI 2022) §3, *iteration-level scheduling*. Only the idea and its main figure, about 15 min.
 
+> [!abstract] What it says: the Anyscale continuous-batching blog (2023)
+> **Key idea.** LLM decode is limited by memory bandwidth, so batching many requests is the main way to get throughput.
+> Static batching wastes that batch: it waits for the longest request before anyone new can join.
+> Continuous batching re-forms the batch at every decode step.
+>
+> **Main figure.** Two grids of sequences over time steps. In the static grid, finished sequences leave empty slots until the whole batch ends.
+> In the continuous grid, new sequences take those slots at once.
+>
+> **Claims to know.** The post benchmarks a 13B model on one A100. Continuous batching (Text Generation Inference, Ray Serve) gives several times the static throughput.
+> vLLM's continuous batching plus paged memory gives the headline "up to 23×". Median latency also falls, because requests stop waiting for a batch to drain.
+>
+> **In this project.** Same comparison, smaller model: static Hugging Face baseline vs your scheduler, 3.82× throughput and TTFT p50 2448 → 179 ms.
+
+> [!abstract] What it says: Orca (Yu et al., OSDI 2022), §3
+> **Key idea: iteration-level scheduling.** The scheduler decides the batch again after every model iteration (one token), not once per request.
+> A request that finishes leaves at once, and a new one can start at the next iteration.
+>
+> **Main figure.** Request-level scheduling, where early finishers sit idle until the batch ends, next to iteration-level scheduling, where the engine returns after each iteration.
+>
+> **Selective batching.** Requests in one iteration have different lengths. Orca flattens all their tokens together for the linear layers (shapes don't matter there).
+> It runs attention separately per request, because attention needs each request's own keys and values.
+>
+> **Claims to know.** On GPT-3 175B, Orca reports about 36.9× the throughput of FasterTransformer at the same latency.
+>
+> **In this project.** The flattened `[T]` token batch is selective batching. `schedule()` running every step is iteration-level scheduling.
+
+
 **Concepts:**
 - **Static batching.** A batch runs until its longest request ends, so new requests queue. That is your HF baseline's TTFT p50 of **2448 ms**.
 - **Continuous batching.** The scheduler runs **every step**: finished requests leave, waiting ones join. TTFT p50 fell to **179 ms**, and throughput rose **3.82×** (2415 vs 631 tok/s), mostly from more requests in flight per step.
@@ -54,17 +81,49 @@ Part of [[Interview plan (Nov 2026)]]. Repo `vLLMmini` (branch `main`). About 7 
 
   You chose **recompute** (README line 742). Prefill is cheap on a 1B model, there's no CPU buffer to manage, and vLLM defaults to it too.
 
+> [!tip] Explained from scratch: [[#6. Deep dive: continuous batching from scratch|§6 continuous batching]], [[#7. Deep dive: the scheduler's rules from scratch (budget, admission, watermark, preemption)|§7 budget, admission, watermark and preemption]]
+
+
 ### A2. Prefix caching (45 min)
 
 **Read:**
 - the LMSYS blog *"Fast and Expressive LLM Inference with RadixAttention and SGLang"* (Jan 2024), about 20 min;
 - the SGLang paper (Zheng et al., 2024) §3: RadixAttention, eviction and its figure, about 25 min.
 
+> [!abstract] What it says: the LMSYS RadixAttention blog (Jan 2024)
+> **Key idea.** Many requests share prefixes: system prompts, few-shot examples, earlier chat turns, several samples of one question.
+> RadixAttention keeps the KV cache after a request ends and stores it in a radix tree keyed by tokens.
+> A new request that starts with a cached prefix reuses those KV entries instead of recomputing them.
+>
+> **Main figure.** A sequence of radix-tree snapshots: chat turns extend a branch, few-shot queries share one branch, and parallel samples fork from one node.
+> When memory runs out, the least recently used leaves are evicted.
+>
+> **Claims to know.** Eviction is LRU over leaves. A cache-aware scheduler runs requests with long shared prefixes first, to raise the hit rate.
+> The post reports up to about 5× higher throughput than earlier systems on prefix-heavy workloads (agents, few-shot, multi-turn chat).
+>
+> **In this project.** `prefix_cache.py` is the same idea, but at block level. Your hit rate (91%) only became time saved at long contexts.
+
+> [!abstract] What it says: the SGLang paper (Zheng et al., 2024), §3
+> **Key idea.** RadixAttention, formally: a radix tree whose edges hold token sequences of any length, each mapped to KV entries in a paged pool.
+>
+> **Main figure.** A worked example of the tree over several requests: insert, match, split a node when a new request diverges mid-edge, and evict leaves.
+>
+> **Claims to know.**
+> - **Refcounts:** a node in use by a running request is never evicted. Only unused leaves go, least recently used first.
+> - **Order:** sorting requests by longest shared prefix makes the offline batch visit the tree depth-first, which the paper argues gives the best hit rate.
+> - **Speed:** the paper reports up to 6.4× higher throughput than other systems across its benchmarks.
+>
+> **Difference from this project.** SGLang matches token by token (page size 1) and splits nodes mid-edge. Here a node is one full 16-token block, so nothing is split and the last partial block is never shared.
+
+
 **Concepts:**
 - **Radix tree.** Each root-to-node path is a token prefix. Here a node holds **one full block** of `B` token ids plus its physical block id, so matching goes block by block.
 - **Only full blocks are shared.** A half-filled last block is still being written, and sharing it would need copy-on-write. A request reuses `floor(matched / B)` blocks and recomputes the rest.
 - **Refcounted LRU.** Evict only **leaves** with refcount 0, least recently used first. Evicting an inner node would orphan its children.
 - **Hit rate is not time saved.** README *"The cache saves 91% of the tokens and 0% of the time"* (line 286).
+
+> [!tip] Explained from scratch: [[#8. Deep dive: the radix prefix cache from scratch|§8 the radix prefix cache (match, acquire, insert, safe eviction, why 7.4× only at 8k)]]
+
 
 **Maths: why 0% below 2k and 7.41× at 8k.** Prefill time is roughly `T(n) ≈ a + b·n + c·n²`: fixed overhead `a`,
 linear MLP and projection cost `b·n`, and quadratic attention cost `c·n²`. For small n, `a` dominates, so skipping

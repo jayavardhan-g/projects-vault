@@ -60,12 +60,37 @@ prep pack [[Micro Exchange - prep]]). Read the branch with `git show upgrade-202
 - Little's law and the utilisation law: any queueing-theory intro (for example, the "Operational Laws" chapter in Lazowska et al., *Quantitative System Performance*, free online, §3.1–3.3). About 25 min.
 - On Nagle + delayed ACK: John Nagle's own Hacker News comment on it, or the Wikipedia article "Nagle's algorithm" (the interaction section). 10 min.
 
+> [!abstract] What it says: the operational laws (Lazowska et al., *Quantitative System Performance*)
+> The book measures a system over a window of time instead of assuming a probability model.
+> You count four things in a window of length $T$: arrivals, completions $C$, busy time $B$, and jobs in the system.
+> From them come throughput $X = C/T$, utilisation $U = B/T$ and service time per job $S = B/C$.
+> **Utilisation law:** $U = X \cdot S$. It holds for any device, with no assumptions about arrival patterns.
+> **Little's law:** $N = X \cdot R$: jobs inside = throughput × time each job spends inside.
+> **Response time law** for a closed (interactive) system: $R = N/X - Z$, where $Z$ is the users' think time.
+> **Bottleneck analysis:** the device with the largest demand $D_{max}$ caps throughput at $1/D_{max}$.
+> The "knee" is the user count where the system stops scaling: about $N^* = (D + Z)/D_{max}$.
+> The book's main picture: throughput rises linearly with users, then flattens at $1/D_{max}$; response time stays flat, then climbs linearly.
+> **In this project:** k6 VUs are a closed system with $Z = 0$, so $N^* \approx D/S$ gives your ≈480 VU knee.
+
+> [!abstract] What it says: Nagle's algorithm and delayed ACK
+> **Nagle's algorithm** (RFC 896, 1984) is a sender rule. While earlier data is still un-ACKed, small new data waits.
+> It is sent when the ACK arrives or a full segment has built up. It stopped "tinygram" floods of 1-byte packets.
+> **Delayed ACK** is a receiver rule: wait a little before ACKing, hoping to piggyback the ACK on a reply.
+> On Linux the delay is about 40 ms at minimum.
+> **The bad interaction:** a sender does two small writes (headers, then body) and then waits for a reply.
+> The second write waits for an ACK (Nagle). The receiver waits for more data before ACKing (delayed ACK). Both stall until the ACK timer fires.
+> Nagle himself has said the interaction is the real problem, and that delayed ACK is the part he'd change.
+> Fixes: one `write()` per response (or `writev`), or set `TCP_NODELAY` on the socket.
+> **In this project:** cpp-httplib's two writes with `TCP_NODELAY` off explain the ~43 ms floor on every request.
+
 **Concepts and your numbers** (prep pack §5.3):
 - **Little's law N = X·R.** get-popular at 1000 VUs: 11,187 × 0.0848 s ≈ 949 in flight. At 10 VUs: 10 / 0.0434 s ≈ 230 TPS, matching 225. So at low load TPS = VUs / 43 ms.
 - **Utilisation law S = U/X:** cache hits ≈ 1.00 / 11,150 ≈ **90 µs** of server-core CPU per request; cache misses ≈ 270 µs (three DB round trips: BEGIN, SELECT, COMMIT).
 - **Knee of a closed system N\* ≈ D/S:** get-popular 0.043 × 11,150 ≈ 480 VUs. The data bends between 500 and 750. ✓
 - **Thread-per-connection** (cpp-httplib's pool; a worker owns one keep-alive connection) vs an **event loop** (epoll, few threads). 800 threads is about holding connections, not parallelism on 12 CPUs.
 - **LRU:** a doubly linked list + hash map; `splice` to front on a hit; evict the tail. One mutex: simple, but contended.
+
+> [!tip] Explained from scratch: [[#8. Deep dive: the operational laws from scratch (Little's law, utilisation, the knee)|§8 the operational laws]], [[#9. Deep dive: the LRU cache, the connection pool and the 43 ms floor from scratch|§9 LRU, the pool and the 43 ms floor]], [[#9.5 The 43 ms floor: Nagle meets delayed ACK|§9.5 Nagle + delayed ACK]]
 
 ### A2. The matching engine (block 5, 45 min)
 
@@ -74,17 +99,51 @@ prep pack [[Micro Exchange - prep]]). Read the branch with `git show upgrade-202
 - Preshing on Programming, *"Acquire and Release Semantics"* and *"An Introduction to Lock-Free Programming"*. 20 min.
 - Optional: Rigtorp's blog *"Optimizing a ring buffer for throughput"* (the cached-index trick your ring uses).
 
+> [!abstract] What it says: the limit order book
+> An order book holds resting **buy orders (bids)** and **sell orders (asks)**, each grouped by price level.
+> The highest bid and the lowest ask are the best prices; the gap between them is the **spread**.
+> A **limit order** names a worst acceptable price. If it can trade now, it does; any rest sits in the book.
+> A **market order** takes the best prices available until it is filled. An **IOC** order fills what it can and cancels the rest.
+> **Partial fills:** one incoming order can trade against several resting orders, and a resting order can be filled bit by bit.
+> **Price-time priority (FIFO):** better price first; at the same price, the order that arrived first goes first. Some markets use pro-rata instead.
+> The usual picture: a ladder of prices, bids below and asks above, with queue lengths drawn at each level.
+> **In this project:** the book keeps a FIFO list per price level, and the matcher walks the best levels of the other side.
+
+> [!abstract] What it says: Preshing on acquire/release and lock-free programming
+> **Lock-free** means the system as a whole always makes progress. If any one thread is paused, the others can still finish their work.
+> His intro flowchart: multiple threads, shared memory, and threads that can't block each other → lock-free.
+> Tools: atomic read-modify-write operations, compare-and-swap loops, and care with memory ordering. He also warns about the ABA problem.
+> **Memory reordering:** the compiler and the CPU may reorder plain loads and stores, as long as one thread can't tell.
+> **Acquire** (on a read): nothing after it in program order may move before it.
+> **Release** (on a write): nothing before it may move after it.
+> A release-write that an acquire-read observes makes all earlier writes visible to the reader ("synchronizes-with").
+> The classic example publishes a message: write the data, then release-store a flag. The reader acquire-loads the flag, then reads the data.
+> On x86, ordinary loads and stores already behave this way, so the cost is only a compiler barrier. ARM and POWER need real fence instructions.
+> **In this project:** the ring's producer release-stores `head` after writing a slot; the consumer acquire-loads it.
+
+> [!abstract] What it says: Rigtorp, optimising a ring buffer
+> He starts from a simple single-producer single-consumer ring with atomic read and write indices.
+> **Problem 1: false sharing.** If both indices sit on one cache line, every update by one core invalidates the other's copy. Fix: align each index to its own cache line.
+> **Problem 2: reading the other side's index every time.** Each such read pulls a cache line from the other core.
+> **The trick:** each side keeps a private, cached copy of the other's index. It reloads the real one only when the cached copy says the ring looks full (producer) or empty (consumer).
+> Most operations then touch only local cache lines, and throughput rises a lot. Read his post for the exact benchmark numbers.
+> **In this project:** your ring pads head and tail apart and caches the opposite index in the same way.
+
 **Concepts:**
 - **Price-time priority:** best price first; at one price, oldest first (a FIFO per level).
 - **SPSC ring:** one producer, one consumer, a power-of-two buffer. The producer writes the slot, then publishes `head` with **release**. The consumer loads `head` with **acquire**, so it sees the complete slot. Each side caches the other's index to avoid cross-core reads.
 - **False sharing:** two threads writing different variables on one 64-byte cache line ping-pong it. Pad the head and tail apart.
 - **Why the server is slower than the laptop:** the book alone does 18.1M/s (about 55 ns per command) on one core; the full two-thread pipeline does 3.44M/s (about 290 ns). The gap is most likely the **cross-core handoff** plus the WAL append, `rdtsc` and the histogram. It's a hypothesis: never profiled.
 
+> [!tip] Explained from scratch: [[#10. Deep dive: the SPSC ring buffer and memory ordering from scratch|§10 the SPSC ring and memory ordering]], [[#11. Deep dive: the order book from scratch (price-time priority, intrusive lists, the id table, the pool)|§11 the order book]]
+
 ### A3. Durability (block 7, 20 min)
 
 - **WAL:** log first, then apply. Recovery = load the snapshot + replay later records.
 - **mmap:** writes go to the page cache; `fsync`/`msync` makes them durable. Snapshots: write tmp → fsync → rename → fsync dir (`snapshot.hpp:84-100`).
 - On `main`, `append` silently dropped records when the log was full, and the count wasn't published with release ordering (story S9). The branch fixed both.
+
+> [!tip] Explained from scratch: [[#12. Deep dive: write-ahead logging and crash recovery from scratch|§12 write-ahead logging and crash recovery]]
 
 ## B. Code
 

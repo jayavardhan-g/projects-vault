@@ -57,20 +57,79 @@ key files §2, design decisions §3, stories §4, numbers §5, a code-review app
 
 **Read:** Ongaro & Ousterhout, *"In Search of an Understandable Consensus Algorithm"* (2014), **§5 in full** and **Figure 2** (print it). About 60 min.
 **Play:** the *Raft visualization* at thesecretlivesofdata.com/raft (10 min) or raft.github.io's interactive demo.
+
+> [!abstract] What it says: the Raft paper (Ongaro & Ousterhout, 2014), §5 and Figure 2
+> **Goal:** a consensus algorithm as safe as Paxos but easier to understand. It splits the problem into leader election, log replication and safety.
+> **Roles and terms:** each server is a follower, a candidate or the leader. Time is divided into numbered **terms**, with at most one leader per term.
+> A server that sees a higher term adopts it and becomes a follower.
+> **Election (§5.2):** a follower that hears nothing for an election timeout becomes a candidate. It raises its term, votes for itself and asks the others for votes.
+> A majority of votes makes it leader. Timeouts are randomised (the paper suggests 150–300 ms), so split votes are rare.
+> **Replication (§5.3):** the leader sends AppendEntries with the previous entry's index and term. A follower whose log doesn't match there rejects, and the leader backs up and retries.
+> **Safety (§5.4):** a voter refuses a candidate whose log is less up to date (the election restriction). A leader counts replicas only for entries of its **own** term; Figure 8 shows an older entry on a majority being overwritten.
+> **Figure 2** is a one-page summary of every rule. It lists the persistent state (currentTerm, votedFor, log[]) and the volatile state (commitIndex, lastApplied, plus nextIndex[] and matchIndex[] on the leader). It also gives both RPCs with receiver rules, and the rules for each role.
+> **Timing (§5.6):** broadcast time ≪ election timeout ≪ mean time between failures.
+> **In this project:** raftkv implements Figure 2 directly; your story 1 is its follower commit-index rule.
+
+> [!abstract] What it says: the Raft visualisation
+> A step-by-step animation of five nodes. Each node shows its role, its term and an election-timeout ring that counts down.
+> First a follower times out, becomes a candidate, collects votes and starts sending heartbeats as leader.
+> Then a client write: the leader appends it, replicates it, and commits it once a majority has it.
+> Then a network partition: the minority side's leader keeps taking writes but can never commit them.
+> When the partition heals, that old leader sees the higher term, steps down, and its uncommitted entries are rolled back.
+> **Use it to:** picture §5 before reading the code, and the partition case before the CAP questions.
+
+**Concepts:**
 - **Election:** randomised timeouts; a vote per term; the **election restriction** (vote only for a log at least as up to date: last term first, then length).
 - **Replication:** AppendEntries with `prevLogIndex`/`prevLogTerm`; the follower rejects on mismatch; the leader backs up (yours jumps back by conflicting term).
 - **Commit rule:** a leader commits an entry from its **current term** once a majority has it; earlier entries commit indirectly. **Figure 8** shows why counting replicas of an old-term entry is unsafe. Your no-op on election makes the rule fire quickly.
 - **Persistence:** `currentTerm`, `votedFor` and the log must be on disk *before* replying.
 - **Follower commit index** = `min(leaderCommit, index of last new entry)`. Your story 1 is exactly this line.
 
+> [!tip] Explained from scratch: [[#5. Deep dive: terms and leader election from scratch|§5 terms and elections]], [[#6. Deep dive: log replication and log matching from scratch|§6 replication and log matching]], [[#7. Deep dive: the commit rule and Figure 8 from scratch|§7 the commit rule and Figure 8]], [[#8. Deep dive: Raft durability from scratch (what to persist, when, and how)|§8 durability]]
+
 ### A2. Beyond §5 (block 6, 40 min)
 
 **Read:** Raft paper §6 (membership, skim) and §7 (log compaction). Ongaro's thesis §9.6 on **pre-vote** and check-quorum (10 min). Kleppmann's blog *"Please stop calling databases CP or AP"* (15 min).
+
+> [!abstract] What it says: Raft paper §6, cluster membership changes
+> Switching straight from the old set of servers to the new one is unsafe. During the switch, two separate majorities could each elect a leader.
+> Raft passes through a **joint consensus** configuration that contains both sets.
+> While it is in force, elections and commits need a majority of the old set **and** of the new set.
+> The configurations themselves travel as special log entries, and a server uses the latest one in its log.
+> The paper also covers adding empty servers as non-voters first, and a leader that is removed from the cluster.
+> **In this project:** raftkv uses a fixed membership, so this is background only.
+
+> [!abstract] What it says: Raft paper §7, log compaction
+> The log can't grow forever. Each server **snapshots** its state machine and throws away the log up to that point.
+> The snapshot records the last included index and term, so the AppendEntries consistency check still works for the next entry.
+> A follower that is too far behind, needing entries the leader has already discarded, gets the snapshot via an **InstallSnapshot** RPC.
+> Servers snapshot independently; the leader doesn't coordinate it.
+> **In this project:** `main` has no compaction and rewrites the whole log on every persist, which is why writes slow down as the log grows (§8).
+
+> [!abstract] What it says: Ongaro's thesis, pre-vote and check-quorum
+> **The problem:** a server cut off from the others keeps timing out and raising its term.
+> When it reconnects, its high term forces a healthy leader to step down, for nothing.
+> **Pre-vote:** before raising its term, a candidate asks whether the others *would* vote for it. Servers that still hear from a leader say no.
+> It raises its term only after a majority says yes, so a returning node can't disrupt a working cluster.
+> **Check-quorum:** a leader that hasn't heard from a majority within an election timeout steps down, so clients stop sending to a leader that can't commit.
+> **In this project:** story 5 measured exactly this: 0/5 vs 5/5 leaders deposed, with and without pre-vote.
+
+> [!abstract] What it says: Kleppmann, "Please stop calling databases CP or AP" (2015)
+> In the CAP theorem, **C** means *linearizability*, and **A** means every request to a non-failed node eventually gets a response.
+> The only fault it considers is a network partition. Most real systems meet neither definition in full, so "CP" and "AP" labels mislead.
+> For example, a "CP" store that serves reads from a local replica isn't linearizable. ZooKeeper's default reads are his main case.
+> A majority-based system also isn't "available" in CAP's sense, because the minority side must refuse requests.
+> He suggests naming the actual consistency model you give (linearizable, sequential, causal, …) and saying how latency and partitions affect it.
+> **In this project:** raftkv's reads go through the log, so they are linearizable, and the minority side is unavailable. `--unsafe-local-reads` is the stale-read counterexample.
+
+**Concepts:**
 - **Linearizability:** every operation appears to take effect at one instant between its call and its return. Your reads go **through the log** (safe). `--unsafe-local-reads` is the negative control.
 - **CAP:** under a partition, Raft keeps consistency and gives up availability on the minority side.
 - **Raft vs Paxos:** same safety guarantees; Raft has a strong leader and explicit log matching, designed to be understandable.
 - **Pre-vote:** a node first asks "would you vote for me?" without raising its term, so a returning partitioned node doesn't depose a healthy leader (story 5: 0/5 vs 5/5 deposed).
 - **Snapshots:** compact the log; InstallSnapshot for followers that are too far behind.
+
+> [!tip] Explained from scratch: [[#5.6 Pre-vote and check-quorum (the upgrade)|§5.6 pre-vote and check-quorum]], [[#6. Deep dive: log replication and log matching from scratch|§6 replication (and when InstallSnapshot is needed)]], [[#8. Deep dive: Raft durability from scratch (what to persist, when, and how)|§8 durability]]
 
 ## B. Code
 

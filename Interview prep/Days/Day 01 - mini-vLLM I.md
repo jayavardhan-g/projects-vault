@@ -62,9 +62,50 @@ flowchart TD
 **Read:** Kwon et al., *Efficient Memory Management for LLM Serving with PagedAttention* (SOSP 2023): §1, §3 (the memory
 problem), §4.1–4.3 (PagedAttention, the KV manager, decoding with it).
 
+> [!abstract] What it says: the PagedAttention paper (Kwon et al., SOSP 2023)
+> **Key idea.** The KV cache, not compute, limits how many requests a GPU can serve at once.
+> Earlier systems stored each request's KV cache in one contiguous chunk sized for the worst case.
+> The paper borrows paging from operating systems: fixed-size KV blocks, a block table per request, and blocks allocated on demand.
+>
+> **Main figures.** One figure shows that in earlier systems only about 20–38% of the KV memory held real token states.
+> The rest was reserved slots, internal fragmentation and external fragmentation.
+> vLLM, by contrast, uses about 96% of it. Another figure shows logical blocks mapped to scattered physical blocks through the block table.
+>
+> **Claims to know.** Waste is limited to the last, partly filled block of each request.
+> Throughput rises 2–4× over FasterTransformer and Orca at the same latency.
+> Blocks can be shared (parallel sampling, beam search) with reference counts and copy-on-write.
+> Under memory pressure a whole request is preempted, either by swapping its blocks to the CPU or by recomputing them later.
+>
+> **In this project.** `BlockAllocator`, `BlockTable` and the refcounts are this design at small scale; the 16.8% → 3.9% result is its waste argument, measured.
+
+
 **Watch or read (30 min, pick one):**
 - YouTube: *"Fast LLM Serving with vLLM and PagedAttention"*, the Anyscale talk by the vLLM authors;
 - the vLLM launch blog post, *"vLLM: Easy, Fast, and Cheap LLM Serving with PagedAttention"* (blog.vllm.ai, June 2023).
+
+> [!abstract] What it says: the vLLM talk by its authors (Anyscale)
+> **Key idea.** The talk covers the same story as the paper, in slides: serving is limited by KV-cache memory, and paging fixes it.
+> It walks through a request's blocks being filled one token at a time, and a new block taken only when the last one is full.
+>
+> **Main picture.** Logical blocks of one request map to physical blocks spread around GPU memory, through a block table.
+> A second picture shows two samples of one prompt sharing the prompt's blocks, with a copy made only when one writes.
+>
+> **Claims to know.** Waste is near zero, at most one partial block per request.
+> More requests fit, so the batch is larger and throughput higher.
+>
+> **In this project.** The talk's "block table" picture is exactly `BlockTable.slot_mapping`; the sharing picture is Day 2's prefix cache.
+
+> [!abstract] What it says: the vLLM launch blog post (June 2023)
+> **Key idea.** vLLM is a serving library built on PagedAttention. The post explains why KV memory is the bottleneck and how paging fixes it.
+>
+> **Main figure.** An animation of a request's KV blocks: logical blocks are contiguous, physical blocks are not, and the block table connects them.
+>
+> **Claims to know.** Existing systems waste 60–80% of KV memory through fragmentation and over-reservation; vLLM wastes under 4%.
+> It reports up to 24× higher throughput than Hugging Face Transformers and up to 3.5× more than Text Generation Inference.
+> Sharing blocks between parallel samples cuts their memory use by up to 55% and raises throughput by up to 2.2×.
+>
+> **In this project.** Your baseline is the Hugging Face path the post compares against. Your 4.3× is a waste ratio, not a throughput claim, so don't mix it with the post's 24×.
+
 
 ### A1. The problem in plain words
 
@@ -95,6 +136,9 @@ The KV cache of a request grows by 32 KiB with every token, and you do not know 
 - **Paging.** Fixed blocks of `B` tokens. A per-request **block table** maps logical block *i* to a physical block id, like an OS page table. Memory grows one block at a time.
 - **Bounded waste.** At most `B − 1` empty slots per sequence, in the last block only; about `(B − 1)/2` on average.
 - **Refcounts.** Several requests may point at one physical block (shared prefixes, on Day 2). It is freed only at refcount 0.
+
+> [!tip] Explained from scratch: [[#2. Deep dive: the paged KV cache|§2 the paged KV cache (fragmentation, blocks, slots, refcounts, the 4.3×)]]
+
 
 **Maths for your model (Llama-3.2-1B, bf16, B = 16):**
 - KV bytes per token = 2 × 16 layers × 8 KV heads × 64 head_dim × 2 B = **32 KiB**.
