@@ -1,0 +1,39 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 880 400' width='880' height='400' font-family='Inter, Helvetica, Arial, sans-serif'><title>Accept and residual</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='880' height='400' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Speculative sampling on a 3-token vocabulary</text>
+<text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>target p = [0.6, 0.3, 0.1], draft q = [0.3, 0.5, 0.2] over tokens A, B, C</text>
+<rect x='70' y='102.0' width='44' height='198.0' fill='#0969da' opacity='0.25' stroke='#0969da'/>
+<rect x='120' y='201.0' width='44' height='99.0' fill='#bf8700' opacity='0.25' stroke='#bf8700'/>
+<rect x='70' y='201.0' width='44' height='99.0' fill='#1a7f37' opacity='0.75'/>
+<rect x='70' y='102.0' width='44' height='99.0' fill='#cf222e' opacity='0.7'/>
+<text x='92' y='96.0' text-anchor='middle' font-size='11' font-weight='600' fill='#0969da'>p 0.6</text>
+<text x='142' y='195.0' text-anchor='middle' font-size='11' font-weight='600' fill='#bf8700'>q 0.3</text>
+<text x='117' y='318' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>token A</text>
+<text x='117' y='336' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>accept if u &lt; 1.00</text>
+<rect x='220' y='201.0' width='44' height='99.0' fill='#0969da' opacity='0.25' stroke='#0969da'/>
+<rect x='270' y='135.0' width='44' height='165.0' fill='#bf8700' opacity='0.25' stroke='#bf8700'/>
+<rect x='220' y='201.0' width='44' height='99.0' fill='#1a7f37' opacity='0.75'/>
+<text x='242' y='195.0' text-anchor='middle' font-size='11' font-weight='600' fill='#0969da'>p 0.3</text>
+<text x='292' y='129.0' text-anchor='middle' font-size='11' font-weight='600' fill='#bf8700'>q 0.5</text>
+<text x='267' y='318' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>token B</text>
+<text x='267' y='336' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>accept if u &lt; 0.60</text>
+<rect x='370' y='267.0' width='44' height='33.0' fill='#0969da' opacity='0.25' stroke='#0969da'/>
+<rect x='420' y='234.0' width='44' height='66.0' fill='#bf8700' opacity='0.25' stroke='#bf8700'/>
+<rect x='370' y='267.0' width='44' height='33.0' fill='#1a7f37' opacity='0.75'/>
+<text x='392' y='261.0' text-anchor='middle' font-size='11' font-weight='600' fill='#0969da'>p 0.1</text>
+<text x='442' y='228.0' text-anchor='middle' font-size='11' font-weight='600' fill='#bf8700'>q 0.2</text>
+<text x='417' y='318' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>token C</text>
+<text x='417' y='336' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>accept if u &lt; 0.50</text>
+<line x1='50' y1='300' x2='510' y2='300' stroke='#57606a'/>
+<rect x='540' y='80' width='18' height='18' fill='#1a7f37' opacity='0.7'/>
+<text x='566' y='93' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>min(p, q): drafted AND accepted</text>
+<text x='566' y='110' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>0.3 + 0.3 + 0.1 = 0.7 = β</text>
+<rect x='540' y='128' width='18' height='18' fill='#cf222e' opacity='0.7'/>
+<text x='566' y='141' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>max(0, p − q): the residual</text>
+<text x='566' y='158' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>only A: 0.3 = 1 − β</text>
+<rect x='540' y='176' width='18' height='18' fill='#bf8700' opacity='0.7'/>
+<text x='566' y='189' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>q: the pale bars</text>
+<text x='566' y='206' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>where q > p (B, C), the draft over-proposes</text>
+<text x='540' y='290' text-anchor='start' font-size='12' font-weight='700' fill='#1a7f37'>Output = green + red = p, exactly:</text>
+<text x='540' y='310' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>A: 0.3 + 0.3 = 0.6   B: 0.3   C: 0.1</text>
+<text x='540' y='336' text-anchor='start' font-size='12' font-weight='700' fill='#cf222e'>Wrong rule (resample from p on reject):</text>
+<text x='540' y='356' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>A 0.48, B 0.39, C 0.13: not p</text>
+<text x='20' y='384' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>Green = probability the draft proposes a token and it is kept. On rejection (30% of the time) the residual puts all of it on A.</text></svg>

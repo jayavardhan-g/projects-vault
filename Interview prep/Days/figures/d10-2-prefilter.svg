@@ -1,0 +1,34 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 880 400' width='880' height='400' font-family='Inter, Helvetica, Arial, sans-serif'><title>pre vs post filter</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='880' height='400' rx='12' fill='#ffffff' stroke='#d0d7de'/><defs><marker id='m-ink' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#1f2328'/></marker><marker id='m-muted' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#57606a'/></marker><marker id='m-red' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#cf222e'/></marker><marker id='m-blue' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#0969da'/></marker><marker id='m-green' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#1a7f37'/></marker><marker id='m-amber' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#bf8700'/></marker><marker id='m-grey' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#8c959f'/></marker></defs><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Filter first, then rank: why post-filtering can return nothing</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>query 'beach' at 0°; SQL allows only photos {12, 40, 77}; we want the top 2</text>
+<text x='30' y='80' text-anchor='start' font-size='13' font-weight='700' fill='#1f2328'>post-filter: top 2 of ALL, then drop disallowed</text>
+<path d='M270.0,330.0 A200,200 0 0 0 -58.6,176.8' fill='none' stroke='#8c959f' stroke-width='1.2' stroke-dasharray='3 3'/>
+<line x1='70' y1='330' x2='220.0' y2='330.0' stroke='#bf8700' stroke-width='3' marker-end='url(#m-amber)'/><text x='234.0' y='334.0' text-anchor='start' font-size='12' font-weight='600' fill='#bf8700'>query (0°)</text>
+<circle cx='269.2' cy='312.6' r='9' fill='#eaeef2' stroke='#cf222e' stroke-width='1'/>
+<text x='281.2' y='304.6' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>5: 0.996</text>
+<circle cx='263.2' cy='278.2' r='9' fill='#eaeef2' stroke='#cf222e' stroke-width='1'/>
+<text x='275.2' y='270.2' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>9: 0.966</text>
+<circle cx='243.2' cy='230.0' r='7' fill='#c7f0d2' stroke='#1f2328' stroke-width='1'/>
+<text x='255.2' y='222.0' text-anchor='start' font-size='11' font-weight='400' fill='#1f2328'>40: 0.866</text>
+<circle cx='138.4' cy='142.1' r='7' fill='#c7f0d2' stroke='#1f2328' stroke-width='1'/>
+<text x='150.4' y='134.1' text-anchor='start' font-size='11' font-weight='400' fill='#1f2328'>12: 0.342</text>
+<circle cx='198.6' cy='176.8' r='7' fill='#c7f0d2' stroke='#1f2328' stroke-width='1'/>
+<text x='210.6' y='168.8' text-anchor='start' font-size='11' font-weight='400' fill='#1f2328'>77: 0.643</text>
+<circle cx='-30.0' cy='156.8' r='7' fill='#eaeef2' stroke='#1f2328' stroke-width='1'/>
+<text x='-42.0' y='148.8' text-anchor='end' font-size='11' font-weight='400' fill='#1f2328'>81: -0.500</text>
+<text x='470' y='80' text-anchor='start' font-size='13' font-weight='700' fill='#1f2328'>pre-filter (IDSelectorBatch): rank only allowed</text>
+<path d='M710.0,330.0 A200,200 0 0 0 381.4,176.8' fill='none' stroke='#8c959f' stroke-width='1.2' stroke-dasharray='3 3'/>
+<line x1='510' y1='330' x2='660.0' y2='330.0' stroke='#bf8700' stroke-width='3' marker-end='url(#m-amber)'/><text x='674.0' y='334.0' text-anchor='start' font-size='12' font-weight='600' fill='#bf8700'>query (0°)</text>
+<circle cx='709.2' cy='312.6' r='7' fill='#eaeef2' stroke='#1f2328' stroke-width='1'/>
+<text x='721.2' y='304.6' text-anchor='start' font-size='11' font-weight='400' fill='#8c959f'>5: 0.996</text>
+<circle cx='703.2' cy='278.2' r='7' fill='#eaeef2' stroke='#1f2328' stroke-width='1'/>
+<text x='715.2' y='270.2' text-anchor='start' font-size='11' font-weight='400' fill='#8c959f'>9: 0.966</text>
+<circle cx='683.2' cy='230.0' r='9' fill='#c7f0d2' stroke='#cf222e' stroke-width='1'/>
+<text x='695.2' y='222.0' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>40: 0.866</text>
+<circle cx='578.4' cy='142.1' r='7' fill='#c7f0d2' stroke='#1f2328' stroke-width='1'/>
+<text x='590.4' y='134.1' text-anchor='start' font-size='11' font-weight='400' fill='#1f2328'>12: 0.342</text>
+<circle cx='638.6' cy='176.8' r='9' fill='#c7f0d2' stroke='#cf222e' stroke-width='1'/>
+<text x='650.6' y='168.8' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>77: 0.643</text>
+<circle cx='410.0' cy='156.8' r='7' fill='#eaeef2' stroke='#1f2328' stroke-width='1'/>
+<text x='398.0' y='148.8' text-anchor='end' font-size='11' font-weight='400' fill='#8c959f'>81: -0.500</text>
+<text x='70' y='362' text-anchor='start' font-size='12' font-weight='600' fill='#cf222e'>top 2 = {5, 9} → both fail the filter → 0 results</text>
+<text x='510' y='362' text-anchor='start' font-size='12' font-weight='600' fill='#1a7f37'>only 12, 40, 77 are scored → 40 (0.866), 77 (0.643)</text>
+<text x='20' y='388' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>green = allowed by SQL; red ring = the top 2 each method returns</text></svg>

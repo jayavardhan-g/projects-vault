@@ -1,37 +1,37 @@
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 420' width='900' height='420' font-family='Inter, Helvetica, Arial, sans-serif'><title>streams</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='900' height='420' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Streams overlap only when kernels leave SMs idle</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>each bar is one kernel; its height is how many of the 132 SMs it keeps busy</text>
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 420' width='900' height='420' font-family='Inter, Helvetica, Arial, sans-serif'><title>streams</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='900' height='420' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Streams overlap only when kernels leave SMs idle</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>each bar is one kernel launched on its own stream; left to right is time</text>
 <text x='20' y='72' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>A. Small kernels (each needs 30 SMs)</text>
-<rect x='120' y='84' width='67' height='24' rx='4' fill='#c7f0d2' stroke='#ffffff' stroke-width='1'/>
-<text x='155.0' y='100' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s0</text>
-<rect x='120' y='114' width='67' height='24' rx='4' fill='#c7f0d2' stroke='#ffffff' stroke-width='1'/>
-<text x='155.0' y='130' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s1</text>
-<rect x='120' y='144' width='67' height='24' rx='4' fill='#c7f0d2' stroke='#ffffff' stroke-width='1'/>
-<text x='155.0' y='160' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s2</text>
-<rect x='120' y='174' width='67' height='24' rx='4' fill='#c7f0d2' stroke='#ffffff' stroke-width='1'/>
-<text x='155.0' y='190' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s3</text>
+<rect x='170' y='84' width='63' height='24' rx='4' fill='#c7f0d2' stroke='#ffffff' stroke-width='1'/>
+<text x='203.0' y='100' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s0</text>
+<rect x='170' y='114' width='63' height='24' rx='4' fill='#c7f0d2' stroke='#ffffff' stroke-width='1'/>
+<text x='203.0' y='130' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s1</text>
+<rect x='170' y='144' width='63' height='24' rx='4' fill='#c7f0d2' stroke='#ffffff' stroke-width='1'/>
+<text x='203.0' y='160' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s2</text>
+<rect x='170' y='174' width='63' height='24' rx='4' fill='#c7f0d2' stroke='#ffffff' stroke-width='1'/>
+<text x='203.0' y='190' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s3</text>
 <text x='20' y='102' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>4 streams:</text>
 <text x='20' y='118' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>run side by side</text>
-<text x='202' y='140' text-anchor='start' font-size='12' font-weight='600' fill='#1a7f37'>done at t = 1 (vs 4 in one stream)</text>
+<text x='248' y='140' text-anchor='start' font-size='12' font-weight='600' fill='#1a7f37'>done at t = 1 (vs 4 in one stream)</text>
 <text x='20' y='232' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>B. Big kernels (each fills all 132 SMs, ~4 waves)</text>
-<rect x='120' y='244' width='172.0' height='24' rx='4' fill='#ffc9c9' stroke='#ffffff' stroke-width='1'/>
-<text x='207.5' y='260' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s0</text>
-<rect x='302.0' y='274' width='172.0' height='24' rx='4' fill='#ffc9c9' stroke='#ffffff' stroke-width='1'/>
-<text x='389.5' y='290' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s1</text>
-<rect x='484.0' y='304' width='172.0' height='24' rx='4' fill='#ffc9c9' stroke='#ffffff' stroke-width='1'/>
-<text x='571.5' y='320' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s2</text>
-<rect x='666.0' y='334' width='102.0' height='24' rx='4' fill='#ffc9c9' stroke='#ffffff' stroke-width='1'/>
-<text x='718.5' y='350' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s3 …</text>
+<rect x='170' y='244' width='162.0' height='24' rx='4' fill='#ffc9c9' stroke='#ffffff' stroke-width='1'/>
+<text x='252.5' y='260' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s0</text>
+<rect x='341.6' y='274' width='162.0' height='24' rx='4' fill='#ffc9c9' stroke='#ffffff' stroke-width='1'/>
+<text x='424.1' y='290' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s1</text>
+<rect x='513.2' y='304' width='162.0' height='24' rx='4' fill='#ffc9c9' stroke='#ffffff' stroke-width='1'/>
+<text x='595.7' y='320' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s2</text>
+<rect x='684.8' y='334' width='96.0' height='24' rx='4' fill='#ffc9c9' stroke='#ffffff' stroke-width='1'/>
+<text x='734.3' y='350' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s3 …</text>
 <text x='20' y='262' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>4 streams:</text>
 <text x='20' y='278' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>still one after another</text>
-<text x='260' y='382' text-anchor='start' font-size='12' font-weight='600' fill='#cf222e'>no idle SMs to share → no overlap; extra launches + host syncs only add time</text>
-<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0200;0.1100;1.0000'/><line x1='120.0' y1='70' x2='120.0' y2='360' stroke='#0969da' stroke-width='2'/></g>
-<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.1100;0.2000;1.0000'/><line x1='186.5' y1='70' x2='186.5' y2='360' stroke='#0969da' stroke-width='2'/></g>
-<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2000;0.2900;1.0000'/><line x1='253.0' y1='70' x2='253.0' y2='360' stroke='#0969da' stroke-width='2'/></g>
-<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2900;0.3800;1.0000'/><line x1='319.5' y1='70' x2='319.5' y2='360' stroke='#0969da' stroke-width='2'/></g>
-<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3800;0.4700;1.0000'/><line x1='386.0' y1='70' x2='386.0' y2='360' stroke='#0969da' stroke-width='2'/></g>
-<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4700;0.5600;1.0000'/><line x1='452.5' y1='70' x2='452.5' y2='360' stroke='#0969da' stroke-width='2'/></g>
-<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5600;0.6500;1.0000'/><line x1='519.0' y1='70' x2='519.0' y2='360' stroke='#0969da' stroke-width='2'/></g>
-<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6500;0.7400;1.0000'/><line x1='585.5' y1='70' x2='585.5' y2='360' stroke='#0969da' stroke-width='2'/></g>
-<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7400;0.8300;1.0000'/><line x1='652.0' y1='70' x2='652.0' y2='360' stroke='#0969da' stroke-width='2'/></g>
-<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.8300;0.9200;1.0000'/><line x1='718.5' y1='70' x2='718.5' y2='360' stroke='#0969da' stroke-width='2'/></g>
-<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.9200;1.0100;1.0000'/><line x1='785.0' y1='70' x2='785.0' y2='360' stroke='#0969da' stroke-width='2'/></g>
+<text x='302' y='382' text-anchor='start' font-size='12' font-weight='600' fill='#cf222e'>no idle SMs to share → no overlap; extra launches + host syncs only add time</text>
+<g opacity='1'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='1;0;0' keyTimes='0.0000;0.1100;1.0000'/><line x1='170.0' y1='70' x2='170.0' y2='360' stroke='#0969da' stroke-width='2'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.1100;0.2000;1.0000'/><line x1='232.7' y1='70' x2='232.7' y2='360' stroke='#0969da' stroke-width='2'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2000;0.2900;1.0000'/><line x1='295.4' y1='70' x2='295.4' y2='360' stroke='#0969da' stroke-width='2'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2900;0.3800;1.0000'/><line x1='358.1' y1='70' x2='358.1' y2='360' stroke='#0969da' stroke-width='2'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3800;0.4700;1.0000'/><line x1='420.79999999999995' y1='70' x2='420.79999999999995' y2='360' stroke='#0969da' stroke-width='2'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4700;0.5600;1.0000'/><line x1='483.5' y1='70' x2='483.5' y2='360' stroke='#0969da' stroke-width='2'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5600;0.6500;1.0000'/><line x1='546.2' y1='70' x2='546.2' y2='360' stroke='#0969da' stroke-width='2'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6500;0.7400;1.0000'/><line x1='608.9' y1='70' x2='608.9' y2='360' stroke='#0969da' stroke-width='2'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7400;0.8300;1.0000'/><line x1='671.5999999999999' y1='70' x2='671.5999999999999' y2='360' stroke='#0969da' stroke-width='2'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.8300;0.9200;1.0000'/><line x1='734.3' y1='70' x2='734.3' y2='360' stroke='#0969da' stroke-width='2'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.9200;1.0100;1.0000'/><line x1='797.0' y1='70' x2='797.0' y2='360' stroke='#0969da' stroke-width='2'/></g>
 <text x='20' y='408' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: the blue line is time. Batch split at width 32: 4.1× slower; column split at 32,768: 1.73× faster, most likely from L2 locality</text></svg>

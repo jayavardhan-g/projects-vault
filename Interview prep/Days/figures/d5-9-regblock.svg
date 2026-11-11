@@ -50,32 +50,32 @@
 <rect x='280' y='230' width='38' height='38' rx='4' fill='#fff1a8' stroke='#ffffff' stroke-width='1'/>
 <text x='299.0' y='254.0' text-anchor='middle' font-size='9' font-weight='400' fill='#1f2328'>+a3b3</text>
 <text x='240' y='292' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>reg[i][j] += av[i] · bv[j]</text>
-<g opacity='0'><animate attributeName='opacity' dur='6.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0500;0.2700;1.0000'/><rect x='58' y='108' width='42' height='42' rx='5' fill='none' stroke='#cf222e' stroke-width='2.5'/><rect x='158' y='58' width='162' height='42' rx='5' fill='none' stroke='#0969da' stroke-width='2.5'/><rect x='158' y='108' width='162' height='42' rx='5' fill='none' stroke='#1a7f37' stroke-width='2.5'/></g>
+<g opacity='1'><animate attributeName='opacity' dur='6.0s' repeatCount='indefinite' calcMode='discrete' values='1;0;0' keyTimes='0.0000;0.2700;1.0000'/><rect x='58' y='108' width='42' height='42' rx='5' fill='none' stroke='#cf222e' stroke-width='2.5'/><rect x='158' y='58' width='162' height='42' rx='5' fill='none' stroke='#0969da' stroke-width='2.5'/><rect x='158' y='108' width='162' height='42' rx='5' fill='none' stroke='#1a7f37' stroke-width='2.5'/></g>
 <g opacity='0'><animate attributeName='opacity' dur='6.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2700;0.4900;1.0000'/><rect x='58' y='148' width='42' height='42' rx='5' fill='none' stroke='#cf222e' stroke-width='2.5'/><rect x='158' y='58' width='162' height='42' rx='5' fill='none' stroke='#0969da' stroke-width='2.5'/><rect x='158' y='148' width='162' height='42' rx='5' fill='none' stroke='#1a7f37' stroke-width='2.5'/></g>
 <g opacity='0'><animate attributeName='opacity' dur='6.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4900;0.7100;1.0000'/><rect x='58' y='188' width='42' height='42' rx='5' fill='none' stroke='#cf222e' stroke-width='2.5'/><rect x='158' y='58' width='162' height='42' rx='5' fill='none' stroke='#0969da' stroke-width='2.5'/><rect x='158' y='188' width='162' height='42' rx='5' fill='none' stroke='#1a7f37' stroke-width='2.5'/></g>
 <g opacity='0'><animate attributeName='opacity' dur='6.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7100;0.9300;1.0000'/><rect x='58' y='228' width='42' height='42' rx='5' fill='none' stroke='#cf222e' stroke-width='2.5'/><rect x='158' y='58' width='162' height='42' rx='5' fill='none' stroke='#0969da' stroke-width='2.5'/><rect x='158' y='228' width='162' height='42' rx='5' fill='none' stroke='#1a7f37' stroke-width='2.5'/></g>
-<rect x='380' y='70' width='490' height='250' rx='8' fill='#fbfcfd' stroke='#d0d7de' stroke-width='1'/>
-<text x='396' y='100' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>kernel</text>
-<text x='536' y='100' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>shared loads per k</text>
-<text x='686' y='100' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>FMAs per k</text>
-<text x='786' y='100' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>loads per FMA</text>
-<text x='396' y='130' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>tiled 1-to-1</text>
-<text x='536' y='130' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2</text>
-<text x='686' y='130' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>1</text>
-<text x='786' y='130' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2</text>
-<text x='396' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>block2d, R = 2</text>
-<text x='536' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>4</text>
-<text x='686' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>4</text>
-<text x='786' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>1</text>
-<text x='396' y='190' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>block2d, R = 4</text>
-<text x='536' y='190' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>8</text>
-<text x='686' y='190' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>16</text>
-<text x='786' y='190' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>0.5</text>
-<text x='396' y='220' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>general R</text>
-<text x='536' y='220' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2R</text>
-<text x='686' y='220' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>R²</text>
-<text x='786' y='220' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2 / R</text>
-<text x='396' y='270' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>Each register value is reused R times, so shared-memory</text>
-<text x='396' y='290' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>traffic per FMA falls by R. Cost: R² accumulators per thread</text>
-<text x='396' y='310' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>(62 registers at R = 4), so fewer threads fit: 50% occupancy.</text>
+<rect x='360' y='70' width='520' height='250' rx='8' fill='#fbfcfd' stroke='#d0d7de' stroke-width='1'/>
+<text x='376' y='100' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>kernel</text>
+<text x='506' y='100' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>shared loads per k</text>
+<text x='656' y='100' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>FMAs per k</text>
+<text x='766' y='100' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>loads per FMA</text>
+<text x='376' y='130' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>tiled 1-to-1</text>
+<text x='506' y='130' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<text x='656' y='130' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>1</text>
+<text x='766' y='130' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<text x='376' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>block2d, R = 2</text>
+<text x='506' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>4</text>
+<text x='656' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>4</text>
+<text x='766' y='160' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>1</text>
+<text x='376' y='190' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>block2d, R = 4</text>
+<text x='506' y='190' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>8</text>
+<text x='656' y='190' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>16</text>
+<text x='766' y='190' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>0.5</text>
+<text x='376' y='220' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>general R</text>
+<text x='506' y='220' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2R</text>
+<text x='656' y='220' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>R²</text>
+<text x='766' y='220' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2 / R</text>
+<text x='376' y='270' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>Each register value is reused R times, so shared-memory</text>
+<text x='376' y='290' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>traffic per FMA falls by R. Cost: R² accumulators per thread</text>
+<text x='376' y='310' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>(62 registers at R = 4), so fewer threads fit: 50% occupancy.</text>
 <text x='20' y='368' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: row i of the patch uses av[i] (red) with the whole bv row (blue)</text></svg>

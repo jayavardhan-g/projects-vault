@@ -1,0 +1,37 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 470' width='900' height='470' font-family='Inter, Helvetica, Arial, sans-serif'><title>retrieval funnel</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='900' height='470' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Retrieve, fuse, rerank: each stage is cheap enough for its input size</text>
+<text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>one query · median latencies from RESULTS §2</text>
+<rect x='20' y='120' width='130' height='70' rx='8' fill='#f6f8fa' stroke='#d0d7de' stroke-width='1.5'/><text x='85.0' y='149.0' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>11,355 chunks</text><text x='85.0' y='168.0' text-anchor='middle' font-size='11' fill='#57606a'>the whole corpus</text>
+<rect x='200' y='80' width='150' height='62' rx='8' fill='#fff4e5' stroke='#bf8700' stroke-width='1.5'/><text x='275.0' y='105.0' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>BM25 → top 40</text><text x='275.0' y='124.0' text-anchor='middle' font-size='11' fill='#57606a'>16 ms, word overlap</text>
+<rect x='200' y='168' width='150' height='62' rx='8' fill='#e8f1fe' stroke='#0969da' stroke-width='1.5'/><text x='275.0' y='193.0' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>dense → top 40</text><text x='275.0' y='212.0' text-anchor='middle' font-size='11' fill='#57606a'>39 ms, cosine</text>
+<rect x='400' y='120' width='140' height='70' rx='8' fill='#eef9f0' stroke='#1a7f37' stroke-width='1.5'/><text x='470.0' y='149.0' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>RRF</text><text x='470.0' y='168.0' text-anchor='middle' font-size='11' fill='#57606a'>≤ 80 unique → 40</text>
+<rect x='590' y='120' width='150' height='70' rx='8' fill='#fdecec' stroke='#cf222e' stroke-width='1.5'/><text x='665.0' y='149.0' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>cross-encoder</text><text x='665.0' y='168.0' text-anchor='middle' font-size='11' fill='#57606a'>40 pairs, ~98 ms</text>
+<rect x='790' y='120' width='90' height='70' rx='8' fill='#f6f8fa' stroke='#d0d7de' stroke-width='1.5'/><text x='835.0' y='149.0' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>top 6</text><text x='835.0' y='168.0' text-anchor='middle' font-size='11' fill='#57606a'>to the prompt</text>
+<line x1='150' y1='140' x2='194' y2='111' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/>
+<line x1='150' y1='170' x2='194' y2='199' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/>
+<line x1='350' y1='111' x2='394' y2='140' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/>
+<line x1='350' y1='199' x2='394' y2='170' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/>
+<line x1='540' y1='155' x2='584' y2='155' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/>
+<line x1='740' y1='155' x2='784' y2='155' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/>
+<text x='20' y='270' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>how many candidates each stage looks at (log scale)</text>
+<rect x='160' y='282' width='640' height='18' rx='3' fill='#d0d7de'/><text x='150' y='295' text-anchor='end' font-size='11' font-weight='400' fill='#1f2328'>corpus</text><text x='808.0' y='295' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>11,355</text>
+<rect x='160' y='308' width='277' height='18' rx='3' fill='#d0d7de'/><text x='150' y='321' text-anchor='end' font-size='11' font-weight='400' fill='#1f2328'>each arm keeps</text><text x='445.03862780032387' y='321' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>40</text>
+<rect x='160' y='334' width='277' height='18' rx='3' fill='#d0d7de'/><text x='150' y='347' text-anchor='end' font-size='11' font-weight='400' fill='#1f2328'>reranked</text><text x='445.03862780032387' y='347' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>40</text>
+<rect x='160' y='360' width='155' height='18' rx='3' fill='#d0d7de'/><text x='150' y='373' text-anchor='end' font-size='11' font-weight='400' fill='#1f2328'>returned</text><text x='323.13420571669803' y='373' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>6</text>
+<text x='20' y='400' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>bi-encoder (dense):</text>
+<rect x='160' y='382' width='60' height='26' rx='8' fill='#e8f1fe' stroke='#d0d7de' stroke-width='1.5'/><text x='190.0' y='400.0' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>query</text>
+<rect x='240' y='382' width='70' height='26' rx='8' fill='#f6f8fa' stroke='#d0d7de' stroke-width='1.5'/><text x='275.0' y='400.0' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>encoder</text>
+<rect x='160' y='414' width='60' height='26' rx='8' fill='#fff4e5' stroke='#d0d7de' stroke-width='1.5'/><text x='190.0' y='432.0' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>chunk</text>
+<rect x='240' y='414' width='70' height='26' rx='8' fill='#f6f8fa' stroke='#d0d7de' stroke-width='1.5'/><text x='275.0' y='432.0' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>encoder</text>
+<line x1='220' y1='395' x2='234' y2='395' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/>
+<line x1='220' y1='427' x2='234' y2='427' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/>
+<rect x='350' y='398' width='64' height='26' rx='8' fill='#eef9f0' stroke='#d0d7de' stroke-width='1.5'/><text x='382.0' y='416.0' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>cosine</text>
+<line x1='310' y1='395' x2='344' y2='408' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/>
+<line x1='310' y1='427' x2='344' y2='416' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/>
+<text x='470' y='400' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>cross-encoder (rerank):</text>
+<rect x='620' y='396' width='120' height='30' rx='8' fill='#fdecec' stroke='#d0d7de' stroke-width='1.5'/><text x='680.0' y='416.0' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>query + chunk</text>
+<rect x='755' y='396' width='70' height='30' rx='8' fill='#f6f8fa' stroke='#d0d7de' stroke-width='1.5'/><text x='790.0' y='416.0' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>encoder</text>
+<line x1='740' y1='411' x2='749' y2='411' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/>
+<line x1='825' y1='411' x2='839' y2='411' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/>
+<text x='849' y='415' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>score</text>
+<text x='620' y='446' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>reads both together → one score per pair</text>
+<text x='160' y='458' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>chunks encoded once, offline</text></svg>

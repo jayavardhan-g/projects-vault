@@ -47,7 +47,9 @@
 <rect x='14' y='182' width='860' height='28' rx='5' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4500;0.8500;1.0000'/></rect>
 <rect x='20' y='250' width='860' height='120' rx='8' fill='#fbfcfd' stroke='#d0d7de' stroke-width='1'/>
 <text x='36' y='274' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>Update rules (per row):  m_new = max(m, m_tile),  e_run = e^(m − m_new),  e_tile = e^(m_tile − m_new)</text>
-<text x='36' y='296' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>l = e_run · l + e_tile · l_tile        o = e_run · o + e_tile · Σ p·v        answer = o / l</text>
+<text x='36' y='296' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>l = e_run · l + e_tile · l_tile</text>
+<text x='330' y='296' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>o = e_run · o + e_tile · Σ p·v</text>
+<text x='640' y='296' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>answer = o / l</text>
 <text x='36' y='322' text-anchor='start' font-size='12' font-weight='400' fill='#0969da'>tile 2: l = 0.368 · 1.368 + 1 · 1.050 = 1.553,   o = 0.368 · 2.104 + 1 · 2.000 = 2.774</text>
 <text x='36' y='346' text-anchor='start' font-size='12' font-weight='600' fill='#1a7f37'>o / l = 2.774 / 1.553 = 1.786 = the exact softmax-weighted average. Never needed all 4 scores at once.</text>
 <text x='20' y='408' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: one tile at a time; the old state is rescaled by e_run when a bigger max appears</text></svg>

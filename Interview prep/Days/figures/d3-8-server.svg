@@ -1,0 +1,57 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 880 420' width='880' height='420' font-family='Inter, Helvetica, Arial, sans-serif'><title>Event loop timeline</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='880' height='420' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>One event loop, three coroutines: why await asyncio.sleep(0) gives continuous batching over HTTP</text>
+<text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>time runs left to right; only one coroutine runs at a time; a coroutine gives up the loop only at an await</text>
+<text x='20' y='76' text-anchor='start' font-size='12' font-weight='700' fill='#1a7f37'>WITH sleep(0)</text>
+<text x='148' y='106' text-anchor='end' font-size='12' font-weight='600' fill='#1f2328'>engine loop</text>
+<line x1='160' y1='120' x2='820' y2='120' stroke='#eaeef2'/>
+<text x='148' y='146' text-anchor='end' font-size='12' font-weight='600' fill='#1f2328'>handler A</text>
+<line x1='160' y1='160' x2='820' y2='160' stroke='#eaeef2'/>
+<text x='148' y='186' text-anchor='end' font-size='12' font-weight='600' fill='#1f2328'>handler B</text>
+<line x1='160' y1='200' x2='820' y2='200' stroke='#eaeef2'/>
+<rect x='162' y='84' width='95.0' height='32' rx='5' fill='#c8e1ff' stroke='#d0d7de'/>
+<text x='209.5' y='105' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 1: A</text>
+<rect x='272.0' y='84' width='94.99999999999999' height='32' rx='5' fill='#c8e1ff' stroke='#d0d7de'/>
+<text x='319.5' y='105' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 2: A</text>
+<rect x='398.5' y='84' width='94.99999999999999' height='32' rx='5' fill='#c7f0d2' stroke='#d0d7de'/>
+<text x='445.99999999999994' y='105' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 3: A+B</text>
+<rect x='508.5' y='84' width='94.99999999999999' height='32' rx='5' fill='#c7f0d2' stroke='#d0d7de'/>
+<text x='556.0' y='105' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 4: A+B</text>
+<rect x='162' y='124' width='441.5' height='32' rx='5' fill='#f6f8fa' stroke='#d0d7de'/>
+<text x='382.75' y='145' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>awaiting its future / stream queue (tokens arrive after each step)</text>
+<line x1='259.0' y1='80' x2='259.0' y2='200' stroke='#bf8700' stroke-dasharray='3 3'/>
+<line x1='369.0' y1='80' x2='369.0' y2='200' stroke='#bf8700' stroke-dasharray='3 3'/>
+<line x1='495.5' y1='80' x2='495.5' y2='200' stroke='#bf8700' stroke-dasharray='3 3'/>
+<line x1='605.5' y1='80' x2='605.5' y2='200' stroke='#bf8700' stroke-dasharray='3 3'/>
+<text x='259.0' y='214' text-anchor='middle' font-size='10' font-weight='600' fill='#bf8700'>sleep(0)</text>
+<text x='369.0' y='214' text-anchor='middle' font-size='10' font-weight='600' fill='#bf8700'>sleep(0)</text>
+<text x='495.5' y='214' text-anchor='middle' font-size='10' font-weight='600' fill='#bf8700'>sleep(0)</text>
+<text x='605.5' y='214' text-anchor='middle' font-size='10' font-weight='600' fill='#bf8700'>sleep(0)</text>
+<rect x='371.0' y='164' width='29.00000000000003' height='32' rx='5' fill='#f5c6e9' stroke='#d0d7de'/>
+<text x='385.5' y='185' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>submit</text>
+<rect x='404.0' y='164' width='199.49999999999997' height='32' rx='5' fill='#f6f8fa' stroke='#d0d7de'/>
+<text x='503.75' y='185' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>awaiting</text>
+<circle cx='314.0' cy='180' r='5' fill='#cf222e'/>
+<text x='305.0' y='184' text-anchor='end' font-size='10' font-weight='600' fill='#cf222e'>B arrives</text>
+<text x='666.0' y='104' text-anchor='start' font-size='11' font-weight='600' fill='#1a7f37'>A and B share steps</text>
+<text x='20' y='250' text-anchor='start' font-size='12' font-weight='700' fill='#cf222e'>WITHOUT it</text>
+<text x='148' y='280' text-anchor='end' font-size='12' font-weight='600' fill='#1f2328'>engine loop</text>
+<line x1='160' y1='294' x2='820' y2='294' stroke='#eaeef2'/>
+<text x='148' y='320' text-anchor='end' font-size='12' font-weight='600' fill='#1f2328'>handler B</text>
+<line x1='160' y1='334' x2='820' y2='334' stroke='#eaeef2'/>
+<rect x='162.0' y='258' width='95.0' height='32' rx='5' fill='#c8e1ff' stroke='#d0d7de'/>
+<text x='209.5' y='279' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 1: A</text>
+<rect x='266.5' y='258' width='95.00000000000001' height='32' rx='5' fill='#c8e1ff' stroke='#d0d7de'/>
+<text x='314.0' y='279' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 2: A</text>
+<rect x='371.0' y='258' width='94.99999999999999' height='32' rx='5' fill='#c8e1ff' stroke='#d0d7de'/>
+<text x='418.49999999999994' y='279' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 3: A</text>
+<rect x='475.49999999999994' y='258' width='94.99999999999999' height='32' rx='5' fill='#c8e1ff' stroke='#d0d7de'/>
+<text x='523.0' y='279' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 4: A</text>
+<rect x='635.0' y='258' width='95.00000000000004' height='32' rx='5' fill='#c7f0d2' stroke='#d0d7de'/>
+<text x='682.5' y='279' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>step 5: B</text>
+<rect x='316.0' y='298' width='260.0' height='32' rx='5' fill='#f6f8fa' stroke='#d0d7de'/>
+<text x='445.99999999999994' y='319' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>can't run yet</text>
+<rect x='580.0' y='298' width='45.50000000000002' height='32' rx='5' fill='#f5c6e9' stroke='#d0d7de'/>
+<text x='602.75' y='319' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>submit</text>
+<circle cx='314.0' cy='314' r='5' fill='#cf222e'/>
+<text x='314.0' y='346' text-anchor='middle' font-size='11' font-weight='600' fill='#cf222e'>B arrived during step 2 but can't run: the loop never awaits while there is work</text>
+<text x='20' y='386' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>The mutation test 'drop the per-iteration await' turned the server back into one-request-at-a-time (README, Phase 6.5).</text>
+<text x='20' y='406' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>No locks are needed: add_request can only run between steps, which is exactly where the scheduler says it is safe.</text></svg>

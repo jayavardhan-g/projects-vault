@@ -312,6 +312,10 @@ because only the last token needs a prediction.
 
 #### 1.1 Embedding: ids → vectors
 
+**The same step with the real model's shapes** (animated; blocks are sized by their dimensions, no values):
+
+![[d1s-embed.svg]]
+
 `src/mini_vllm/model/llama.py:264–264`
 ```python
 hidden = self.embed_tokens(input_ids)
@@ -397,6 +401,10 @@ from the embedding survives all 16 layers.
 
 #### 1.4 RMSNorm: rescale each token's vector
 
+**The same step with the real model's shapes** (animated; blocks are sized by their dimensions, no values):
+
+![[d1s-rmsnorm.svg]]
+
 > [!tip] New to normalisation? [[#4. Deep dive: RMSNorm from scratch, on our three tokens|§4 builds RMSNorm from scratch]]: why normalise, what RMS means, RMSNorm vs LayerNorm, "the" number by number, and the code line by line.
 
 `src/mini_vllm/model/llama.py:60–65`
@@ -442,6 +450,12 @@ The same happens independently to "cat" (rms 1.34) and "sat" (rms 1.28). Each ro
 
 #### 1.5 Project into queries, keys and values
 
+**The same step with the real model's shapes** (animated; blocks are sized by their dimensions, no values):
+
+![[d1s-qkv.svg]]
+
+![[d1s-heads.svg]]
+
 `src/mini_vllm/model/llama.py:283–285`
 ```python
 q = attn.q_proj(x).view(total_tokens, self.num_q_heads, self.head_dim)
@@ -464,6 +478,10 @@ both query heads will share. In the real model it's the same picture, scaled up:
 ![[d1t-2-qkv.svg]]
 
 #### 1.6 Rotate q and k by position
+
+**The same step with the real model's shapes** (animated; blocks are sized by their dimensions, no values):
+
+![[d1s-rope.svg]]
 
 > [!tip] New to RoPE? [[#3. Deep dive: RoPE from scratch, on our three tokens|§3 builds it from scratch on this example]]: why rotate, where the angles and the base come from, and the full arithmetic for "cat".
 
@@ -520,6 +538,12 @@ belong to nobody yet or to other requests. Attention in 1.8 then reads these row
 ![[d1t-1c-cache-write.svg]]
 
 #### 1.8 Attention, request by request
+
+**The same step with the real model's shapes** (animated; blocks are sized by their dimensions, no values):
+
+![[d1s-gqa.svg]]
+
+![[d1s-attn.svg]]
 
 > [!tip] New to attention? [[#5. Deep dive: attention from scratch, on our three tokens|§5 builds attention from scratch]]: Q, K, V, the score table, why ÷√d, the causal mask, softmax step by step, the weighted average, heads and GQA, and the code line by line.
 
@@ -618,6 +642,10 @@ real model: 32 heads concatenated to `[T, 2048]`.
 
 #### 1.9 Merge the heads, project, add the residual
 
+**The same step with the real model's shapes** (animated; blocks are sized by their dimensions, no values):
+
+![[d1s-oproj.svg]]
+
 `src/mini_vllm/model/llama.py:298–299`
 ```python
 out = out.reshape(total_tokens, self.num_q_heads * self.head_dim)
@@ -640,6 +668,10 @@ The attention block only *adds* a correction to the stream; it doesn't replace w
 ![[d1t-1d-merge-residual.svg]]
 
 #### 1.10 The MLP: SwiGLU
+
+**The same step with the real model's shapes** (animated; blocks are sized by their dimensions, no values):
+
+![[d1s-mlp.svg]]
 
 > [!tip] New to MLPs? [[#6. Deep dive: the SwiGLU MLP from scratch, on our three tokens|§6 builds the SwiGLU MLP from scratch]]: why a nonlinearity, ReLU vs SiLU, what gating does, where the parameters are, and "sat" number by number.
 
@@ -670,6 +702,10 @@ hidden = residual + mlp.down_proj(
 ![[d1t-1e-mlp.svg]]
 
 #### 1.11 From the last hidden state to logits
+
+**The same step with the real model's shapes** (animated; blocks are sized by their dimensions, no values):
+
+![[d1s-logits.svg]]
 
 `src/mini_vllm/model/llama.py:308–311`
 ```python
@@ -775,6 +811,7 @@ print("logits", [round(v, 2) for v in logits], "-> next token:", VOCAB[nxt])
 > - `math.sin(x)`: sine of an angle in radians. `math.sin(1)` = 0.841. [[Function glossary#math.sin|→ examples]]
 > - `max(xs) / max(a, b)`: the largest. `max([3, 9, 2])` = 9. With `key=f` it compares `f(x)` instead: `max(range(3), key=lambda i: s[i])` is the index of the largest `s[i]`. [[Function glossary#max|→ examples]]
 > - `math.exp(x)`: e to the power x. `math.exp(0)` = 1, `math.exp(-2.85)` = 0.058. [[Function glossary#math.exp|→ examples]]
+> - `print(x)`: writes text to the output. `print(f'{0.5:.2f}x')` prints `0.50x`; `:.2f` = 2 decimals. [[Function glossary#print|→ examples]]
 
 ### 2. Deep dive: the paged KV cache
 
@@ -971,6 +1008,7 @@ def __init__(self, num_blocks: int) -> None:
     self._free_blocks = list(reversed(range(num_blocks)))
 ```
 > [!info] New functions in this code
+> - `raise ValueError(msg)`: Python's built-in error for "right type, wrong value". `raise` stops the function and passes the error up to the caller. The kernel wrapper raises it for a bad shape (e.g. head_dim not a power of two) instead of computing a wrong answer. [[Function glossary#ValueError|→ examples]]
 > - `list(xs)`: makes a new list from any iterable. `list(reversed(range(3)))` = `[2, 1, 0]`. `list(x)` on a list makes a **copy**. [[Function glossary#list|→ examples]]
 > - `reversed(xs)`: the items in reverse order. `list(reversed([0, 1, 2]))` = `[2, 1, 0]`. [[Function glossary#reversed|→ examples]]
 

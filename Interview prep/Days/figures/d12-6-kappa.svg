@@ -1,0 +1,37 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 860 360' width='860' height='360' font-family='Inter, Helvetica, Arial, sans-serif'><title>kappa</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='860' height='360' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Judge vs hand labels (n = 40): agreement and Cohen's κ</text>
+<text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>rows = the LLM judge, columns = the blind hand label; the diagonal is agreement</text>
+<text x='196.0' y='90' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>supported</text>
+<text x='288.0' y='90' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>partial</text>
+<text x='380.0' y='90' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>unsupported</text>
+<text x='456' y='90' text-anchor='middle' font-size='11' font-weight='600' fill='#57606a'>judge Σ</text>
+<text x='140' y='129' text-anchor='end' font-size='11' font-weight='600' fill='#1f2328'>supported</text>
+<rect x='150' y='100' width='88' height='44' rx='6' fill='#c7f0d2'/><text x='194.0' y='128' text-anchor='middle' font-size='16' font-weight='700' fill='#1f2328'>20</text>
+<rect x='242' y='100' width='88' height='44' rx='6' fill='#f6f8fa'/><text x='286.0' y='128' text-anchor='middle' font-size='16' font-weight='400' fill='#1f2328'>0</text>
+<rect x='334' y='100' width='88' height='44' rx='6' fill='#f6f8fa'/><text x='378.0' y='128' text-anchor='middle' font-size='16' font-weight='400' fill='#1f2328'>0</text>
+<text x='456' y='128' text-anchor='middle' font-size='13' font-weight='600' fill='#57606a'>20</text>
+<text x='140' y='177' text-anchor='end' font-size='11' font-weight='600' fill='#1f2328'>partial</text>
+<rect x='150' y='148' width='88' height='44' rx='6' fill='#ffe1c2'/><text x='194.0' y='176' text-anchor='middle' font-size='16' font-weight='700' fill='#1f2328'>5</text>
+<rect x='242' y='148' width='88' height='44' rx='6' fill='#c7f0d2'/><text x='286.0' y='176' text-anchor='middle' font-size='16' font-weight='700' fill='#1f2328'>7</text>
+<rect x='334' y='148' width='88' height='44' rx='6' fill='#ffe1c2'/><text x='378.0' y='176' text-anchor='middle' font-size='16' font-weight='700' fill='#1f2328'>2</text>
+<text x='456' y='176' text-anchor='middle' font-size='13' font-weight='600' fill='#57606a'>14</text>
+<text x='140' y='225' text-anchor='end' font-size='11' font-weight='600' fill='#1f2328'>unsupported</text>
+<rect x='150' y='196' width='88' height='44' rx='6' fill='#f6f8fa'/><text x='194.0' y='224' text-anchor='middle' font-size='16' font-weight='400' fill='#1f2328'>0</text>
+<rect x='242' y='196' width='88' height='44' rx='6' fill='#f6f8fa'/><text x='286.0' y='224' text-anchor='middle' font-size='16' font-weight='400' fill='#1f2328'>0</text>
+<rect x='334' y='196' width='88' height='44' rx='6' fill='#c7f0d2'/><text x='378.0' y='224' text-anchor='middle' font-size='16' font-weight='700' fill='#1f2328'>6</text>
+<text x='456' y='224' text-anchor='middle' font-size='13' font-weight='600' fill='#57606a'>6</text>
+<text x='140' y='262' text-anchor='end' font-size='11' font-weight='600' fill='#57606a'>hand Σ</text>
+<text x='196.0' y='262' text-anchor='middle' font-size='13' font-weight='600' fill='#57606a'>25</text>
+<text x='288.0' y='262' text-anchor='middle' font-size='13' font-weight='600' fill='#57606a'>7</text>
+<text x='380.0' y='262' text-anchor='middle' font-size='13' font-weight='600' fill='#57606a'>8</text>
+<g opacity='0'><animate attributeName='opacity' dur='6.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0500;0.4500;1.0000'/><rect x='147' y='97' width='94' height='50' rx='8' fill='none' stroke='#1a7f37' stroke-width='3'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='6.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.1700;0.4500;1.0000'/><rect x='239' y='145' width='94' height='50' rx='8' fill='none' stroke='#1a7f37' stroke-width='3'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='6.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2900;0.4500;1.0000'/><rect x='331' y='193' width='94' height='50' rx='8' fill='none' stroke='#1a7f37' stroke-width='3'/></g>
+<text x='520' y='100' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>observed  p_o = (20 + 7 + 6) / 40 = 0.825</text>
+<text x='520' y='132' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>chance  p_e = (20·25 + 14·7 + 6·8) / 40²</text>
+<text x='580' y='152' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>= 646 / 1600 = 0.404</text>
+<text x='520' y='190' text-anchor='start' font-size='14' font-weight='700' fill='#cf222e'>κ = (p_o − p_e) / (1 − p_e)</text>
+<text x='538' y='212' text-anchor='start' font-size='14' font-weight='700' fill='#cf222e'>= (0.825 − 0.404) / 0.596 = 0.707</text>
+<text x='520' y='250' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>supported-or-not: p_o 0.875, p_e 0.5 → κ 0.75</text>
+<text x='520' y='276' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>judge's “partial” is a catch-all: 5 of 14</text>
+<text x='520' y='294' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>were really supported</text>
+<text x='20' y='348' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: the green diagonal is what both agree on; p_e is what two random raters with these totals would match</text></svg>

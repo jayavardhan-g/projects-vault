@@ -1,0 +1,88 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 420' width='900' height='420' font-family='Inter, Helvetica, Arial, sans-serif'><title>fast backup</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='900' height='420' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>AppendEntries repair with fast backup: 3 round trips instead of 8</text>
+<text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>the follower answers a mismatch with the FIRST index of its conflicting term</text>
+<text x='150' y='76' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>1</text>
+<text x='194' y='76' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>2</text>
+<text x='238' y='76' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>3</text>
+<text x='282' y='76' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>4</text>
+<text x='326' y='76' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>5</text>
+<text x='370' y='76' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>6</text>
+<text x='414' y='76' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>7</text>
+<text x='458' y='76' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>8</text>
+<text x='502' y='76' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>9</text>
+<text x='546' y='76' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>10</text>
+<text x='590' y='76' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>11</text>
+<text x='20' y='104' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>leader (t6)</text>
+<rect x='130' y='84' width='40' height='30' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='150.0' y='103.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='174' y='84' width='40' height='30' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='194.0' y='103.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='218' y='84' width='40' height='30' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='238.0' y='103.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='262' y='84' width='40' height='30' rx='5' fill='#c7f0d2' stroke='#8c959f' stroke-width='1.3'/><text x='282.0' y='103.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t4</text>
+<rect x='306' y='84' width='40' height='30' rx='5' fill='#c7f0d2' stroke='#8c959f' stroke-width='1.3'/><text x='326.0' y='103.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t4</text>
+<rect x='350' y='84' width='40' height='30' rx='5' fill='#f5c6e9' stroke='#8c959f' stroke-width='1.3'/><text x='370.0' y='103.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t5</text>
+<rect x='394' y='84' width='40' height='30' rx='5' fill='#f5c6e9' stroke='#8c959f' stroke-width='1.3'/><text x='414.0' y='103.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t5</text>
+<rect x='438' y='84' width='40' height='30' rx='5' fill='#fff1a8' stroke='#8c959f' stroke-width='1.3'/><text x='458.0' y='103.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t6</text>
+<rect x='482' y='84' width='40' height='30' rx='5' fill='#fff1a8' stroke='#8c959f' stroke-width='1.3'/><text x='502.0' y='103.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t6</text>
+<rect x='526' y='84' width='40' height='30' rx='5' fill='#fff1a8' stroke='#8c959f' stroke-width='1.3'/><text x='546.0' y='103.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t6</text>
+<text x='20' y='142' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>follower before</text>
+<rect x='130' y='122' width='40' height='30' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='150.0' y='141.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='174' y='122' width='40' height='30' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='194.0' y='141.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='218' y='122' width='40' height='30' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='238.0' y='141.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='262' y='122' width='40' height='30' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='282.0' y='141.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='306' y='122' width='40' height='30' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='326.0' y='141.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='350' y='122' width='40' height='30' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='370.0' y='141.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='394' y='122' width='40' height='30' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='414.0' y='141.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='438' y='122' width='40' height='30' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='458.0' y='141.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='482' y='122' width='40' height='30' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='502.0' y='141.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='526' y='122' width='40' height='30' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='546.0' y='141.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='570' y='122' width='40' height='30' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='590.0' y='141.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<text x='20' y='196' text-anchor='start' font-size='12' font-weight='700' fill='#0969da'>round 1</text>
+<rect x='130' y='176' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='150.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='174' y='176' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='194.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='218' y='176' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='238.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='262' y='176' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='282.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='306' y='176' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='326.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='350' y='176' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='370.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='394' y='176' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='414.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='438' y='176' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='458.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='482' y='176' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='502.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='526' y='176' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#cf222e' stroke-width='1.3'/><text x='546.0' y='193.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t3</text>
+<rect x='570' y='176' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='590.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<text x='130' y='220' text-anchor='start' font-size='11' font-weight='400' fill='#1f2328'>prev = 10: leader t6, follower t3 → reject, conflict = 7 (first index of t3)</text>
+<text x='20' y='250' text-anchor='start' font-size='12' font-weight='700' fill='#0969da'>round 2</text>
+<rect x='130' y='230' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='150.0' y='247.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='174' y='230' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='194.0' y='247.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='218' y='230' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='238.0' y='247.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='262' y='230' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='282.0' y='247.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='306' y='230' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='326.0' y='247.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='350' y='230' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#cf222e' stroke-width='1.3'/><text x='370.0' y='247.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t2</text>
+<rect x='394' y='230' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='414.0' y='247.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='438' y='230' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='458.0' y='247.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='482' y='230' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='502.0' y='247.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='526' y='230' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='546.0' y='247.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='570' y='230' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='590.0' y='247.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<text x='130' y='274' text-anchor='start' font-size='11' font-weight='400' fill='#1f2328'>prev = 6: leader t5, follower t2 → reject, conflict = 4 (first index of t2)</text>
+<text x='20' y='304' text-anchor='start' font-size='12' font-weight='700' fill='#0969da'>round 3</text>
+<rect x='130' y='284' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='150.0' y='301.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='174' y='284' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='194.0' y='301.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='218' y='284' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#cf222e' stroke-width='1.3'/><text x='238.0' y='301.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t1</text>
+<rect x='262' y='284' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='282.0' y='301.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='306' y='284' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='326.0' y='301.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='350' y='284' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='370.0' y='301.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='394' y='284' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='414.0' y='301.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='438' y='284' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='458.0' y='301.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='482' y='284' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='502.0' y='301.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='526' y='284' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='546.0' y='301.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='570' y='284' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='590.0' y='301.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<text x='130' y='328' text-anchor='start' font-size='11' font-weight='400' fill='#1f2328'>prev = 3: both t1 → match. Send 4..10; at 4 the terms differ → truncate, append</text>
+<text x='20' y='362' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>follower after</text>
+<rect x='130' y='342' width='40' height='30' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='150.0' y='361.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='174' y='342' width='40' height='30' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='194.0' y='361.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='218' y='342' width='40' height='30' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='238.0' y='361.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='262' y='342' width='40' height='30' rx='5' fill='#c7f0d2' stroke='#cf222e' stroke-width='1.3'/><text x='282.0' y='361.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t4</text>
+<rect x='306' y='342' width='40' height='30' rx='5' fill='#c7f0d2' stroke='#cf222e' stroke-width='1.3'/><text x='326.0' y='361.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t4</text>
+<rect x='350' y='342' width='40' height='30' rx='5' fill='#f5c6e9' stroke='#cf222e' stroke-width='1.3'/><text x='370.0' y='361.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t5</text>
+<rect x='394' y='342' width='40' height='30' rx='5' fill='#f5c6e9' stroke='#cf222e' stroke-width='1.3'/><text x='414.0' y='361.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t5</text>
+<rect x='438' y='342' width='40' height='30' rx='5' fill='#fff1a8' stroke='#cf222e' stroke-width='1.3'/><text x='458.0' y='361.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t6</text>
+<rect x='482' y='342' width='40' height='30' rx='5' fill='#fff1a8' stroke='#cf222e' stroke-width='1.3'/><text x='502.0' y='361.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t6</text>
+<rect x='526' y='342' width='40' height='30' rx='5' fill='#fff1a8' stroke='#cf222e' stroke-width='1.3'/><text x='546.0' y='361.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t6</text>
+<text x='640' y='362' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>stale entry 11 is gone too</text>
+<text x='20' y='405' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>One index at a time, the leader would try prev = 10, 9, 8, 7, 6, 5, 4 (7 rejects) and then 3: 8 round trips.</text></svg>

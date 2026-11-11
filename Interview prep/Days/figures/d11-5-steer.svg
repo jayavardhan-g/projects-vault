@@ -1,0 +1,31 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 860 420' width='860' height='420' font-family='Inter, Helvetica, Arial, sans-serif'><title>difference of means</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='860' height='420' rx='12' fill='#ffffff' stroke='#d0d7de'/><defs><marker id='m-ink' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#1f2328'/></marker><marker id='m-muted' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#57606a'/></marker><marker id='m-red' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#cf222e'/></marker><marker id='m-blue' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#0969da'/></marker><marker id='m-green' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#1a7f37'/></marker><marker id='m-amber' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#bf8700'/></marker><marker id='m-grey' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#8c959f'/></marker></defs><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Difference of means: the joy–sadness direction from 3 + 3 hidden states</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>first two features of 3-d toy states; v = normalise(mean(joy) − mean(sadness)); steer by adding 5v</text>
+<line x1='50' y1='350' x2='687.0' y2='350' stroke='#d0d7de'/><line x1='60' y1='360' x2='60' y2='140.99999999999997' stroke='#d0d7de'/>
+<text x='60' y='366' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>0</text>
+<text x='155' y='366' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>1</text>
+<text x='250' y='366' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>2</text>
+<text x='345' y='366' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>3</text>
+<text x='440' y='366' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>4</text>
+<text x='535' y='366' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>5</text>
+<text x='630' y='366' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>6</text>
+<text x='52' y='259' text-anchor='end' font-size='10' font-weight='400' fill='#57606a'>1</text>
+<text x='52' y='164' text-anchor='end' font-size='10' font-weight='400' fill='#57606a'>2</text>
+<circle cx='250.0' cy='255.0' r='7' fill='#ffd8b5' stroke='#1f2328' stroke-width='1'/>
+<circle cx='345.0' cy='255.0' r='7' fill='#ffd8b5' stroke='#1f2328' stroke-width='1'/>
+<circle cx='297.5' cy='302.5' r='7' fill='#ffd8b5' stroke='#1f2328' stroke-width='1'/>
+<circle cx='60.0' cy='255.0' r='7' fill='#c8e1ff' stroke='#1f2328' stroke-width='1'/>
+<circle cx='155.0' cy='255.0' r='7' fill='#c8e1ff' stroke='#1f2328' stroke-width='1'/>
+<circle cx='107.5' cy='207.5' r='7' fill='#c8e1ff' stroke='#1f2328' stroke-width='1'/>
+<circle cx='297.5' cy='270.9' r='8' fill='#cf222e' stroke='#1f2328' stroke-width='1'/><text x='309.5' y='288.9' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>mean joy (2.5, 0.83)</text>
+<circle cx='107.5' cy='239.1' r='8' fill='#0969da' stroke='#1f2328' stroke-width='1'/><text x='67.5' y='275.1' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>mean sadness (0.5, 1.17)</text>
+<line x1='107.5' y1='239.1' x2='289.5' y2='270.9' stroke='#1f2328' stroke-width='2.5' marker-end='url(#m-ink)'/>
+<text x='222.5' y='243.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>diff (2, −0.33), length 2.03</text>
+<circle cx='174.0' cy='169.5' r='7' fill='#ffffff' stroke='#1f2328' stroke-width='1'/><text x='186.0' y='161.5' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>h (1.2, 1.9): a new prompt's last token</text>
+<line x1='174.0' y1='169.5' x2='634.5' y2='247.6' stroke='#1a7f37' stroke-width='2' stroke-dasharray='6 4' marker-end='url(#m-green)'/>
+<circle cx='642.5' cy='247.6' r='7' fill='#c7f0d2' stroke='#1f2328' stroke-width='1'/><text x='572.5' y='271.6' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>h + 5v (6.13, 1.08)</text>
+<circle r='7' fill='#1a7f37' stroke='#1f2328'><animate attributeName='cx' dur='6.0s' repeatCount='indefinite' values='174.0;174.0;642.5;642.5' keyTimes='0;0.2;0.7;1'/><animate attributeName='cy' dur='6.0s' repeatCount='indefinite' values='169.5;169.5;247.6;247.6' keyTimes='0;0.2;0.7;1'/></circle>
+<text x='560' y='80' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>v = (0.986, −0.164, 0)</text>
+<text x='560' y='100' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>projection on v: joy 1.8 to 2.8,</text>
+<text x='560' y='116' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>sadness −0.2 to 0.8</text>
+<text x='560' y='136' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>h: 0.87 → h + 5v: 5.87 (exactly +5)</text>
+<circle cx='566.0' cy='160.0' r='6' fill='#ffd8b5' stroke='#1f2328' stroke-width='1'/><text x='575' y='164' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>joy sentences</text><circle cx='566.0' cy='180.0' r='6' fill='#c8e1ff' stroke='#1f2328' stroke-width='1'/><text x='575' y='184' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>sadness sentences</text>
+<text x='20' y='408' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: the hook moves the last token's state by 5v at layer 9 on every forward pass</text></svg>

@@ -1,0 +1,21 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 880 320' width='880' height='320' font-family='Inter, Helvetica, Arial, sans-serif'><title>Arrival time bug</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='880' height='320' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>The arrival-time bug: when does a request in batch 4 arrive?</text>
+<text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>HF static batching, 32 requests, batch size 8: batches run one after another; all 32 were submitted at t = 0</text>
+<rect x='120' y='80' width='154' height='40' rx='6' fill='#ffd8b5' stroke='#d0d7de'/>
+<text x='197.0' y='105' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>batch 1 (r0–r7)</text>
+<rect x='280' y='80' width='154' height='40' rx='6' fill='#c8e1ff' stroke='#d0d7de'/>
+<text x='357.0' y='105' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>batch 2 (r8–r15)</text>
+<rect x='440' y='80' width='154' height='40' rx='6' fill='#c7f0d2' stroke='#d0d7de'/>
+<text x='517.0' y='105' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>batch 3 (r16–r23)</text>
+<rect x='600' y='80' width='154' height='40' rx='6' fill='#f5c6e9' stroke='#d0d7de'/>
+<text x='677.0' y='105' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>batch 4 (r24–r31)</text>
+<text x='110' y='105' text-anchor='end' font-size='12' font-weight='600' fill='#1f2328'>GPU</text>
+<line x1='120' y1='135' x2='760' y2='135' stroke='#57606a'/>
+<text x='120' y='152' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>t = 0: all 32 arrive</text>
+<line x1='670' y1='75' x2='670' y2='125' stroke='#cf222e' stroke-width='2' stroke-dasharray='4 3'/>
+<text x='674' y='72' text-anchor='start' font-size='11' font-weight='600' fill='#cf222e'>r24's first token</text>
+<line x1='600' y1='190' x2='666' y2='190' stroke='#cf222e' stroke-width='2' marker-end='url(#ah)'/>
+<text x='592' y='194' text-anchor='end' font-size='12' font-weight='600' fill='#cf222e'>buggy TTFT: from its batch's start</text>
+<line x1='120' y1='230' x2='666' y2='230' stroke='#1a7f37' stroke-width='2' marker-end='url(#ah)'/>
+<text x='130' y='222' text-anchor='start' font-size='12' font-weight='600' fill='#1a7f37'>real TTFT: from submission (arrival = start). Includes 3 batches of queueing</text>
+<text x='20' y='280' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>Fixing it moved the baseline's TTFT p50 from 24.6 ms to 2,448 ms. The fix helped our side, so it got the most scrutiny.</text>
+<text x='20' y='302' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>serving.py:142 sets arrival=start for every HF request; the engine arm always measured from submission.</text></svg>

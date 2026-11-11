@@ -1,0 +1,51 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 400' width='900' height='400' font-family='Inter, Helvetica, Arial, sans-serif'><title>election timeline</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='900' height='400' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Leader election after a crash: randomized timeouts (3 nodes)</text>
+<text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>heartbeat every 100 ms; each follower draws a fresh timeout in [600, 1200] ms whenever it hears from the leader</text>
+<text x='30' y='115' text-anchor='start' font-size='14' font-weight='700' fill='#1f2328'>n1</text>
+<line x1='110' y1='125' x2='860' y2='125' stroke='#d0d7de' stroke-width='1'/>
+<text x='30' y='195' text-anchor='start' font-size='14' font-weight='700' fill='#1f2328'>n2</text>
+<line x1='110' y1='205' x2='860' y2='205' stroke='#d0d7de' stroke-width='1'/>
+<text x='30' y='275' text-anchor='start' font-size='14' font-weight='700' fill='#1f2328'>n3</text>
+<line x1='110' y1='285' x2='860' y2='285' stroke='#d0d7de' stroke-width='1'/>
+<text x='110.0' y='345' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>0</text>
+<line x1='110.0' y1='90' x2='110.0' y2='330' stroke='#f0f2f4' stroke-width='1'/>
+<text x='167.69230769230768' y='345' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>100</text>
+<line x1='167.69230769230768' y1='90' x2='167.69230769230768' y2='330' stroke='#f0f2f4' stroke-width='1'/>
+<text x='225.3846153846154' y='345' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>200</text>
+<line x1='225.3846153846154' y1='90' x2='225.3846153846154' y2='330' stroke='#f0f2f4' stroke-width='1'/>
+<text x='283.0769230769231' y='345' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>300</text>
+<line x1='283.0769230769231' y1='90' x2='283.0769230769231' y2='330' stroke='#f0f2f4' stroke-width='1'/>
+<text x='340.7692307692308' y='345' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>400</text>
+<line x1='340.7692307692308' y1='90' x2='340.7692307692308' y2='330' stroke='#f0f2f4' stroke-width='1'/>
+<text x='398.46153846153845' y='345' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>500</text>
+<line x1='398.46153846153845' y1='90' x2='398.46153846153845' y2='330' stroke='#f0f2f4' stroke-width='1'/>
+<text x='456.1538461538462' y='345' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>600</text>
+<line x1='456.1538461538462' y1='90' x2='456.1538461538462' y2='330' stroke='#f0f2f4' stroke-width='1'/>
+<text x='513.8461538461538' y='345' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>700</text>
+<line x1='513.8461538461538' y1='90' x2='513.8461538461538' y2='330' stroke='#f0f2f4' stroke-width='1'/>
+<text x='571.5384615384615' y='345' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>800</text>
+<line x1='571.5384615384615' y1='90' x2='571.5384615384615' y2='330' stroke='#f0f2f4' stroke-width='1'/>
+<text x='629.2307692307692' y='345' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>900</text>
+<line x1='629.2307692307692' y1='90' x2='629.2307692307692' y2='330' stroke='#f0f2f4' stroke-width='1'/>
+<text x='686.9230769230769' y='345' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>1000</text>
+<line x1='686.9230769230769' y1='90' x2='686.9230769230769' y2='330' stroke='#f0f2f4' stroke-width='1'/>
+<text x='744.6153846153846' y='345' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>1100</text>
+<line x1='744.6153846153846' y1='90' x2='744.6153846153846' y2='330' stroke='#f0f2f4' stroke-width='1'/>
+<text x='802.3076923076924' y='345' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>1200</text>
+<line x1='802.3076923076924' y1='90' x2='802.3076923076924' y2='330' stroke='#f0f2f4' stroke-width='1'/>
+<text x='860.0' y='345' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>1300</text>
+<line x1='860.0' y1='90' x2='860.0' y2='330' stroke='#f0f2f4' stroke-width='1'/>
+<text x='485.0' y='365' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>time since the leader's last heartbeat (ms)</text>
+<rect x='106.0' y='100' width='70' height='28' rx='5' fill='#c8e1ff' stroke='#0969da' stroke-width='1.3'/><text x='141.0' y='118.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>leader t2</text>
+<text x='190.0' y='120' text-anchor='start' font-size='12' font-weight='700' fill='#cf222e'>✕ crashes right after its heartbeat at 0 ms</text>
+<rect x='110.0' y='186' width='432.6923076923076' height='18' rx='4' fill='#fff1a8' stroke='#bf8700'/>
+<text x='326.3461538461538' y='199' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>n2 timer: 750 ms</text>
+<rect x='110.0' y='266' width='582.6923076923077' height='18' rx='4' fill='#fff1a8' stroke='#bf8700' opacity='0.45'/>
+<text x='401.34615384615387' y='279' text-anchor='middle' font-size='11' font-weight='600' fill='#57606a'>n3 timer: 1010 ms (never fires)</text>
+<rect x='546.6923076923076' y='180' width='140' height='30' rx='5' fill='#ffd8b5' stroke='#bf8700' stroke-width='1.3'/><text x='616.6923076923076' y='199.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>750 ms: candidate t3</text>
+<line x1='543.8461538461538' y1='212' x2='546.1538461538462' y2='262' stroke='#cf222e' stroke-width='2'/><path d='M546.2,262.0 L540.7,252.2 L550.7,251.8 z' fill='#cf222e'/>
+<text x='539.8461538461538' y='240' text-anchor='end' font-size='11' font-weight='600' fill='#cf222e'>RequestVote(t3, last t2/6)</text>
+<rect x='548.4615384615386' y='290' width='150' height='28' rx='5' fill='#ffffff' stroke='#1a7f37' stroke-width='1.3'/><text x='623.4615384615386' y='308.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>grants: log ok, resets timer</text>
+<rect x='692.6923076923077' y='180' width='130' height='30' rx='5' fill='#ffd8b5' stroke='#cf222e' stroke-width='1.3'/><text x='757.6923076923077' y='199.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>≈751 ms: LEADER t3</text>
+<text x='757.6923076923077' y='225' text-anchor='middle' font-size='11' font-weight='600' fill='#cf222e'>2 of 3 votes = majority</text>
+<line x1='110' y1='88' x2='110' y2='332' stroke='#cf222e' stroke-width='2'><animate attributeName='x1' dur='9.0s' repeatCount='indefinite' values='110;860;860' keyTimes='0;0.92;1'/><animate attributeName='x2' dur='9.0s' repeatCount='indefinite' values='110;860;860' keyTimes='0;0.92;1'/></line>
+<text x='20' y='388' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: the red line is the clock. Boxes are labels: on loopback the vote round trip takes ~1 ms, so n2 leads at ≈751 ms.</text></svg>

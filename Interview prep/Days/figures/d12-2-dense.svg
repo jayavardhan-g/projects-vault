@@ -1,0 +1,29 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 820 414' width='820' height='414' font-family='Inter, Helvetica, Arial, sans-serif'><title>dense retrieval</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='820' height='414' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Dense retrieval: texts become directions; score = cosine of the angle</text>
+<text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>a made-up 2-D picture (the real vectors have 384 dimensions)</text>
+<line x1='70' y1='368' x2='340' y2='368' stroke='#57606a' marker-end='url(#ah)'/>
+<line x1='70' y1='368' x2='70' y2='98' stroke='#57606a' marker-end='url(#ah)'/>
+<text x='340' y='386' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>“server fetches something”</text>
+<text x='80' y='116' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>“who may access what”</text>
+<path d='M310,368 A240,240 0 0 0 70,128' fill='none' stroke='#d0d7de' stroke-dasharray='4 4'/>
+<line x1='70' y1='368' x2='297.7' y2='292.2' stroke='#cf222e' stroke-width='3'/>
+<circle cx='297.7' cy='292.2' r='5' fill='#cf222e'/>
+<text x='307.73024279467916' y='296.2442311326954' text-anchor='start' font-size='12' font-weight='600' fill='#cf222e'>query</text>
+<line x1='70' y1='368' x2='284.6' y2='260.5' stroke='#1a7f37' stroke-width='2'/>
+<circle cx='284.6' cy='260.5' r='5' fill='#1a7f37'/>
+<text x='294.59701684144835' y='264.5378189186953' text-anchor='start' font-size='12' font-weight='600' fill='#1a7f37'>cloud metadata  cos 0.990</text>
+<line x1='70' y1='368' x2='308.2' y2='338.3' stroke='#1a7f37' stroke-width='2'/>
+<circle cx='308.2' cy='338.3' r='5' fill='#1a7f37'/>
+<text x='318.1596650925173' y='352.33564558228176' text-anchor='start' font-size='12' font-weight='600' fill='#1a7f37'>SSRF doc  cos 0.981</text>
+<line x1='70' y1='368' x2='128.1' y2='135.1' stroke='#8c959f' stroke-width='2'/>
+<circle cx='128.1' cy='135.1' r='5' fill='#8c959f'/>
+<text x='138.06125494392023' y='139.12902569376084' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>IDOR doc  cos 0.537</text>
+<g opacity='0'><animate attributeName='opacity' dur='6.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0500;0.3300;1.0000'/><path d='M136.4,345.9 A70,70 0 0 0 132.6,336.7' fill='none' stroke='#bf8700' stroke-width='4'/><text x='530' y='330' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>angle query ↔ cloud metadata: 8.2° → cos 0.990</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='6.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3500;0.6300;1.0000'/><path d='M164.9,336.4 A100,100 0 0 1 169.2,355.6' fill='none' stroke='#bf8700' stroke-width='4'/><text x='530' y='330' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>angle query ↔ SSRF doc: 11.3° → cos 0.981</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='6.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6500;0.9300;1.0000'/><path d='M193.4,327.0 A130,130 0 0 0 101.4,241.9' fill='none' stroke='#bf8700' stroke-width='4'/><text x='530' y='330' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>angle query ↔ IDOR doc: 57.6° → cos 0.537</text></g>
+<text x='530' y='100' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>cos(q, d) = q · d  (unit vectors)</text>
+<text x='530' y='126' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>metadata: 0.949·0.894 + 0.316·0.447 = 0.990</text>
+<text x='530' y='148' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>SSRF:      0.949·0.992 + 0.316·0.124 = 0.981</text>
+<text x='530' y='170' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>IDOR:      0.949·0.243 + 0.316·0.970 = 0.537</text>
+<text x='530' y='206' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>The query shares no words with the SSRF doc,</text>
+<text x='530' y='224' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>so BM25 scores it 0; dense finds it.</text>
+<text x='20' y='402' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: the amber arc shows each doc's angle to the query</text></svg>

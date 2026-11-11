@@ -1,32 +1,32 @@
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 430' width='900' height='430' font-family='Inter, Helvetica, Arial, sans-serif'><title>checkpointing memory</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='900' height='430' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Checkpointing on the N = 4096 config: what is allocated (MiB)</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>4-layer MLP, batch 4096, widths 1024 → 4096 → 4096 → 4096 → 1024; one 4096×4096 float tensor = 64 MiB</text>
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 450' width='900' height='450' font-family='Inter, Helvetica, Arial, sans-serif'><title>checkpointing memory</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='900' height='450' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Checkpointing on the N = 4096 config: what is allocated (MiB)</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>4-layer MLP, batch 4096, widths 1024 → 4096 → 4096 → 4096 → 1024; one 4096×4096 float tensor = 64 MiB</text>
 <text x='220' y='80' text-anchor='middle' font-size='13' font-weight='700' fill='#1f2328'>baseline: keep all 7</text>
-<rect x='130' y='332.0' width='180' height='47.0' rx='3' fill='#ffd8b5' stroke='#ffffff' stroke-width='1'/>
-<text x='220' y='360.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>Z1  64</text>
-<rect x='130' y='284.0' width='180' height='47.0' rx='3' fill='#ffd8b5' stroke='#ffffff' stroke-width='1'/>
-<text x='220' y='312.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>A1  64</text>
-<rect x='130' y='236.0' width='180' height='47.0' rx='3' fill='#ffd8b5' stroke='#ffffff' stroke-width='1'/>
-<text x='220' y='264.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>Z2  64</text>
-<rect x='130' y='188.0' width='180' height='47.0' rx='3' fill='#c7f0d2' stroke='#ffffff' stroke-width='1'/>
-<text x='220' y='216.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>A2 (checkpoint)  64</text>
-<rect x='130' y='140.0' width='180' height='47.0' rx='3' fill='#c8e1ff' stroke='#ffffff' stroke-width='1'/>
-<text x='220' y='168.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>Z3  64</text>
-<rect x='130' y='92.0' width='180' height='47.0' rx='3' fill='#c8e1ff' stroke='#ffffff' stroke-width='1'/>
-<text x='220' y='120.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>A3  64</text>
-<rect x='130' y='80.0' width='180' height='11.0' rx='3' fill='#c7f0d2' stroke='#ffffff' stroke-width='1'/>
-<text x='220' y='90.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>Z4 (checkpoint)  16</text>
-<text x='220' y='72.0' text-anchor='middle' font-size='13' font-weight='700' fill='#1f2328'>400 MiB</text>
+<rect x='130' y='338.4' width='180' height='40.6' rx='3' fill='#ffd8b5' stroke='#ffffff' stroke-width='1'/>
+<text x='220' y='363.2' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>Z1  64</text>
+<rect x='130' y='296.79999999999995' width='180' height='40.6' rx='3' fill='#ffd8b5' stroke='#ffffff' stroke-width='1'/>
+<text x='220' y='321.59999999999997' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>A1  64</text>
+<rect x='130' y='255.19999999999996' width='180' height='40.6' rx='3' fill='#ffd8b5' stroke='#ffffff' stroke-width='1'/>
+<text x='220' y='279.99999999999994' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>Z2  64</text>
+<rect x='130' y='213.59999999999997' width='180' height='40.6' rx='3' fill='#c7f0d2' stroke='#ffffff' stroke-width='1'/>
+<text x='220' y='238.39999999999995' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>A2 (checkpoint)  64</text>
+<rect x='130' y='171.99999999999997' width='180' height='40.6' rx='3' fill='#c8e1ff' stroke='#ffffff' stroke-width='1'/>
+<text x='220' y='196.79999999999995' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>Z3  64</text>
+<rect x='130' y='130.39999999999998' width='180' height='40.6' rx='3' fill='#c8e1ff' stroke='#ffffff' stroke-width='1'/>
+<text x='220' y='155.19999999999996' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>A3  64</text>
+<rect x='130' y='119.99999999999997' width='180' height='9.4' rx='3' fill='#c7f0d2' stroke='#ffffff' stroke-width='1'/>
+<text x='220' y='129.2' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>Z4 (checkpoint)  16</text>
+<text x='220' y='111.99999999999997' text-anchor='middle' font-size='13' font-weight='700' fill='#1f2328'>400 MiB</text>
 <text x='560' y='80' text-anchor='middle' font-size='13' font-weight='700' fill='#1f2328'>checkpointed</text>
-<rect x='470' y='332.0' width='180' height='47.0' rx='3' fill='#c7f0d2' stroke='#ffffff' stroke-width='1'/>
-<text x='560' y='360.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>A2 (checkpoint)  64</text>
-<rect x='470' y='320.0' width='180' height='11.0' rx='3' fill='#c7f0d2' stroke='#ffffff' stroke-width='1'/>
-<text x='560' y='330.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>Z4  16</text>
-<rect x='470' y='176.0' width='180' height='143.0' rx='3' fill='#fff1a8' stroke='#ffffff' stroke-width='1'/>
-<text x='560' y='252.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>arena  192</text>
-<text x='560' y='168.0' text-anchor='middle' font-size='13' font-weight='700' fill='#1f2328'>272 MiB</text>
-<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0400;0.2800;1.0000'/><rect x='470' y='176.0' width='180' height='143.0' rx='3' fill='#ffd8b5' stroke='#cf222e' stroke-width='2'/><text x='560' y='252.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>192 MiB in use</text><text x='670' y='196.0' text-anchor='start' font-size='12' font-weight='600' fill='#cf222e'>forward 1–2: z1 a1 z2</text></g>
-<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2800;0.5200;1.0000'/><rect x='470' y='224.0' width='180' height='95.0' rx='3' fill='#c8e1ff' stroke='#cf222e' stroke-width='2'/><text x='560' y='276.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>128 MiB in use</text><text x='670' y='196.0' text-anchor='start' font-size='12' font-weight='600' fill='#cf222e'>forward 3: z3 a3 (overwrites)</text></g>
-<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5200;0.7600;1.0000'/><rect x='470' y='224.0' width='180' height='95.0' rx='3' fill='#c8e1ff' stroke='#cf222e' stroke-width='2'/><text x='560' y='276.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>128 MiB in use</text><text x='670' y='196.0' text-anchor='start' font-size='12' font-weight='600' fill='#cf222e'>backward: rebuild z3 a3 from A2</text></g>
-<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7600;1.0000;1.0000'/><rect x='470' y='176.0' width='180' height='143.0' rx='3' fill='#ffd8b5' stroke='#cf222e' stroke-width='2'/><text x='560' y='252.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>192 MiB in use</text><text x='670' y='196.0' text-anchor='start' font-size='12' font-weight='600' fill='#cf222e'>backward: rebuild z1 a1 z2 from X</text></g>
+<rect x='470' y='338.4' width='180' height='40.6' rx='3' fill='#c7f0d2' stroke='#ffffff' stroke-width='1'/>
+<text x='560' y='363.2' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>A2 (checkpoint)  64</text>
+<rect x='470' y='328.0' width='180' height='9.4' rx='3' fill='#c7f0d2' stroke='#ffffff' stroke-width='1'/>
+<text x='560' y='337.2' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>Z4  16</text>
+<rect x='470' y='203.2' width='180' height='123.80000000000001' rx='3' fill='#fff1a8' stroke='#ffffff' stroke-width='1'/>
+<text x='560' y='269.6' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>arena  192</text>
+<text x='560' y='195.2' text-anchor='middle' font-size='13' font-weight='700' fill='#1f2328'>272 MiB</text>
+<g opacity='1'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='1;0;0' keyTimes='0.0000;0.2800;1.0000'/><rect x='470' y='203.2' width='180' height='123.80000000000001' rx='3' fill='#ffd8b5' stroke='#cf222e' stroke-width='2'/><text x='560' y='269.6' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>192 MiB in use</text><text x='560' y='404' text-anchor='middle' font-size='12' font-weight='600' fill='#cf222e'>forward 1–2: z1 a1 z2</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2800;0.5200;1.0000'/><rect x='470' y='244.8' width='180' height='82.2' rx='3' fill='#c8e1ff' stroke='#cf222e' stroke-width='2'/><text x='560' y='290.4' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>128 MiB in use</text><text x='560' y='404' text-anchor='middle' font-size='12' font-weight='600' fill='#cf222e'>forward 3: z3 a3 (overwrites)</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5200;0.7600;1.0000'/><rect x='470' y='244.8' width='180' height='82.2' rx='3' fill='#c8e1ff' stroke='#cf222e' stroke-width='2'/><text x='560' y='290.4' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>128 MiB in use</text><text x='560' y='404' text-anchor='middle' font-size='12' font-weight='600' fill='#cf222e'>backward: rebuild z3 a3 from A2</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='8.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7600;1.0000;1.0000'/><rect x='470' y='203.2' width='180' height='123.80000000000001' rx='3' fill='#ffd8b5' stroke='#cf222e' stroke-width='2'/><text x='560' y='269.6' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>192 MiB in use</text><text x='560' y='404' text-anchor='middle' font-size='12' font-weight='600' fill='#cf222e'>backward: rebuild z1 a1 z2 from X</text></g>
 <text x='690' y='130' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>arena = max(</text>
 <text x='690' y='148' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>  2·n3 = 128,</text>
 <text x='690' y='166' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>  2·n1 + n2 = 192) MiB</text>
@@ -36,4 +36,4 @@
 <text x='690' y='266' text-anchor='start' font-size='12' font-weight='600' fill='#1a7f37'>(−128 MiB = −13.3%)</text>
 <text x='690' y='296' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>cost: backward 136.1 →</text>
 <text x='690' y='314' text-anchor='start' font-size='12' font-weight='600' fill='#cf222e'>171.7 ms (+26%)</text>
-<text x='20' y='418' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: what the one arena holds in each phase. Five separate buffers instead would total 400 again: the 0 MB bug</text></svg>
+<text x='20' y='438' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: what the one arena holds in each phase. Five separate buffers instead would total 400 again: the 0 MB bug</text></svg>

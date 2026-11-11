@@ -1,0 +1,71 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 880 462' width='880' height='462' font-family='Inter, Helvetica, Arial, sans-serif'><title>WER DP</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='880' height='462' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>WER by dynamic programming: ref “the cat sat down”, hyp “the bat sat”</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>each cell = min(up + 1 deletion, left + 1 insertion, diagonal + 0 if words match else 1 substitution)</text>
+<text x='20' y='72' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>D[i][j] = fewest edits that turn the first i reference words into the first j hypothesis words</text>
+<rect x='140' y='110' width='210' height='302' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='145' y='115' width='200' height='56' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='150' y='120' width='46' height='46' rx='4' fill='#fff1a8' stroke='#ffffff'/>
+<text x='173.0' y='147.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>0</text>
+<rect x='198' y='120' width='46' height='46' rx='4' fill='#f6f8fa' stroke='#ffffff'/>
+<text x='221.0' y='147.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>1</text>
+<rect x='246' y='120' width='46' height='46' rx='4' fill='#f6f8fa' stroke='#ffffff'/>
+<text x='269.0' y='147.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<rect x='294' y='120' width='46' height='46' rx='4' fill='#f6f8fa' stroke='#ffffff'/>
+<text x='317.0' y='147.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>3</text>
+<rect x='145' y='174' width='200' height='56' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='150' y='179' width='46' height='46' rx='4' fill='#f6f8fa' stroke='#ffffff'/>
+<text x='173.0' y='206.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>1</text>
+<rect x='198' y='179' width='46' height='46' rx='4' fill='#fff1a8' stroke='#ffffff'/>
+<text x='221.0' y='206.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>0</text>
+<rect x='246' y='179' width='46' height='46' rx='4' fill='#f6f8fa' stroke='#ffffff'/>
+<text x='269.0' y='206.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>1</text>
+<rect x='294' y='179' width='46' height='46' rx='4' fill='#f6f8fa' stroke='#ffffff'/>
+<text x='317.0' y='206.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<rect x='145' y='233' width='200' height='56' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='150' y='238' width='46' height='46' rx='4' fill='#f6f8fa' stroke='#ffffff'/>
+<text x='173.0' y='265.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<rect x='198' y='238' width='46' height='46' rx='4' fill='#f6f8fa' stroke='#ffffff'/>
+<text x='221.0' y='265.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>1</text>
+<rect x='246' y='238' width='46' height='46' rx='4' fill='#fff1a8' stroke='#ffffff'/>
+<text x='269.0' y='265.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>1</text>
+<rect x='294' y='238' width='46' height='46' rx='4' fill='#f6f8fa' stroke='#ffffff'/>
+<text x='317.0' y='265.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<rect x='145' y='292' width='200' height='56' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='150' y='297' width='46' height='46' rx='4' fill='#f6f8fa' stroke='#ffffff'/>
+<text x='173.0' y='324.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>3</text>
+<rect x='198' y='297' width='46' height='46' rx='4' fill='#f6f8fa' stroke='#ffffff'/>
+<text x='221.0' y='324.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<rect x='246' y='297' width='46' height='46' rx='4' fill='#f6f8fa' stroke='#ffffff'/>
+<text x='269.0' y='324.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<rect x='294' y='297' width='46' height='46' rx='4' fill='#fff1a8' stroke='#ffffff'/>
+<text x='317.0' y='324.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>1</text>
+<rect x='145' y='351' width='200' height='56' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='150' y='356' width='46' height='46' rx='4' fill='#f6f8fa' stroke='#ffffff'/>
+<text x='173.0' y='383.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>4</text>
+<rect x='198' y='356' width='46' height='46' rx='4' fill='#f6f8fa' stroke='#ffffff'/>
+<text x='221.0' y='383.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>3</text>
+<rect x='246' y='356' width='46' height='46' rx='4' fill='#f6f8fa' stroke='#ffffff'/>
+<text x='269.0' y='383.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>3</text>
+<rect x='294' y='356' width='46' height='46' rx='4' fill='#fff1a8' stroke='#ffffff'/>
+<text x='317.0' y='383.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<text x='173.0' y='103' text-anchor='middle' font-size='12' font-weight='600' fill='#0969da'>∅</text>
+<text x='221.0' y='103' text-anchor='middle' font-size='12' font-weight='600' fill='#0969da'>the</text>
+<text x='269.0' y='103' text-anchor='middle' font-size='12' font-weight='600' fill='#0969da'>bat</text>
+<text x='317.0' y='103' text-anchor='middle' font-size='12' font-weight='600' fill='#0969da'>sat</text>
+<text x='128' y='147.0' text-anchor='end' font-size='12' font-weight='600' fill='#cf222e'>∅</text>
+<text x='128' y='206.0' text-anchor='end' font-size='12' font-weight='600' fill='#cf222e'>the</text>
+<text x='128' y='265.0' text-anchor='end' font-size='12' font-weight='600' fill='#cf222e'>cat</text>
+<text x='128' y='324.0' text-anchor='end' font-size='12' font-weight='600' fill='#cf222e'>sat</text>
+<text x='128' y='383.0' text-anchor='end' font-size='12' font-weight='600' fill='#cf222e'>down</text>
+<rect x='147' y='117' width='52' height='52' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0600;0.2200;1.0000'/></rect>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0600;0.2200;1.0000'/><text x='400' y='150' text-anchor='start' font-size='14' font-weight='600' fill='#1f2328'>start</text></g>
+<rect x='195' y='176' width='52' height='52' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2300;0.3900;1.0000'/></rect>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2300;0.3900;1.0000'/><text x='400' y='150' text-anchor='start' font-size='14' font-weight='600' fill='#1f2328'>the = the: 0</text></g>
+<rect x='243' y='235' width='52' height='52' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4000;0.5600;1.0000'/></rect>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4000;0.5600;1.0000'/><text x='400' y='150' text-anchor='start' font-size='14' font-weight='600' fill='#1f2328'>cat → bat: +1 (S)</text></g>
+<rect x='291' y='294' width='52' height='52' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5700;0.7300;1.0000'/></rect>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5700;0.7300;1.0000'/><text x='400' y='150' text-anchor='start' font-size='14' font-weight='600' fill='#1f2328'>sat = sat: +0</text></g>
+<rect x='291' y='353' width='52' height='52' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7400;0.9000;1.0000'/></rect>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7400;0.9000;1.0000'/><text x='400' y='150' text-anchor='start' font-size='14' font-weight='600' fill='#1f2328'>down missing: +1 (D)</text></g>
+<text x='400' y='200' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>bottom-right = 2 edits (S = 1, D = 1, I = 0)</text>
+<text x='400' y='222' text-anchor='start' font-size='13' font-weight='700' fill='#cf222e'>WER = (S + D + I) / N = 2 / 4 = 0.50</text>
+<text x='400' y='262' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>Insertions have no cap: ref of 4 words,</text><text x='400' y='280' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>hyp with 1 substitution + 6 extra words</text><text x='400' y='298' text-anchor='start' font-size='12' font-weight='600' fill='#cf222e'>→ (1 + 0 + 6) / 4 = 1.75</text>
+<text x='20' y='448' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: the yellow cheapest path, one step at a time (diagonal = keep or substitute, down = delete)</text></svg>

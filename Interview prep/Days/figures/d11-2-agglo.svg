@@ -1,0 +1,40 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 880 440' width='880' height='440' font-family='Inter, Helvetica, Arial, sans-serif'><title>agglomerative</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='880' height='440' rx='12' fill='#ffffff' stroke='#d0d7de'/><defs><marker id='m-ink' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#1f2328'/></marker><marker id='m-muted' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#57606a'/></marker><marker id='m-red' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#cf222e'/></marker><marker id='m-blue' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#0969da'/></marker><marker id='m-green' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#1a7f37'/></marker><marker id='m-amber' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#bf8700'/></marker><marker id='m-grey' markerUnits='userSpaceOnUse' markerWidth='12' markerHeight='12' refX='10' refY='6' orient='auto'><path d='M0,1 L11,6 L0,11 z' fill='#8c959f'/></marker></defs><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Agglomerative clustering, average linkage, threshold 0.75</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>5 faces as unit vectors; distance = 1 − cos; merge the closest pair until the next merge is > 0.75</text>
+<path d='M480.0,340.0 A210,210 0 0 0 88.1,235.0' fill='none' stroke='#8c959f' stroke-width='1.2' stroke-dasharray='3 3'/>
+<circle cx='480.0' cy='340.0' r='9' fill='#ffd8b5' stroke='#1f2328' stroke-width='1'/>
+<text x='494.0' y='344.0' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>a (0°)</text>
+<circle cx='467.3' cy='268.2' r='9' fill='#ffd8b5' stroke='#1f2328' stroke-width='1'/>
+<text x='481.3' y='272.2' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>b (20°)</text>
+<circle cx='430.9' cy='205.0' r='9' fill='#ffd8b5' stroke='#1f2328' stroke-width='1'/>
+<text x='444.9' y='209.0' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>c (40°)</text>
+<circle cx='165.0' cy='158.1' r='9' fill='#c8e1ff' stroke='#1f2328' stroke-width='1'/>
+<text x='151.0' y='162.1' text-anchor='end' font-size='12' font-weight='600' fill='#1f2328'>d (120°)</text>
+<circle cx='121.5' cy='191.5' r='9' fill='#c8e1ff' stroke='#1f2328' stroke-width='1'/>
+<text x='107.5' y='195.5' text-anchor='end' font-size='12' font-weight='600' fill='#1f2328'>e (135°)</text>
+<line x1='510' y1='330' x2='510' y2='100.49999999999997' stroke='#57606a'/>
+<text x='504' y='334' text-anchor='end' font-size='10' font-weight='400' fill='#57606a'>0</text>
+<text x='504' y='291.5' text-anchor='end' font-size='10' font-weight='400' fill='#57606a'>0.25</text>
+<text x='504' y='249.0' text-anchor='end' font-size='10' font-weight='400' fill='#57606a'>0.5</text>
+<text x='504' y='206.5' text-anchor='end' font-size='10' font-weight='400' fill='#57606a'>0.75</text>
+<text x='504' y='164.0' text-anchor='end' font-size='10' font-weight='400' fill='#57606a'>1</text>
+<text x='504' y='121.5' text-anchor='end' font-size='10' font-weight='400' fill='#57606a'>1.25</text>
+<text x='540' y='348' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>d</text>
+<text x='602' y='348' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>e</text>
+<text x='664' y='348' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>a</text>
+<text x='726' y='348' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>b</text>
+<text x='788' y='348' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>c</text>
+<path d='M540,330.0 V324.2 H602 V330.0' fill='none' stroke='#1f2328' stroke-width='2'/>
+<text x='534' y='320.2' text-anchor='end' font-size='11' font-weight='700' fill='#1f2328'>1</text>
+<path d='M664,330.0 V319.8 H726 V330.0' fill='none' stroke='#1f2328' stroke-width='2'/>
+<text x='658' y='315.8' text-anchor='end' font-size='11' font-weight='700' fill='#1f2328'>2</text>
+<path d='M695.0,319.8 V305.0 H788 V330.0' fill='none' stroke='#1f2328' stroke-width='2'/>
+<text x='689.0' y='301.0' text-anchor='end' font-size='11' font-weight='700' fill='#1f2328'>3</text>
+<path d='M571.0,324.2 V111.4 H741.5 V305.0' fill='none' stroke='#cf222e' stroke-width='2' stroke-dasharray='5 4'/>
+<text x='565.0' y='107.4' text-anchor='end' font-size='11' font-weight='700' fill='#cf222e'>4</text>
+<line x1='510' y1='202.5' x2='820' y2='202.5' stroke='#bf8700' stroke-width='2' stroke-dasharray='6 4'/>
+<text x='822' y='206.5' text-anchor='start' font-size='11' font-weight='700' fill='#bf8700'>cut 0.75</text>
+<text x='510' y='70' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>dendrogram: height = linkage distance</text>
+<text x='20' y='384' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>merge 1: d + e at 0.034</text>
+<text x='450' y='384' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>merge 2: a + b at 0.060</text>
+<text x='20' y='402' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>merge 3: (a, b) + c at (0.234 + 0.060) / 2 = 0.147</text>
+<text x='450' y='402' text-anchor='start' font-size='11' font-weight='600' fill='#cf222e'>merge 4: (d, e) + (a, b, c) at 1.286: above the cut</text>
+<text x='20' y='428' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>result: two people {a, b, c} and {d, e}; merge 4 (1.286 > 0.75, red) is never made. No k was given</text></svg>

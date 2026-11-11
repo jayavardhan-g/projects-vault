@@ -1,0 +1,119 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 470' width='900' height='470' font-family='Inter, Helvetica, Arial, sans-serif'><title>figure 8</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='900' height='470' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Why a leader only counts entries of its own term (Raft paper, Figure 8)</text>
+<text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>5 servers, log indices 1–3; colour = the term an entry was written in</text>
+<text x='24' y='80' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>(a) S1 leads t2,</text>
+<text x='24' y='95' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>index 2 on S1, S2</text>
+<text x='24' y='126' text-anchor='start' font-size='11' font-weight='700' fill='#cf222e'>S1</text>
+<rect x='48' y='108' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='68.0' y='125.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='92' y='108' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='112.0' y='125.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='136' y='108' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='156.0' y='125.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='24' y='160' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S2</text>
+<rect x='48' y='142' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='68.0' y='159.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='92' y='142' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='112.0' y='159.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='136' y='142' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='156.0' y='159.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='24' y='194' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S3</text>
+<rect x='48' y='176' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='68.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='92' y='176' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='112.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<rect x='136' y='176' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='156.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='24' y='228' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S4</text>
+<rect x='48' y='210' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='68.0' y='227.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='92' y='210' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='112.0' y='227.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<rect x='136' y='210' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='156.0' y='227.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='24' y='262' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S5</text>
+<rect x='48' y='244' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='68.0' y='261.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='92' y='244' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='112.0' y='261.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<rect x='136' y='244' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='156.0' y='261.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='200' y='80' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>(b) S1 dies; S5 wins t3</text>
+<text x='200' y='95' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>(S3, S4, S5), writes 2 = t3</text>
+<text x='200' y='126' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S1</text>
+<rect x='224' y='108' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='244.0' y='125.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='268' y='108' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='288.0' y='125.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='312' y='108' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='332.0' y='125.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='200' y='160' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S2</text>
+<rect x='224' y='142' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='244.0' y='159.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='268' y='142' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='288.0' y='159.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='312' y='142' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='332.0' y='159.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='200' y='194' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S3</text>
+<rect x='224' y='176' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='244.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='268' y='176' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='288.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<rect x='312' y='176' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='332.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='200' y='228' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S4</text>
+<rect x='224' y='210' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='244.0' y='227.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='268' y='210' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='288.0' y='227.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<rect x='312' y='210' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='332.0' y='227.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='200' y='262' text-anchor='start' font-size='11' font-weight='700' fill='#cf222e'>S5</text>
+<rect x='224' y='244' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='244.0' y='261.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='268' y='244' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='288.0' y='261.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='312' y='244' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='332.0' y='261.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='376' y='80' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>(c) S5 dies; S1 wins t4,</text>
+<text x='376' y='95' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>copies t2 to S3: on 3 of 5!</text>
+<text x='376' y='126' text-anchor='start' font-size='11' font-weight='700' fill='#cf222e'>S1</text>
+<rect x='400' y='108' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='420.0' y='125.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='444' y='108' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='464.0' y='125.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='488' y='108' width='40' height='26' rx='5' fill='#c7f0d2' stroke='#8c959f' stroke-width='1.3'/><text x='508.0' y='125.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t4</text>
+<text x='376' y='160' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S2</text>
+<rect x='400' y='142' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='420.0' y='159.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='444' y='142' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='464.0' y='159.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='488' y='142' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='508.0' y='159.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='376' y='194' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S3</text>
+<rect x='400' y='176' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='420.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='444' y='176' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='464.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='488' y='176' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='508.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='376' y='228' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S4</text>
+<rect x='400' y='210' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='420.0' y='227.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='444' y='210' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='464.0' y='227.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<rect x='488' y='210' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='508.0' y='227.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='376' y='262' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S5</text>
+<rect x='400' y='244' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='420.0' y='261.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='444' y='244' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='464.0' y='261.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='488' y='244' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='508.0' y='261.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='552' y='80' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>(d) if S1 dies now: S5 wins t5</text>
+<text x='552' y='95' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>and overwrites index 2</text>
+<text x='552' y='126' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S1</text>
+<rect x='576' y='108' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='596.0' y='125.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='620' y='108' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#cf222e' stroke-width='1.3'/><text x='640.0' y='125.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t3</text>
+<rect x='664' y='108' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='684.0' y='125.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='552' y='160' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S2</text>
+<rect x='576' y='142' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='596.0' y='159.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='620' y='142' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#cf222e' stroke-width='1.3'/><text x='640.0' y='159.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t3</text>
+<rect x='664' y='142' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='684.0' y='159.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='552' y='194' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S3</text>
+<rect x='576' y='176' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='596.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='620' y='176' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#cf222e' stroke-width='1.3'/><text x='640.0' y='193.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t3</text>
+<rect x='664' y='176' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='684.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='552' y='228' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S4</text>
+<rect x='576' y='210' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='596.0' y='227.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='620' y='210' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#cf222e' stroke-width='1.3'/><text x='640.0' y='227.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t3</text>
+<rect x='664' y='210' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='684.0' y='227.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='552' y='262' text-anchor='start' font-size='11' font-weight='700' fill='#cf222e'>S5</text>
+<rect x='576' y='244' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='596.0' y='261.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='620' y='244' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#cf222e' stroke-width='1.3'/><text x='640.0' y='261.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t3</text>
+<rect x='664' y='244' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='684.0' y='261.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='728' y='80' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>(e) safe path: S1 puts its t4</text>
+<text x='728' y='95' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>entry on a majority first</text>
+<text x='728' y='126' text-anchor='start' font-size='11' font-weight='700' fill='#cf222e'>S1</text>
+<rect x='752' y='108' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='772.0' y='125.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='796' y='108' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='816.0' y='125.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='840' y='108' width='40' height='26' rx='5' fill='#c7f0d2' stroke='#cf222e' stroke-width='1.3'/><text x='860.0' y='125.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t4</text>
+<text x='728' y='160' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S2</text>
+<rect x='752' y='142' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='772.0' y='159.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='796' y='142' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='816.0' y='159.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='840' y='142' width='40' height='26' rx='5' fill='#c7f0d2' stroke='#cf222e' stroke-width='1.3'/><text x='860.0' y='159.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t4</text>
+<text x='728' y='194' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S3</text>
+<rect x='752' y='176' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='772.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='796' y='176' width='40' height='26' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='816.0' y='193.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='840' y='176' width='40' height='26' rx='5' fill='#c7f0d2' stroke='#cf222e' stroke-width='1.3'/><text x='860.0' y='193.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t4</text>
+<text x='728' y='228' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S4</text>
+<rect x='752' y='210' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='772.0' y='227.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='796' y='210' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='816.0' y='227.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<rect x='840' y='210' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='860.0' y='227.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<text x='728' y='262' text-anchor='start' font-size='11' font-weight='700' fill='#1f2328'>S5</text>
+<rect x='752' y='244' width='40' height='26' rx='5' fill='#d6dbe0' stroke='#8c959f' stroke-width='1.3'/><text x='772.0' y='261.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='796' y='244' width='40' height='26' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='816.0' y='261.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='840' y='244' width='40' height='26' rx='5' fill='#ffffff' stroke='#8c959f' stroke-width='1.3'/><text x='860.0' y='261.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'></text>
+<rect x='20' y='290' width='860' height='160' rx='8' fill='#f6f8fa' stroke='#d0d7de'/>
+<text x='36' y='314' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>In (c) the t2 entry sits on a majority (S1, S2, S3), but it is NOT safe to call it committed:</text>
+<text x='36' y='336' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>S5's last entry is t3, newer than t2, so S2, S3 and S4 would all vote for S5 in term 5. S5 then overwrites index 2 → (d).</text>
+<text x='36' y='358' text-anchor='start' font-size='12' font-weight='700' fill='#cf222e'>Raft's rule: the leader advances commit_index only to an index whose entry has the leader's CURRENT term.</text>
+<text x='36' y='380' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>In (e) the t4 entry is on S1, S2, S3. Now S5 (last t3) can't win, and committing index 3 commits index 2 with it.</text>
+<text x='36' y='402' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>Code: maybe_advance_commit stops at the first older-term entry (raft_node.cpp:258); become_leader appends a NOOP</text>
+<text x='36' y='424' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>so a new leader has a current-term entry at once (:248).</text></svg>

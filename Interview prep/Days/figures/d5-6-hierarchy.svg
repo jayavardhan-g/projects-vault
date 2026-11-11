@@ -283,7 +283,7 @@
 <rect x='609.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
 <rect x='617.0' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
 <rect x='624.5' y='199' width='6' height='11' rx='1' fill='#eef1f4'/>
-<text x='392' y='232' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>a warp = 32 lanes that issue the SAME instruction together</text>
+<text x='340' y='232' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>a warp = 32 lanes issuing one instruction together</text>
 <rect x='388' y='122' width='248' height='17' rx='3' fill='none' stroke='#cf222e' stroke-width='2' opacity='0'><animate attributeName='opacity' dur='6.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0500;0.9500;1.0000'/></rect>
 <text x='670' y='82' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>one SM (H200 has 132)</text>
 <text x='670' y='100' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>threads</text>
@@ -307,7 +307,7 @@
 <rect x='695.0' y='190' width='24.0' height='14' rx='3' fill='#c8e1ff'/>
 <rect x='720.0' y='190' width='24.0' height='14' rx='3' fill='#c7f0d2'/>
 <rect x='745.0' y='190' width='24.0' height='14' rx='3' fill='#f5c6e9'/>
-<text x='670' y='232' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>4 blocks of mm_block2d&lt;64,4&gt; fit</text>
+<text x='670' y='250' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>4 blocks of mm_block2d&lt;64,4&gt; fit</text>
 <rect x='30' y='270' width='840' height='112' rx='8' fill='#fbfcfd' stroke='#d0d7de' stroke-width='1'/>
 <text x='48' y='296' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>Every thread computes its own global index from three built-in variables:</text>
 <text x='48' y='322' text-anchor='start' font-size='14' font-weight='600' fill='#0969da'>col = blockIdx.x · blockDim.x + threadIdx.x  =  2 · 32 + 5  =  69</text>
