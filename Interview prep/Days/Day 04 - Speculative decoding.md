@@ -172,6 +172,10 @@ Result: 3 tokens for one target pass. With perfect agreement you'd get 5 (4 prop
 
 ### 1. Turning logits into the distributions p and q
 
+**Greedy decoding as one-hot probability rows** (animated; blocks are sized by their real dimensions, no values):
+
+![[d04s-greedy.svg]]
+
 ```mermaid
 flowchart TB
   TL["target logits, 152,064 wide"] --> AV["align_vocab :42<br/>cut every model to the narrowest width"]
@@ -248,6 +252,12 @@ return torch.softmax(logits, dim=-1)
 ---
 
 ### 2. The decode loop: `SpeculativeDecoder.generate`
+
+**The draft and verify phases with the real models' shapes** (animated; blocks are sized by their real dimensions, no values):
+
+![[d04s-draft.svg]]
+
+![[d04s-verify.svg]]
 
 > [!tip] Concept from scratch: [[#6. Deep dive: the speedup maths from scratch|tokens per iteration, the speedup formula and the two acceptance rates]]
 
@@ -348,6 +358,12 @@ crop_cache(draft_cache, keep)
 
 ### 3. The accept/reject rule: `verify_and_correct`
 
+**Accept/reject and the residual, shape by shape** (animated; blocks are sized by their real dimensions, no values):
+
+![[d04s-accept.svg]]
+
+![[d04s-residual.svg]]
+
 > [!tip] Concept from scratch: [[#5. Deep dive: speculative sampling from scratch|the rule and its proof on a 3-token vocabulary]]
 
 ```mermaid
@@ -415,6 +431,12 @@ Map each line to the algorithm:
 ---
 
 ### 4. Rollback and the 0.88× → 2.25× fix
+
+**Both KV caches through one iteration, and why every call has a fixed length** (animated; blocks are sized by their real dimensions, no values):
+
+![[d04s-crop.svg]]
+
+![[d04s-shapes.svg]]
 
 > [!tip] Concept from scratch: [[#7. Deep dive: launch-bound decode and CUDA graphs from scratch|why eager batch-1 decode is launch-bound, and how CUDA graphs fix it]]
 
@@ -889,6 +911,10 @@ That's why the draft wasn't cheap: c ≈ 1 for 28 vs 28 layers, and even the 0.5
 reached c = 19.68/39.02 ≈ 0.5.
 
 #### 7.3 What a CUDA graph is
+
+**One iteration to time scale, eager vs compiled** (animated; blocks are sized by their real dimensions, no values):
+
+![[d04s-timeline.svg]]
 
 A CUDA graph is a **recording** of a sequence of GPU kernels, with their arguments and memory addresses. Record once;
 then **replay** the whole sequence with a single launch. The CPU work per step drops from hundreds of launches to one.
