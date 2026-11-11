@@ -154,6 +154,10 @@ prompt whose **first 4 tokens equal A's first 4**.
 
 ### 1. One step: `engine.step` and `schedule`
 
+**One step as shapes** (animated; blocks are sized by their real dimensions, no values):
+
+![[d02s-step.svg]]
+
 > [!tip] Concept from scratch: [[#6. Deep dive: continuous batching from scratch|continuous batching from scratch (§6)]]
 
 `src/mini_vllm/engine.py:113–150`
@@ -229,6 +233,12 @@ assert not (set(id(r) for r in output.preempted) &
 ---
 
 ### 2. Decode and preemption: `_schedule_running`
+
+**_prepare and decode growth as shapes** (animated; blocks are sized by their real dimensions, no values):
+
+![[d02s-prepare.svg]]
+
+![[d02s-decode.svg]]
 
 > [!tip] Concept from scratch: [[#7. Deep dive: the scheduler's rules from scratch (budget, admission, watermark, preemption)|the scheduler rules from scratch (§7)]]
 
@@ -328,6 +338,10 @@ def _preempt(self, request: Request) -> None:
 ---
 
 ### 3. Admission: `_schedule_waiting`
+
+**Admission and the watermark as shapes** (animated; blocks are sized by their real dimensions, no values):
+
+![[d02s-admit.svg]]
 
 > [!tip] Concept from scratch: [[#7. Deep dive: the scheduler's rules from scratch (budget, admission, watermark, preemption)|admission and the watermark from scratch (§7)]]
 
@@ -429,6 +443,10 @@ return total_blocks - match.num_blocks
 ---
 
 ### 4. The radix cache: lookup, insert, evict
+
+**Prefix match and adopt as shapes** (animated; blocks are sized by their real dimensions, no values):
+
+![[d02s-match.svg]]
 
 > [!tip] Concept from scratch: [[#8. Deep dive: the radix prefix cache from scratch|the radix prefix cache from scratch (§8)]]
 
@@ -576,6 +594,10 @@ return freed
 ---
 
 ### 5. After the forward pass: `update`, publish, finish
+
+**Publish and finish as shapes** (animated; blocks are sized by their real dimensions, no values):
+
+![[d02s-publish.svg]]
 
 ```mermaid
 flowchart TB
@@ -787,6 +809,10 @@ answer:
 
 #### 7.2 The token budget
 
+**The token budget at real scale** (animated; blocks are sized by their real dimensions, no values):
+
+![[d02s-budget.svg]]
+
 `max_num_batched_tokens` (8,192 here) caps the tokens in one step: each decode counts 1, a prefill counts its whole
 prompt. Without it, one 8,000-token prompt could join a step and make all 30 decodes in that step wait for it. With it,
 a step stays bounded in time. A prompt longer than the budget is rejected at `add_request` (prefills aren't chunked
@@ -812,6 +838,10 @@ Admission is **FCFS** (first come, first served): if the request at the head of 
 is admitted either. That's simple and fair, at the cost of head-of-line blocking.
 
 #### 7.5 Preemption: recompute vs swap
+
+**Preemption by recompute as shapes** (animated; blocks are sized by their real dimensions, no values):
+
+![[d02s-preempt.svg]]
 
 When a running request needs a block and none is free:
 1. first **evict cached blocks** nobody is using (Day 2's prefix cache): they hold no live work;
@@ -959,6 +989,10 @@ Under continuous batching, requests sharing a system prompt are all in flight be
 only at the end would miss nearly every hit.
 
 #### 8.5 Refcounts and safe eviction
+
+**Eviction, round by round** (animated; blocks are sized by their real dimensions, no values):
+
+![[d02s-evict.svg]]
 
 Each cached block's refcount = **1 for the tree + 1 for each running request** using it. In the figure:
 - blocks 0 and 1 (the system prompt): rc 3 = tree + A + C;
