@@ -535,7 +535,7 @@ Measured: median **1.01 s** (3 nodes, leader killed) and **0.81 s** (5 nodes, 2 
 
 n1 leads term 2, its last heartbeat was at t = 0, then it crashes. n2 drew 750 ms, n3 drew 1010 ms.
 
-![[d14-1-election.svg]]
+![[d14-1-election.svg]] [[d14-1-election.html|▶ Step through it]]
 
 ```cpp
 role_ = Role::Candidate;

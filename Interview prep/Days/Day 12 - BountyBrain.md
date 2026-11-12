@@ -511,7 +511,7 @@ The factor can never exceed $k_1 + 1 = 2.5$. The first occurrence is worth 1.0, 
 almost nothing. $k_1$ sets how fast it saturates: a small $k_1$ means "present or not", a large one is closer to a raw
 count.
 
-![[d12-1-bm25.svg]]
+![[d12-1-bm25.svg]] [[d12-1-bm25.html|▶ Step through it]]
 
 #### 5.6 Length normalisation
 
@@ -713,7 +713,7 @@ Real vectors have 384 dimensions, which you can't draw. Pretend there are only t
 
 A **unit vector** is the vector divided by its length, so it has length 1. Only its direction is left.
 
-![[d12-2-dense.svg]]
+![[d12-2-dense.svg]] [[d12-2-dense.html|▶ Step through it]]
 
 #### 6.3 Cosine similarity, with numbers
 
@@ -961,7 +961,7 @@ A chunk missing from a run gets nothing from it. With dense = [A, B, C, D, E] an
 
 B was never first anywhere, yet it beats A, dense's favourite. Being found by **both** arms is what counts.
 
-![[d12-3-rrf.svg]]
+![[d12-3-rrf.svg]] [[d12-3-rrf.html|▶ Step through it]]
 
 #### 7.3 What $k$ does
 
@@ -1152,7 +1152,7 @@ Top 5 results per query; ✓ marks a relevant hit, and "first ✓" is the rank o
 | q4 | · | ✓ | · | · | · | 2 |
 | q5 | ✓ | · | · | · | · | 1 |
 
-![[d12-5-metrics.svg]]
+![[d12-5-metrics.svg]] [[d12-5-metrics.html|▶ Step through it]]
 
 #### 8.3 Recall@k
 
@@ -1391,7 +1391,7 @@ Judge (rows) vs hand label (columns), n = 40:
 | unsupported | 0 | 0 | **6** | 6 |
 | hand total | 25 | 7 | 8 | 40 |
 
-![[d12-6-kappa.svg]]
+![[d12-6-kappa.svg]] [[d12-6-kappa.html|▶ Step through it]]
 
 **Observed agreement** $p_o$: the diagonal.
 
@@ -1616,7 +1616,7 @@ With made-up priors $p_{\text{SSRF}} = 0.05$ and $p_{\text{XSS}} = 0.30$ (XSS is
 - With 4 real signatures against 25 imaginary ones, the prior still wins: stack A looks mostly like the average stack.
 - With 400 real signatures, the data wins, and the estimates sit close to the raw 0.75 / 0.25.
 
-![[d12-7-shrinkage.svg]]
+![[d12-7-shrinkage.svg]] [[d12-7-shrinkage.html|▶ Step through it]]
 
 #### 10.5 The same thing as a weighted average
 

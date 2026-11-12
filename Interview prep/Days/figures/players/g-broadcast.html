@@ -1,0 +1,98 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>broadcasting</title><style>
+:root{--bg:#f6f8fa;--ink:#1f2328;--mute:#57606a;--line:#d0d7de;--acc:#0969da;--card:#fff}
+@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--ink:#e6edf3;--mute:#9198a1;--line:#30363d;--acc:#4493f8;--card:#161b22}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.fig{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fig svg{display:block;width:100%;height:auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+button,select{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc)} button.main{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--acc)}
+#lab{font-weight:700;min-width:110px;font-variant-numeric:tabular-nums} .hint{color:var(--mute);font-size:13px}
+</style></head><body><div class="wrap">
+<div class="bar"><button id="prev" title="Left arrow">◀ Previous</button><button id="next" class="main" title="Right arrow">Next ▶</button>
+<span id="lab"></span><input id="sl" type="range" min="0" max="1000" value="0" aria-label="position">
+<button id="play" title="Space">Play</button>
+<select id="sp" aria-label="speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></div>
+<div class="fig"><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 840 320' font-family='Inter, Helvetica, Arial, sans-serif'><title>broadcasting</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='840' height='320' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Broadcasting: why unsqueeze is needed before multiplying</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>size-1 axes are stretched (copied) to match; [3, 1] × [1, 2] → [3, 2] (RoPE's angle table)</text>
+<text x='66.0' y='104' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>pos.unsqueeze(1)</text>
+<rect x='40' y='112' width='52' height='142' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='45' y='117' width='42' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='50' y='122' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='66.0' y='142.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>0</text>
+<rect x='45' y='162' width='42' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='50' y='167' width='32' height='32' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='66.0' y='187.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>1</text>
+<rect x='45' y='207' width='42' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='50' y='212' width='32' height='32' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='66.0' y='232.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<text x='66.0' y='269' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[3, 1]</text>
+<text x='168' y='165' text-anchor='middle' font-size='22' font-weight='700' fill='#1f2328'>×</text>
+<text x='243.0' y='144' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>inv_freq.unsqueeze(0)</text>
+<rect x='190' y='152' width='106' height='62' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='195' y='157' width='96' height='52' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='200' y='162' width='42' height='42' rx='4' fill='#f5c6e9' stroke='#ffffff'/>
+<text x='221.0' y='187.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>1</text>
+<rect x='244' y='162' width='42' height='42' rx='4' fill='#fff1a8' stroke='#ffffff'/>
+<text x='265.0' y='187.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>.001</text>
+<text x='243.0' y='229' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[1, 2]</text>
+<line x1='320' y1='165' x2='464' y2='165' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/><text x='395.0' y='156' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>broadcast</text><text x='395.0' y='183' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>rows × columns</text>
+<text x='543.0' y='104' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>pos × inv_freq = angles</text>
+<rect x='490' y='112' width='106' height='172' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='495' y='117' width='96' height='52' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='500' y='122' width='42' height='42' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='521.0' y='147.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>0</text>
+<rect x='544' y='122' width='42' height='42' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='565.0' y='147.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>0</text>
+<rect x='495' y='172' width='96' height='52' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='500' y='177' width='42' height='42' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='521.0' y='202.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>1</text>
+<rect x='544' y='177' width='42' height='42' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='565.0' y='202.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>.001</text>
+<rect x='495' y='227' width='96' height='52' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='500' y='232' width='42' height='42' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='521.0' y='257.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>2</text>
+<rect x='544' y='232' width='42' height='42' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='565.0' y='257.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>.003</text>
+<text x='543.0' y='299' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[3, 2]: every pair (p, f)</text>
+<rect x='47' y='119' width='38' height='38' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0800;0.3200;1.0000'/></rect>
+<rect x='497' y='119' width='92' height='48' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0800;0.3200;1.0000'/></rect>
+<rect x='197' y='159' width='48' height='48' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0800;0.2000;1.0000'/></rect>
+<rect x='500' y='122' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.1400;1.0000'/></rect>
+<rect x='241' y='159' width='48' height='48' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2000;0.3200;1.0000'/></rect>
+<rect x='544' y='122' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.2600;1.0000'/></rect>
+<rect x='47' y='164' width='38' height='38' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3400;0.5800;1.0000'/></rect>
+<rect x='497' y='174' width='92' height='48' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3400;0.5800;1.0000'/></rect>
+<rect x='197' y='159' width='48' height='48' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3400;0.4600;1.0000'/></rect>
+<rect x='500' y='177' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.4000;1.0000'/></rect>
+<rect x='241' y='159' width='48' height='48' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4600;0.5800;1.0000'/></rect>
+<rect x='544' y='177' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.5200;1.0000'/></rect>
+<rect x='47' y='209' width='38' height='38' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6000;0.8400;1.0000'/></rect>
+<rect x='497' y='229' width='92' height='48' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6000;0.8400;1.0000'/></rect>
+<rect x='197' y='159' width='48' height='48' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6000;0.7200;1.0000'/></rect>
+<rect x='500' y='232' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.6600;1.0000'/></rect>
+<rect x='241' y='159' width='48' height='48' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7200;0.8400;1.0000'/></rect>
+<rect x='544' y='232' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.7800;1.0000'/></rect>
+<text x='660' y='130' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>row = position</text>
+<text x='660' y='148' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>column = frequency</text>
+<text x='20' y='306' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: each output cell = (its row's position) × (its column's frequency)</text></svg>
+</div>
+<p class="hint">Keys: ← previous step, → next step, space play / pause. Drag the slider to move freely. The picture stays still until you move it.</p>
+</div><script>
+const D=7.0, steps=[0.0, 0.28, 0.56, 0.98, 1.4, 1.82, 2.24, 2.8, 3.22, 3.64, 4.06, 4.62, 5.04, 5.46, 5.88], svg=document.querySelector('.fig svg'), EPS=0.02;
+const lab=document.getElementById('lab'), sl=document.getElementById('sl'), playB=document.getElementById('play'), sp=document.getElementById('sp');
+let t=EPS, playing=false, last=0;
+svg.pauseAnimations();
+function cur(){let i=0; for(let k=0;k<steps.length;k++) if(steps[k]<=t+1e-6) i=k; return i;}
+function show(){svg.setCurrentTime(t); sl.value=Math.round(t/D*1000); lab.textContent='step '+(cur()+1)+' / '+steps.length;}
+function go(i){playing=false; playB.textContent='Play'; i=(i+steps.length)%steps.length; t=steps[i]+EPS; show();}
+document.getElementById('next').onclick=()=>go(cur()+1);
+document.getElementById('prev').onclick=()=>go(cur()-1);
+sl.oninput=()=>{playing=false; playB.textContent='Play'; t=Math.min(D-EPS,Math.max(EPS,sl.value/1000*D)); show();};
+function tick(now){ if(!playing) return; t+=(now-last)/1000*parseFloat(sp.value); last=now; if(t>=D) t=EPS; show(); requestAnimationFrame(tick); }
+playB.onclick=()=>{playing=!playing; playB.textContent=playing?'Pause':'Play'; if(playing){last=performance.now(); requestAnimationFrame(tick);} };
+document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){go(cur()+1);e.preventDefault();} else if(e.key==='ArrowLeft'){go(cur()-1);e.preventDefault();} else if(e.key===' '){playB.click();e.preventDefault();} });
+show();
+</script></body></html>

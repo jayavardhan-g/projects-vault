@@ -1,0 +1,66 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>int8</title><style>
+:root{--bg:#f6f8fa;--ink:#1f2328;--mute:#57606a;--line:#d0d7de;--acc:#0969da;--card:#fff}
+@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--ink:#e6edf3;--mute:#9198a1;--line:#30363d;--acc:#4493f8;--card:#161b22}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.fig{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fig svg{display:block;width:100%;height:auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+button,select{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc)} button.main{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--acc)}
+#lab{font-weight:700;min-width:110px;font-variant-numeric:tabular-nums} .hint{color:var(--mute);font-size:13px}
+</style></head><body><div class="wrap">
+<div class="bar"><button id="prev" title="Left arrow">◀ Previous</button><button id="next" class="main" title="Right arrow">Next ▶</button>
+<span id="lab"></span><input id="sl" type="range" min="0" max="1000" value="0" aria-label="position">
+<button id="play" title="Space">Play</button>
+<select id="sp" aria-label="speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></div>
+<div class="fig"><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 880 330' font-family='Inter, Helvetica, Arial, sans-serif'><title>int8</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='880' height='330' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>INT8, symmetric per tensor: scale = max|w| / 127 = 1.30 / 127 = 0.010236</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>q = round(w / scale) stored in 1 byte; read back as q · scale; error at most scale / 2 = 0.0051</text>
+<line x1='60.0' y1='120.0' x2='820.0' y2='120.0' stroke='#57606a' stroke-width='1.5'/><text x='20' y='78' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>float32 w</text>
+<line x1='168.6' y1='116.0' x2='168.6' y2='124.0' stroke='#57606a' stroke-width='1.5'/><text x='168.57142857142856' y='138' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>-1</text>
+<line x1='304.3' y1='116.0' x2='304.3' y2='124.0' stroke='#57606a' stroke-width='1.5'/><text x='304.2857142857142' y='138' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>-0.5</text>
+<line x1='440.0' y1='116.0' x2='440.0' y2='124.0' stroke='#57606a' stroke-width='1.5'/><text x='440.0' y='138' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>0</text>
+<line x1='575.7' y1='116.0' x2='575.7' y2='124.0' stroke='#57606a' stroke-width='1.5'/><text x='575.7142857142858' y='138' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>0.5</text>
+<line x1='711.4' y1='116.0' x2='711.4' y2='124.0' stroke='#57606a' stroke-width='1.5'/><text x='711.4285714285714' y='138' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>1</text>
+<line x1='60.0' y1='230.0' x2='820.0' y2='230.0' stroke='#57606a' stroke-width='1.5'/><text x='60' y='270' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>int8 q (−127 … 127)</text>
+<line x1='87.7' y1='226.0' x2='87.7' y2='234.0' stroke='#57606a' stroke-width='1.5'/><text x='87.73722627737226' y='248' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>-127</text>
+<line x1='262.5' y1='226.0' x2='262.5' y2='234.0' stroke='#57606a' stroke-width='1.5'/><text x='262.4817518248175' y='248' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>-64</text>
+<line x1='440.0' y1='226.0' x2='440.0' y2='234.0' stroke='#57606a' stroke-width='1.5'/><text x='440.0' y='248' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>0</text>
+<line x1='617.5' y1='226.0' x2='617.5' y2='234.0' stroke='#57606a' stroke-width='1.5'/><text x='617.5182481751825' y='248' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>64</text>
+<line x1='792.3' y1='226.0' x2='792.3' y2='234.0' stroke='#57606a' stroke-width='1.5'/><text x='792.2627737226277' y='248' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>127</text>
+<line x1='548.6' y1='120.0' x2='548.2' y2='230.0' stroke='#afb8c1' stroke-width='1.5' stroke-dasharray='3 3'/>
+<circle cx='548.6' cy='120.0' r='7' fill='#ffd8b5' stroke='#1f2328' stroke-width='1.5'/><text x='548.5714285714284' y='100' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>+0.40</text>
+<circle cx='548.2' cy='230.0' r='7' fill='#ffd8b5' stroke='#1f2328' stroke-width='1.5'/><text x='548.1751824817518' y='212' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>39</text>
+<line x1='87.1' y1='120.0' x2='87.7' y2='230.0' stroke='#afb8c1' stroke-width='1.5' stroke-dasharray='3 3'/>
+<circle cx='87.1' cy='120.0' r='7' fill='#c8e1ff' stroke='#1f2328' stroke-width='1.5'/><text x='87.14285714285711' y='100' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>-1.30</text>
+<circle cx='87.7' cy='230.0' r='7' fill='#c8e1ff' stroke='#1f2328' stroke-width='1.5'/><text x='87.73722627737226' y='212' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>-127</text>
+<line x1='459.0' y1='120.0' x2='459.4' y2='230.0' stroke='#afb8c1' stroke-width='1.5' stroke-dasharray='3 3'/>
+<circle cx='459.0' cy='120.0' r='7' fill='#c7f0d2' stroke='#1f2328' stroke-width='1.5'/><text x='459.00000000000006' y='100' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>+0.07</text>
+<circle cx='459.4' cy='230.0' r='7' fill='#c7f0d2' stroke='#1f2328' stroke-width='1.5'/><text x='459.4160583941606' y='212' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>7</text>
+<line x1='697.9' y1='120.0' x2='698.0' y2='230.0' stroke='#afb8c1' stroke-width='1.5' stroke-dasharray='3 3'/>
+<circle cx='697.9' cy='120.0' r='7' fill='#f5c6e9' stroke='#1f2328' stroke-width='1.5'/><text x='697.8571428571428' y='100' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>+0.95</text>
+<circle cx='698.0' cy='230.0' r='7' fill='#f5c6e9' stroke='#1f2328' stroke-width='1.5'/><text x='697.956204379562' y='212' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>93</text>
+<text x='60' y='300' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>back: 39·s = 0.3992, −127·s = −1.3000, 7·s = 0.0717, 93·s = 0.9520 (errors 0.0008, 0, −0.0017, −0.0020)</text>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0800;0.2600;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='548.6,120;548.6,120;548.2,230;548.2,230' keyTimes='0.0000;0.0800;0.2400;1.0000'/><circle r='8' fill='#ffd8b5' stroke='#cf222e' stroke-width='2'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2800;0.4600;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='87.1,120;87.1,120;87.7,230;87.7,230' keyTimes='0.0000;0.2800;0.4400;1.0000'/><circle r='8' fill='#c8e1ff' stroke='#cf222e' stroke-width='2'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4800;0.6600;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='459.0,120;459.0,120;459.4,230;459.4,230' keyTimes='0.0000;0.4800;0.6400;1.0000'/><circle r='8' fill='#c7f0d2' stroke='#cf222e' stroke-width='2'/></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6800;0.8600;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='697.9,120;697.9,120;698.0,230;698.0,230' keyTimes='0.0000;0.6800;0.8400;1.0000'/><circle r='8' fill='#f5c6e9' stroke='#cf222e' stroke-width='2'/></g></svg>
+</div>
+<p class="hint">Keys: ← previous step, → next step, space play / pause. Drag the slider to move freely. The picture stays still until you move it.</p>
+</div><script>
+const D=7.0, steps=[0.0, 0.56, 1.82, 3.22, 4.62, 6.02], svg=document.querySelector('.fig svg'), EPS=0.02;
+const lab=document.getElementById('lab'), sl=document.getElementById('sl'), playB=document.getElementById('play'), sp=document.getElementById('sp');
+let t=EPS, playing=false, last=0;
+svg.pauseAnimations();
+function cur(){let i=0; for(let k=0;k<steps.length;k++) if(steps[k]<=t+1e-6) i=k; return i;}
+function show(){svg.setCurrentTime(t); sl.value=Math.round(t/D*1000); lab.textContent='step '+(cur()+1)+' / '+steps.length;}
+function go(i){playing=false; playB.textContent='Play'; i=(i+steps.length)%steps.length; t=steps[i]+EPS; show();}
+document.getElementById('next').onclick=()=>go(cur()+1);
+document.getElementById('prev').onclick=()=>go(cur()-1);
+sl.oninput=()=>{playing=false; playB.textContent='Play'; t=Math.min(D-EPS,Math.max(EPS,sl.value/1000*D)); show();};
+function tick(now){ if(!playing) return; t+=(now-last)/1000*parseFloat(sp.value); last=now; if(t>=D) t=EPS; show(); requestAnimationFrame(tick); }
+playB.onclick=()=>{playing=!playing; playB.textContent=playing?'Pause':'Play'; if(playing){last=performance.now(); requestAnimationFrame(tick);} };
+document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){go(cur()+1);e.preventDefault();} else if(e.key==='ArrowLeft'){go(cur()-1);e.preventDefault();} else if(e.key===' '){playB.click();e.preventDefault();} });
+show();
+</script></body></html>

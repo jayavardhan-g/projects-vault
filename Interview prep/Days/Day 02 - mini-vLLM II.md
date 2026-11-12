@@ -215,7 +215,7 @@ prompt whose **first 4 tokens equal A's first 4**.
 
 **One step as shapes** (animated; blocks are sized by their real dimensions, no values):
 
-![[d02s-step.svg]]
+![[d02s-step.svg]] [[d02s-step.html|▶ Step through it]]
 
 > [!tip] Concept from scratch: [[#6. Deep dive: continuous batching from scratch|continuous batching from scratch (§6)]]
 
@@ -295,9 +295,9 @@ assert not (set(id(r) for r in output.preempted) &
 
 **_prepare and decode growth as shapes** (animated; blocks are sized by their real dimensions, no values):
 
-![[d02s-prepare.svg]]
+![[d02s-prepare.svg]] [[d02s-prepare.html|▶ Step through it]]
 
-![[d02s-decode.svg]]
+![[d02s-decode.svg]] [[d02s-decode.html|▶ Step through it]]
 
 > [!tip] Concept from scratch: [[#7. Deep dive: the scheduler's rules from scratch (budget, admission, watermark, preemption)|the scheduler rules from scratch (§7)]]
 
@@ -400,7 +400,7 @@ def _preempt(self, request: Request) -> None:
 
 **Admission and the watermark as shapes** (animated; blocks are sized by their real dimensions, no values):
 
-![[d02s-admit.svg]]
+![[d02s-admit.svg]] [[d02s-admit.html|▶ Step through it]]
 
 > [!tip] Concept from scratch: [[#7. Deep dive: the scheduler's rules from scratch (budget, admission, watermark, preemption)|admission and the watermark from scratch (§7)]]
 
@@ -505,7 +505,7 @@ return total_blocks - match.num_blocks
 
 **Prefix match and adopt as shapes** (animated; blocks are sized by their real dimensions, no values):
 
-![[d02s-match.svg]]
+![[d02s-match.svg]] [[d02s-match.html|▶ Step through it]]
 
 > [!tip] Concept from scratch: [[#8. Deep dive: the radix prefix cache from scratch|the radix prefix cache from scratch (§8)]]
 
@@ -656,7 +656,7 @@ return freed
 
 **Publish and finish as shapes** (animated; blocks are sized by their real dimensions, no values):
 
-![[d02s-publish.svg]]
+![[d02s-publish.svg]] [[d02s-publish.html|▶ Step through it]]
 
 ```mermaid
 flowchart TB
@@ -870,7 +870,7 @@ answer:
 
 **The token budget at real scale** (animated; blocks are sized by their real dimensions, no values):
 
-![[d02s-budget.svg]]
+![[d02s-budget.svg]] [[d02s-budget.html|▶ Step through it]]
 
 `max_num_batched_tokens` (8,192 here) caps the tokens in one step: each decode counts 1, a prefill counts its whole
 prompt. Without it, one 8,000-token prompt could join a step and make all 30 decodes in that step wait for it. With it,
@@ -900,7 +900,7 @@ is admitted either. That's simple and fair, at the cost of head-of-line blocking
 
 **Preemption by recompute as shapes** (animated; blocks are sized by their real dimensions, no values):
 
-![[d02s-preempt.svg]]
+![[d02s-preempt.svg]] [[d02s-preempt.html|▶ Step through it]]
 
 When a running request needs a block and none is free:
 1. first **evict cached blocks** nobody is using (Day 2's prefix cache): they hold no live work;
@@ -1051,7 +1051,7 @@ only at the end would miss nearly every hit.
 
 **Eviction, round by round** (animated; blocks are sized by their real dimensions, no values):
 
-![[d02s-evict.svg]]
+![[d02s-evict.svg]] [[d02s-evict.html|▶ Step through it]]
 
 Each cached block's refcount = **1 for the tree + 1 for each running request** using it. In the figure:
 - blocks 0 and 1 (the system prompt): rc 3 = tree + A + C;

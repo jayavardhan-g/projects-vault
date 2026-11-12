@@ -558,7 +558,7 @@ takes a batch of N (photo, caption) pairs. Take N = 3: the table above, before t
 The bold **diagonal** holds the true pairs. The other 6 cells are mismatches ("negatives"), and they come free from
 the batch: no extra labels are needed.
 
-![[d10-1-clip-space.svg]]
+![[d10-1-clip-space.svg]] [[d10-1-clip-space.html|▶ Step through it]]
 
 **Step 2: turn each row into probabilities.** Multiply by a scale $s$ (CLIP learns it; take $s = 10$ here), then
 softmax. Row "hill photo": $10 \times (0.906, 0.906, 0.985) = (9.06, 9.06, 9.85)$.

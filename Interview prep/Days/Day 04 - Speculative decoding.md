@@ -246,7 +246,7 @@ Result: 3 tokens for one target pass. With perfect agreement you'd get 5 (4 prop
 
 **Greedy decoding as one-hot probability rows** (animated; blocks are sized by their real dimensions, no values):
 
-![[d04s-greedy.svg]]
+![[d04s-greedy.svg]] [[d04s-greedy.html|▶ Step through it]]
 
 ```mermaid
 flowchart TB
@@ -327,9 +327,9 @@ return torch.softmax(logits, dim=-1)
 
 **The draft and verify phases with the real models' shapes** (animated; blocks are sized by their real dimensions, no values):
 
-![[d04s-draft.svg]]
+![[d04s-draft.svg]] [[d04s-draft.html|▶ Step through it]]
 
-![[d04s-verify.svg]]
+![[d04s-verify.svg]] [[d04s-verify.html|▶ Step through it]]
 
 > [!tip] Concept from scratch: [[#6. Deep dive: the speedup maths from scratch|tokens per iteration, the speedup formula and the two acceptance rates]]
 
@@ -432,9 +432,9 @@ crop_cache(draft_cache, keep)
 
 **Accept/reject and the residual, shape by shape** (animated; blocks are sized by their real dimensions, no values):
 
-![[d04s-accept.svg]]
+![[d04s-accept.svg]] [[d04s-accept.html|▶ Step through it]]
 
-![[d04s-residual.svg]]
+![[d04s-residual.svg]] [[d04s-residual.html|▶ Step through it]]
 
 > [!tip] Concept from scratch: [[#5. Deep dive: speculative sampling from scratch|the rule and its proof on a 3-token vocabulary]]
 
@@ -506,9 +506,9 @@ Map each line to the algorithm:
 
 **Both KV caches through one iteration, and why every call has a fixed length** (animated; blocks are sized by their real dimensions, no values):
 
-![[d04s-crop.svg]]
+![[d04s-crop.svg]] [[d04s-crop.html|▶ Step through it]]
 
-![[d04s-shapes.svg]]
+![[d04s-shapes.svg]] [[d04s-shapes.html|▶ Step through it]]
 
 > [!tip] Concept from scratch: [[#7. Deep dive: launch-bound decode and CUDA graphs from scratch|why eager batch-1 decode is launch-bound, and how CUDA graphs fix it]]
 
@@ -972,7 +972,7 @@ the floor is **≈ 0.2 ms**.
 Read the eager per-layer column: **0.813, 0.808, 0.820**, flat across a 28× range in parameters. The 0.5B took
 19.7 ms against a 0.2 ms floor: **100× slower than its memory floor**. The GPU was idle most of the time.
 
-![[d4-7-launch.svg]]
+![[d4-7-launch.svg]] [[d4-7-launch.html|▶ Step through it]]
 
 Why? Each layer is a handful of small kernels (norms, matmuls, RoPE, attention, activation). In eager mode Python
 launches them **one by one**. At batch 1 each kernel finishes in microseconds, before the CPU has launched the next.
@@ -986,7 +986,7 @@ reached c = 19.68/39.02 ≈ 0.5.
 
 **One iteration to time scale, eager vs compiled** (animated; blocks are sized by their real dimensions, no values):
 
-![[d04s-timeline.svg]]
+![[d04s-timeline.svg]] [[d04s-timeline.html|▶ Step through it]]
 
 A CUDA graph is a **recording** of a sequence of GPU kernels, with their arguments and memory addresses. Record once;
 then **replay** the whole sequence with a single launch. The CPU work per step drops from hundreds of launches to one.

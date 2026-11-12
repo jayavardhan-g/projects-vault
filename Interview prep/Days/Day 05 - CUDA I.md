@@ -221,7 +221,7 @@ Matrix multiplication fits this well. Each of the N² outputs `C[row][col]` is i
 
 #### 2.2 Grid → block → warp → thread
 
-![[d5-6-hierarchy.svg]]
+![[d5-6-hierarchy.svg]] [[d5-6-hierarchy.html|▶ Step through it]]
 
 Four levels, from the top:
 - **grid:** everything one launch runs. `mm_naive` at N = 32768 with 32 × 32 blocks has a grid of 1024 × 1024 blocks.
@@ -235,7 +235,7 @@ all 32 values of `threadIdx.x`.** Every coalescing argument today uses this fact
 
 **Who owns which part of C, at real size** (animated; blocks are sized by their real dimensions, no values):
 
-![[d05s-grid.svg]]
+![[d05s-grid.svg]] [[d05s-grid.html|▶ Step through it]]
 
 #### 2.3 The memory ladder
 
@@ -391,7 +391,7 @@ A warp issues one load instruction for all 32 lanes at once. The hardware looks 
 Shrink everything: an 8 × 8 matrix, a "warp" of 8 lanes, and a "line" of 8 floats. The matrix is stored row after
 row, so `address = row · 8 + col`. Each row is exactly one line.
 
-![[d5-7-coalescing.svg]]
+![[d5-7-coalescing.svg]] [[d5-7-coalescing.html|▶ Step through it]]
 
 **Naive (lane → row):** lane r reads `A[r·8 + k]`. At k = 0 the addresses are **0, 8, 16, …, 56**. That's one float
 from each of the 8 rows, so **8 lines** for 8 floats.
@@ -418,9 +418,9 @@ that is, the number of distinct 128-byte lines among the 32 lane addresses. Thre
 
 **One thread's walk, then one warp's 32 addresses** (animated; blocks are sized by their real dimensions, no values):
 
-![[d05s-naive.svg]]
+![[d05s-naive.svg]] [[d05s-naive.html|▶ Step through it]]
 
-![[d05s-warp.svg]]
+![[d05s-warp.svg]] [[d05s-warp.html|▶ Step through it]]
 
 ```mermaid
 flowchart TB
@@ -575,7 +575,7 @@ design.
 
 #### 4.2 A 4 × 4 toy with TILE = 2
 
-![[d5-8-tiling.svg]]
+![[d5-8-tiling.svg]] [[d5-8-tiling.html|▶ Step through it]]
 
 C is cut into 2 × 2 tiles, one per block (4 blocks). The block owning C's top-left tile needs rows 0–1 of A and
 columns 0–1 of B. It walks along them in **two steps**:
@@ -607,9 +607,9 @@ intensity = TILE / 4. Section 9 uses this.)
 
 **Tiles marching along K, then the reuse inside one tile** (animated; blocks are sized by their real dimensions, no values):
 
-![[d05s-march.svg]]
+![[d05s-march.svg]] [[d05s-march.html|▶ Step through it]]
 
-![[d05s-reuse.svg]]
+![[d05s-reuse.svg]] [[d05s-reuse.html|▶ Step through it]]
 
 ```mermaid
 flowchart TB
@@ -801,7 +801,7 @@ Toy: TILE = 4, BLK = 2, so F = 2. A 2 × 2 block of threads must fill a 4 × 4 t
 
 **The two loaders, one warp instruction at a time** (animated; blocks are sized by their real dimensions, no values):
 
-![[d05s-loaders.svg]]
+![[d05s-loaders.svg]] [[d05s-loaders.html|▶ Step through it]]
 
 ```mermaid
 flowchart TB
@@ -958,7 +958,7 @@ memory, same occupancy; only the access pattern differs.
 
 #### 6.1 The idea: an outer product per k
 
-![[d5-9-regblock.svg]]
+![[d5-9-regblock.svg]] [[d5-9-regblock.html|▶ Step through it]]
 
 Give each thread an **R × R patch** of outputs. For each k:
 1. read R values of A, `av[i] = sA[ty·R + i][k]`, into registers;
@@ -982,7 +982,7 @@ $$\begin{bmatrix}1\\0\end{bmatrix}\begin{bmatrix}2&1\end{bmatrix} = \begin{bmatr
 
 **One k step of mm_block2d in registers** (animated; blocks are sized by their real dimensions, no values):
 
-![[d05s-regblock.svg]]
+![[d05s-regblock.svg]] [[d05s-regblock.html|▶ Step through it]]
 
 ```mermaid
 flowchart TB
@@ -1453,7 +1453,7 @@ double peak = (double)prop.multiProcessorCount * 128.0 * 2.0
 
 **Intensity as shapes, and the dots on the roofline** (animated; blocks are sized by their real dimensions, no values):
 
-![[d05s-intensity.svg]]
+![[d05s-intensity.svg]] [[d05s-intensity.html|▶ Step through it]]
 
 ![[d5-10-roofline.svg]]
 

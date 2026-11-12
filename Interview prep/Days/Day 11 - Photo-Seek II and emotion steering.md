@@ -609,7 +609,7 @@ Same toy, with the margin:
 | 50° | 12.6 | 11.1, 5.6 | 0.81 | 0.21 |
 | 45° | 18.0 | 11.1, 5.6 | 0.999 | 0.001 |
 
-![[d11-1-arcface.svg]]
+![[d11-1-arcface.svg]] [[d11-1-arcface.html|▶ Step through it]]
 
 At 60°, the face now **loses** to person 2 (1.5 vs 11.1), so the loss is large and the gradient pulls $x$ toward
 $W_y$. The loss only becomes small once $\theta_y + 28.6°$ is clearly smaller than the angle to any other centre. So
@@ -1188,7 +1188,7 @@ layer. Shrink 2048 numbers to **3**:
 Everything the two groups **share** (sentence length, "I am …" structure) cancels in the subtraction. What's left is
 what differs on average: here, mostly feature 1.
 
-![[d11-5-steer.svg]]
+![[d11-5-steer.svg]] [[d11-5-steer.html|▶ Step through it]]
 
 **Check it separates them.** Project each state onto the direction (dot product with the unit vector below):
 joy sentences give 1.81, 2.80, 2.38; sad ones give −0.16, 0.82, 0.25. Every joy sentence scores higher than every sad
@@ -1259,7 +1259,7 @@ what its steered self wrote?" Broken text ("interploggrus") gets a very high ppl
 
 #### 10.7 The guard: a ladder of strengths
 
-![[d11-6-guard.svg]]
+![[d11-6-guard.svg]] [[d11-6-guard.html|▶ Step through it]]
 
 1. Baseline: strength 0, seed s → base_ppl 5.66.
 2. Rung 1.0: full vector, same seed → ppl 11.31, ratio 2.0 > 1.75 → **reject**.

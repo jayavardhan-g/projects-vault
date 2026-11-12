@@ -640,7 +640,7 @@ $$h = W x + \frac{\alpha}{r}\, B A x$$
 | $r$ | 16 | the rank: how many directions the correction may use |
 | $\alpha$ | 32 | a fixed scale; the correction is multiplied by α / r = **2** |
 
-![[d08-1-lora.svg]]
+![[d08-1-lora.svg]] [[d08-1-lora.html|▶ Step through it]]
 
 **Why α / r?** If you change r, the scale keeps the update's size roughly the same, so the learning rate doesn't have
 to be retuned. **Why B = 0 at the start?** Then $BAx = 0$, so the adapted model is **exactly** the base model at step
@@ -777,7 +777,7 @@ Take a clip with **3 text tokens** (t1 t2 t3) and **4 speech tokens** (s1 … s4
 - **input** = `[sos, t1, t2, t3, task_id, s1, s2, s3, s4]`: 9 positions;
 - **target** = `[−1, −1, −1, −1, s1, s2, s3, s4, eos]`: also 9.
 
-![[d08-2-sequence.svg]]
+![[d08-2-sequence.svg]] [[d08-2-sequence.html|▶ Step through it]]
 
 Read it column by column. Position 4 holds `task_id` (a special "now start speaking" token); its target is **s1**. Position
 8 holds s4; its target is **eos**. Positions 0–3 (sos and the text) have target −1.
@@ -952,7 +952,7 @@ turn the first i reference words into the first j hypothesis words**:
 
 $$D[i][j] = \min\big(\underbrace{D[i-1][j] + 1}_{\text{delete}},\ \underbrace{D[i][j-1] + 1}_{\text{insert}},\ \underbrace{D[i-1][j-1] + [\text{ref}_i \ne \text{hyp}_j]}_{\text{match or substitute}}\big)$$
 
-![[d08-3-wer-dp.svg]]
+![[d08-3-wer-dp.svg]] [[d08-3-wer-dp.html|▶ Step through it]]
 
 Three cells by hand:
 - **D[1][1]** ("the" vs "the"): diagonal 0 + 0 (words match) = **0**.

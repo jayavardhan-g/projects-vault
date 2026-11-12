@@ -1,0 +1,59 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RoPE animation: rotating feature pairs</title><style>
+:root{--bg:#f6f8fa;--ink:#1f2328;--mute:#57606a;--line:#d0d7de;--acc:#0969da;--card:#fff}
+@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--ink:#e6edf3;--mute:#9198a1;--line:#30363d;--acc:#4493f8;--card:#161b22}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.fig{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fig svg{display:block;width:100%;height:auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+button,select{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc)} button.main{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--acc)}
+#lab{font-weight:700;min-width:110px;font-variant-numeric:tabular-nums} .hint{color:var(--mute);font-size:13px}
+</style></head><body><div class="wrap">
+<div class="bar"><button id="prev" title="Left arrow">◀ Previous</button><button id="next" class="main" title="Right arrow">Next ▶</button>
+<span id="lab"></span><input id="sl" type="range" min="0" max="1000" value="0" aria-label="position">
+<button id="play" title="Space">Play</button>
+<select id="sp" aria-label="speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></div>
+<div class="fig"><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 830 360' font-family='Inter, Helvetica, Arial, sans-serif'><title>RoPE animation: rotating feature pairs</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='830' height='360' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='140' y='38' text-anchor='middle' font-size='15' font-weight='700' fill='#1f2328'>Pair 0 (features 0, 2)</text><text x='140' y='58' text-anchor='middle' font-size='12' fill='#57606a'>inv_freq = 1: turns 1 rad ≈ 57° per position</text><circle cx='140' cy='170' r='88' fill='#f6f8fa' stroke='#d0d7de'/><line x1='44' y1='170' x2='236' y2='170' stroke='#d0d7de'/><line x1='140' y1='74' x2='140' y2='266' stroke='#d0d7de'/>
+<g><animateTransform attributeName='transform' type='rotate' dur='14s' repeatCount='indefinite' values='-0.00 140 170;-57.30 140 170;-114.59 140 170;-171.89 140 170;-229.18 140 170;-286.48 140 170;-343.77 140 170;-401.07 140 170' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/><line x1='140' y1='170' x2='222' y2='170' stroke='#cf222e' stroke-width='5' stroke-linecap='round'/><circle cx='222' cy='170' r='7' fill='#cf222e'/></g>
+<text x='140' y='292' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328' opacity='1'>position p = 0: angle 0 rad<animate attributeName='opacity' dur='14s' repeatCount='indefinite' calcMode='discrete' values='1;0;0;0;0;0;0;1' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/></text>
+<text x='140' y='292' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328' opacity='0'>position p = 1: angle 1 rad<animate attributeName='opacity' dur='14s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0;0;0;0;0' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/></text>
+<text x='140' y='292' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328' opacity='0'>position p = 2: angle 2 rad<animate attributeName='opacity' dur='14s' repeatCount='indefinite' calcMode='discrete' values='0;0;1;0;0;0;0;0' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/></text>
+<text x='140' y='292' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328' opacity='0'>position p = 3: angle 3 rad<animate attributeName='opacity' dur='14s' repeatCount='indefinite' calcMode='discrete' values='0;0;0;1;0;0;0;0' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/></text>
+<text x='140' y='292' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328' opacity='0'>position p = 4: angle 4 rad<animate attributeName='opacity' dur='14s' repeatCount='indefinite' calcMode='discrete' values='0;0;0;0;1;0;0;0' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/></text>
+<text x='140' y='292' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328' opacity='0'>position p = 5: angle 5 rad<animate attributeName='opacity' dur='14s' repeatCount='indefinite' calcMode='discrete' values='0;0;0;0;0;1;0;0' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/></text>
+<text x='140' y='292' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328' opacity='0'>position p = 6: angle 6 rad<animate attributeName='opacity' dur='14s' repeatCount='indefinite' calcMode='discrete' values='0;0;0;0;0;0;1;0' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/></text>
+<text x='410' y='38' text-anchor='middle' font-size='15' font-weight='700' fill='#1f2328'>Pair 1 (features 1, 3)</text><text x='410' y='58' text-anchor='middle' font-size='12' fill='#57606a'>inv_freq = 0.0014: ~4,440 positions per turn</text><circle cx='410' cy='170' r='88' fill='#f6f8fa' stroke='#d0d7de'/><line x1='314' y1='170' x2='506' y2='170' stroke='#d0d7de'/><line x1='410' y1='74' x2='410' y2='266' stroke='#d0d7de'/>
+<g><animateTransform attributeName='transform' type='rotate' dur='14s' repeatCount='indefinite' values='-0.00 410 170;-0.08 410 170;-0.16 410 170;-0.24 410 170;-0.32 410 170;-0.41 410 170;-0.49 410 170;-0.57 410 170' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/><line x1='410' y1='170' x2='492' y2='170' stroke='#0969da' stroke-width='5' stroke-linecap='round'/><circle cx='492' cy='170' r='7' fill='#0969da'/></g>
+<text x='410' y='292' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328'>barely moves: encodes long range</text>
+<text x='690' y='38' text-anchor='middle' font-size='15' font-weight='700' fill='#1f2328'>q at position m, k at position n</text><text x='690' y='58' text-anchor='middle' font-size='12' fill='#57606a'>both shift by 1 each step; the gap stays (m − n) rad</text><circle cx='690' cy='170' r='88' fill='#f6f8fa' stroke='#d0d7de'/><line x1='594' y1='170' x2='786' y2='170' stroke='#d0d7de'/><line x1='690' y1='74' x2='690' y2='266' stroke='#d0d7de'/>
+<g><animateTransform attributeName='transform' type='rotate' dur='14s' repeatCount='indefinite' values='-0.00 690 170;-57.30 690 170;-114.59 690 170;-171.89 690 170;-229.18 690 170;-286.48 690 170;-343.77 690 170;-401.07 690 170' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/><line x1='690' y1='170' x2='772' y2='170' stroke='#0969da' stroke-width='5' stroke-linecap='round'/></g>
+<g><animateTransform attributeName='transform' type='rotate' dur='14s' repeatCount='indefinite' values='-114.59 690 170;-171.89 690 170;-229.18 690 170;-286.48 690 170;-343.77 690 170;-401.07 690 170;-458.37 690 170;-515.66 690 170' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/><line x1='690' y1='170' x2='772' y2='170' stroke='#cf222e' stroke-width='5' stroke-linecap='round'/></g>
+<text x='690' y='292' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328' opacity='1'>m = 2, n = 0: gap = 2 rad<animate attributeName='opacity' dur='14s' repeatCount='indefinite' calcMode='discrete' values='1;0;0;0;0;0;0;1' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/></text>
+<text x='690' y='292' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328' opacity='0'>m = 3, n = 1: gap = 2 rad<animate attributeName='opacity' dur='14s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0;0;0;0;0' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/></text>
+<text x='690' y='292' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328' opacity='0'>m = 4, n = 2: gap = 2 rad<animate attributeName='opacity' dur='14s' repeatCount='indefinite' calcMode='discrete' values='0;0;1;0;0;0;0;0' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/></text>
+<text x='690' y='292' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328' opacity='0'>m = 5, n = 3: gap = 2 rad<animate attributeName='opacity' dur='14s' repeatCount='indefinite' calcMode='discrete' values='0;0;0;1;0;0;0;0' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/></text>
+<text x='690' y='292' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328' opacity='0'>m = 6, n = 4: gap = 2 rad<animate attributeName='opacity' dur='14s' repeatCount='indefinite' calcMode='discrete' values='0;0;0;0;1;0;0;0' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/></text>
+<text x='690' y='292' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328' opacity='0'>m = 7, n = 5: gap = 2 rad<animate attributeName='opacity' dur='14s' repeatCount='indefinite' calcMode='discrete' values='0;0;0;0;0;1;0;0' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/></text>
+<text x='690' y='292' text-anchor='middle' font-size='14' font-weight='600' fill='#1f2328' opacity='0'>m = 8, n = 6: gap = 2 rad<animate attributeName='opacity' dur='14s' repeatCount='indefinite' calcMode='discrete' values='0;0;0;0;0;0;1;0' keyTimes='0.0000;0.1429;0.2857;0.4286;0.5714;0.7143;0.8571;1.0000'/></text>
+<text x='690' y='314' text-anchor='middle' font-size='12' fill='#57606a'><tspan fill='#cf222e' font-weight='700'>red = q</tspan>, <tspan fill='#0969da' font-weight='700'>blue = k</tspan>: so q · k depends only on m − n</text></svg>
+</div>
+<p class="hint">Keys: ← previous step, → next step, space play / pause. Drag the slider to move freely. The picture stays still until you move it.</p>
+</div><script>
+const D=14.0, steps=[0.0, 2.001, 4.0, 6.0, 8.0, 10.0, 11.999], svg=document.querySelector('.fig svg'), EPS=0.02;
+const lab=document.getElementById('lab'), sl=document.getElementById('sl'), playB=document.getElementById('play'), sp=document.getElementById('sp');
+let t=EPS, playing=false, last=0;
+svg.pauseAnimations();
+function cur(){let i=0; for(let k=0;k<steps.length;k++) if(steps[k]<=t+1e-6) i=k; return i;}
+function show(){svg.setCurrentTime(t); sl.value=Math.round(t/D*1000); lab.textContent='step '+(cur()+1)+' / '+steps.length;}
+function go(i){playing=false; playB.textContent='Play'; i=(i+steps.length)%steps.length; t=steps[i]+EPS; show();}
+document.getElementById('next').onclick=()=>go(cur()+1);
+document.getElementById('prev').onclick=()=>go(cur()-1);
+sl.oninput=()=>{playing=false; playB.textContent='Play'; t=Math.min(D-EPS,Math.max(EPS,sl.value/1000*D)); show();};
+function tick(now){ if(!playing) return; t+=(now-last)/1000*parseFloat(sp.value); last=now; if(t>=D) t=EPS; show(); requestAnimationFrame(tick); }
+playB.onclick=()=>{playing=!playing; playB.textContent=playing?'Pause':'Play'; if(playing){last=performance.now(); requestAnimationFrame(tick);} };
+document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){go(cur()+1);e.preventDefault();} else if(e.key==='ArrowLeft'){go(cur()-1);e.preventDefault();} else if(e.key===' '){playB.click();e.preventDefault();} });
+show();
+</script></body></html>

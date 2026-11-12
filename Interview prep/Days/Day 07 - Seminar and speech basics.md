@@ -393,7 +393,7 @@ So we describe the audio one short window at a time.
 
 For 10 s of audio: **1,000 frames**.
 
-![[d07-1-frames.svg]]
+![[d07-1-frames.svg]] [[d07-1-frames.html|▶ Step through it]]
 
 #### 5.3 What the FFT gives you
 
@@ -551,7 +551,7 @@ $c_3 = (0, -1)$.
 
 So the token is **0**, and the decoder will see $c_0 = (1, 0)$. The leftover error is $(−0.1, 0.2)$.
 
-![[d07-2-quantisers.svg]]
+![[d07-2-quantisers.svg]] [[d07-2-quantisers.html|▶ Step through it]]
 
 **How the codebook is learned:** codes are moved towards the inputs that chose them (like k-means), either by a loss
 term or by an exponential moving average. The encoder can't get a gradient through `argmin`, so training copies the
@@ -727,7 +727,7 @@ not measurements):
 | TTS first audio chunk | 200 | synthesise the first piece |
 | **total to first audio** | **1,400** | |
 
-![[d07-4-cascade.svg]]
+![[d07-4-cascade.svg]] [[d07-4-cascade.html|▶ Step through it]]
 
 Humans leave about **200 ms** between turns. 1,400 ms is 7× that. For scale, OpenAI reported the old cascaded Voice
 Mode at 2.8 s (GPT-3.5) and 5.4 s (GPT-4), and GPT-4o at about 320 ms on average (vendor numbers, quote them as such).

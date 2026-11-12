@@ -1,0 +1,92 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launch bound</title><style>
+:root{--bg:#f6f8fa;--ink:#1f2328;--mute:#57606a;--line:#d0d7de;--acc:#0969da;--card:#fff}
+@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--ink:#e6edf3;--mute:#9198a1;--line:#30363d;--acc:#4493f8;--card:#161b22}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.fig{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fig svg{display:block;width:100%;height:auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+button,select{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc)} button.main{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--acc)}
+#lab{font-weight:700;min-width:110px;font-variant-numeric:tabular-nums} .hint{color:var(--mute);font-size:13px}
+</style></head><body><div class="wrap">
+<div class="bar"><button id="prev" title="Left arrow">◀ Previous</button><button id="next" class="main" title="Right arrow">Next ▶</button>
+<span id="lab"></span><input id="sl" type="range" min="0" max="1000" value="0" aria-label="position">
+<button id="play" title="Space">Play</button>
+<select id="sp" aria-label="speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></div>
+<div class="fig"><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 880 380' font-family='Inter, Helvetica, Arial, sans-serif'><title>Launch bound</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='880' height='380' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Batch-1 decode in eager mode is launch-bound; a CUDA graph launches the whole step at once</text>
+<text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>schematic, not to scale: each small box = one kernel; the CPU must launch each one from Python</text>
+<text x='20' y='80' text-anchor='start' font-size='12' font-weight='700' fill='#cf222e'>EAGER</text>
+<text x='130' y='106' text-anchor='end' font-size='12' font-weight='600' fill='#1f2328'>CPU (Python)</text>
+<text x='130' y='146' text-anchor='end' font-size='12' font-weight='600' fill='#1f2328'>GPU</text>
+<rect x='140' y='90' width='58' height='26' rx='4' fill='#ffd8b5' stroke='#d0d7de'/>
+<text x='169' y='107' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>launch</text>
+<rect x='186' y='130' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='206' y='90' width='58' height='26' rx='4' fill='#ffd8b5' stroke='#d0d7de'/>
+<text x='235' y='107' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>launch</text>
+<rect x='252' y='130' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='272' y='90' width='58' height='26' rx='4' fill='#ffd8b5' stroke='#d0d7de'/>
+<text x='301' y='107' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>launch</text>
+<rect x='318' y='130' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='338' y='90' width='58' height='26' rx='4' fill='#ffd8b5' stroke='#d0d7de'/>
+<text x='367' y='107' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>launch</text>
+<rect x='384' y='130' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='404' y='90' width='58' height='26' rx='4' fill='#ffd8b5' stroke='#d0d7de'/>
+<text x='433' y='107' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>launch</text>
+<rect x='450' y='130' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='470' y='90' width='58' height='26' rx='4' fill='#ffd8b5' stroke='#d0d7de'/>
+<text x='499' y='107' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>launch</text>
+<rect x='516' y='130' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='536' y='90' width='58' height='26' rx='4' fill='#ffd8b5' stroke='#d0d7de'/>
+<text x='565' y='107' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>launch</text>
+<rect x='582' y='130' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='602' y='90' width='58' height='26' rx='4' fill='#ffd8b5' stroke='#d0d7de'/>
+<text x='631' y='107' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>launch</text>
+<rect x='648' y='130' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='668' y='90' width='58' height='26' rx='4' fill='#ffd8b5' stroke='#d0d7de'/>
+<text x='697' y='107' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>launch</text>
+<rect x='714' y='130' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='734' y='90' width='58' height='26' rx='4' fill='#ffd8b5' stroke='#d0d7de'/>
+<text x='763' y='107' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>launch</text>
+<rect x='780' y='130' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<text x='140' y='176' text-anchor='start' font-size='11' font-weight='600' fill='#cf222e'>GPU busy only in the thin blue slivers: each kernel finishes before Python launches the next.</text>
+<text x='140' y='194' text-anchor='start' font-size='11' font-weight='400' fill='#1f2328'>So step time ≈ number of kernels × launch cost ≈ layers × 0.81 ms, whether 0.5B or 14B.</text>
+<text x='20' y='230' text-anchor='start' font-size='12' font-weight='700' fill='#1a7f37'>CUDA GRAPH</text>
+<text x='130' y='256' text-anchor='end' font-size='12' font-weight='600' fill='#1f2328'>CPU</text>
+<text x='130' y='296' text-anchor='end' font-size='12' font-weight='600' fill='#1f2328'>GPU</text>
+<rect x='140' y='240' width='90' height='26' rx='4' fill='#c7f0d2' stroke='#d0d7de'/>
+<text x='185' y='257' text-anchor='middle' font-size='10' font-weight='600' fill='#1f2328'>replay graph</text>
+<rect x='236' y='280' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='252' y='280' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='268' y='280' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='284' y='280' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='300' y='280' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='316' y='280' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='332' y='280' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='348' y='280' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='364' y='280' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<rect x='380' y='280' width='14' height='26' rx='3' fill='#0969da' opacity='0.8'/>
+<text x='430' y='298' text-anchor='start' font-size='11' font-weight='600' fill='#1a7f37'>kernels back to back: time ≈ real GPU work (tracks model size)</text>
+<line x1='140' y1='84' x2='140' y2='312' stroke='#1f2328' stroke-width='1.5' opacity='0.6'><animate attributeName='x1' values='140;800' dur='6s' repeatCount='indefinite'/><animate attributeName='x2' values='140;800' dur='6s' repeatCount='indefinite'/></line>
+<text x='20' y='344' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>Per-layer cost, eager → compiled: 14B 0.813 → 0.223 ms; 0.5B 0.820 → 0.071 ms. c went from ≈ 1 to 0.158.</text>
+<text x='20' y='364' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: a time cursor. Needs fixed shapes (γ+1 = 5-token verify) and fixed addresses (StaticCache, fill_ in place).</text></svg>
+</div>
+<p class="hint">Keys: ← previous step, → next step, space play / pause. Drag the slider to move freely. The picture stays still until you move it.</p>
+</div><script>
+const D=6.0, steps=[0.0, 0.375, 0.75, 1.125, 1.5, 1.875, 2.25, 2.625, 3.0, 3.375, 3.75, 4.125, 4.5, 4.875, 5.25, 5.625], svg=document.querySelector('.fig svg'), EPS=0.02;
+const lab=document.getElementById('lab'), sl=document.getElementById('sl'), playB=document.getElementById('play'), sp=document.getElementById('sp');
+let t=EPS, playing=false, last=0;
+svg.pauseAnimations();
+function cur(){let i=0; for(let k=0;k<steps.length;k++) if(steps[k]<=t+1e-6) i=k; return i;}
+function show(){svg.setCurrentTime(t); sl.value=Math.round(t/D*1000); lab.textContent='step '+(cur()+1)+' / '+steps.length;}
+function go(i){playing=false; playB.textContent='Play'; i=(i+steps.length)%steps.length; t=steps[i]+EPS; show();}
+document.getElementById('next').onclick=()=>go(cur()+1);
+document.getElementById('prev').onclick=()=>go(cur()-1);
+sl.oninput=()=>{playing=false; playB.textContent='Play'; t=Math.min(D-EPS,Math.max(EPS,sl.value/1000*D)); show();};
+function tick(now){ if(!playing) return; t+=(now-last)/1000*parseFloat(sp.value); last=now; if(t>=D) t=EPS; show(); requestAnimationFrame(tick); }
+playB.onclick=()=>{playing=!playing; playB.textContent=playing?'Pause':'Play'; if(playing){last=performance.now(); requestAnimationFrame(tick);} };
+document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){go(cur()+1);e.preventDefault();} else if(e.key==='ArrowLeft'){go(cur()-1);e.preventDefault();} else if(e.key===' '){playB.click();e.preventDefault();} });
+show();
+</script></body></html>

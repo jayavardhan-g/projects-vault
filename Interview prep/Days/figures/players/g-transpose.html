@@ -1,0 +1,103 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>transpose</title><style>
+:root{--bg:#f6f8fa;--ink:#1f2328;--mute:#57606a;--line:#d0d7de;--acc:#0969da;--card:#fff}
+@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--ink:#e6edf3;--mute:#9198a1;--line:#30363d;--acc:#4493f8;--card:#161b22}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.fig{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fig svg{display:block;width:100%;height:auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+button,select{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc)} button.main{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--acc)}
+#lab{font-weight:700;min-width:110px;font-variant-numeric:tabular-nums} .hint{color:var(--mute);font-size:13px}
+</style></head><body><div class="wrap">
+<div class="bar"><button id="prev" title="Left arrow">◀ Previous</button><button id="next" class="main" title="Right arrow">Next ▶</button>
+<span id="lab"></span><input id="sl" type="range" min="0" max="1000" value="0" aria-label="position">
+<button id="play" title="Space">Play</button>
+<select id="sp" aria-label="speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></div>
+<div class="fig"><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 760 360' font-family='Inter, Helvetica, Arial, sans-serif'><title>transpose</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='760' height='360' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>x.transpose(a, b): swap two axes</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>[tokens, heads, d] → [heads, tokens, d], so each head's tokens sit together for attention</text>
+<text x='146.0' y='89' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>x</text>
+<rect x='30' y='97' width='232' height='143' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<text x='66.0' y='113' text-anchor='middle' font-size='11' font-weight='600' fill='#57606a'>[0]</text>
+<rect x='35' y='118' width='62' height='117' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='40' y='123' width='52' height='52' rx='5' fill='none' stroke='#afb8c1' stroke-width='1.3'/>
+<rect x='45' y='128' width='42' height='42' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='66.0' y='153.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t0h0</text>
+<rect x='40' y='178' width='52' height='52' rx='5' fill='none' stroke='#afb8c1' stroke-width='1.3'/>
+<rect x='45' y='183' width='42' height='42' rx='4' fill='#f5c6e9' stroke='#ffffff'/>
+<text x='66.0' y='208.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t0h1</text>
+<text x='146.0' y='113' text-anchor='middle' font-size='11' font-weight='600' fill='#57606a'>[1]</text>
+<rect x='115' y='118' width='62' height='117' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='120' y='123' width='52' height='52' rx='5' fill='none' stroke='#afb8c1' stroke-width='1.3'/>
+<rect x='125' y='128' width='42' height='42' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='146.0' y='153.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1h0</text>
+<rect x='120' y='178' width='52' height='52' rx='5' fill='none' stroke='#afb8c1' stroke-width='1.3'/>
+<rect x='125' y='183' width='42' height='42' rx='4' fill='#fff1a8' stroke='#ffffff'/>
+<text x='146.0' y='208.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1h1</text>
+<text x='226.0' y='113' text-anchor='middle' font-size='11' font-weight='600' fill='#57606a'>[2]</text>
+<rect x='195' y='118' width='62' height='117' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='200' y='123' width='52' height='52' rx='5' fill='none' stroke='#afb8c1' stroke-width='1.3'/>
+<rect x='205' y='128' width='42' height='42' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='226.0' y='153.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2h0</text>
+<rect x='200' y='178' width='52' height='52' rx='5' fill='none' stroke='#afb8c1' stroke-width='1.3'/>
+<rect x='205' y='183' width='42' height='42' rx='4' fill='#d8d0ff' stroke='#ffffff'/>
+<text x='226.0' y='208.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2h1</text>
+<text x='146.0' y='255' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[3 tokens, 2 heads, 1]</text>
+<line x1='282' y1='175' x2='446' y2='175' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/><text x='367.0' y='166' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>transpose(0, 1)</text><text x='367.0' y='193' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>element [t, h] → [h, t]</text>
+<text x='548.0' y='89' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>x.transpose(0, 1)</text>
+<rect x='472' y='97' width='152' height='198' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<text x='508.0' y='113' text-anchor='middle' font-size='11' font-weight='600' fill='#57606a'>[0]</text>
+<rect x='477' y='118' width='62' height='172' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='482' y='123' width='52' height='52' rx='5' fill='none' stroke='#afb8c1' stroke-width='1.3'/>
+<rect x='487' y='128' width='42' height='42' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='508.0' y='153.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t0h0</text>
+<rect x='482' y='178' width='52' height='52' rx='5' fill='none' stroke='#afb8c1' stroke-width='1.3'/>
+<rect x='487' y='183' width='42' height='42' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='508.0' y='208.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1h0</text>
+<rect x='482' y='233' width='52' height='52' rx='5' fill='none' stroke='#afb8c1' stroke-width='1.3'/>
+<rect x='487' y='238' width='42' height='42' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='508.0' y='263.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2h0</text>
+<text x='588.0' y='113' text-anchor='middle' font-size='11' font-weight='600' fill='#57606a'>[1]</text>
+<rect x='557' y='118' width='62' height='172' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='562' y='123' width='52' height='52' rx='5' fill='none' stroke='#afb8c1' stroke-width='1.3'/>
+<rect x='567' y='128' width='42' height='42' rx='4' fill='#f5c6e9' stroke='#ffffff'/>
+<text x='588.0' y='153.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t0h1</text>
+<rect x='562' y='178' width='52' height='52' rx='5' fill='none' stroke='#afb8c1' stroke-width='1.3'/>
+<rect x='567' y='183' width='42' height='42' rx='4' fill='#fff1a8' stroke='#ffffff'/>
+<text x='588.0' y='208.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t1h1</text>
+<rect x='562' y='233' width='52' height='52' rx='5' fill='none' stroke='#afb8c1' stroke-width='1.3'/>
+<rect x='567' y='238' width='42' height='42' rx='4' fill='#d8d0ff' stroke='#ffffff'/>
+<text x='588.0' y='263.0' text-anchor='middle' font-size='11' font-weight='400' fill='#1f2328'>t2h1</text>
+<text x='548.0' y='310' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[2 heads, 3 tokens, 1]</text>
+<rect x='487' y='128' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.2573;1.0000'/></rect>
+<rect x='487' y='183' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.3807;1.0000'/></rect>
+<rect x='487' y='238' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.5040;1.0000'/></rect>
+<rect x='567' y='128' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.6273;1.0000'/></rect>
+<rect x='567' y='183' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.7507;1.0000'/></rect>
+<rect x='567' y='238' width='42' height='42' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.8740;1.0000'/></rect>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0600;0.2573;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='45,128;45,128;487,128;487,128' keyTimes='0.0000;0.0600;0.2573;1.0000'/><rect width='42' height='42' rx='4' fill='#ffd8b5' stroke='#1f2328' stroke-width='1.6'/><text x='21.0' y='25.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t0h0</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.1833;0.3807;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='125,128;125,128;487,183;487,183' keyTimes='0.0000;0.1833;0.3807;1.0000'/><rect width='42' height='42' rx='4' fill='#c8e1ff' stroke='#1f2328' stroke-width='1.6'/><text x='21.0' y='25.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t1h0</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3067;0.5040;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='205,128;205,128;487,238;487,238' keyTimes='0.0000;0.3067;0.5040;1.0000'/><rect width='42' height='42' rx='4' fill='#c7f0d2' stroke='#1f2328' stroke-width='1.6'/><text x='21.0' y='25.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t2h0</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4300;0.6273;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='45,183;45,183;567,128;567,128' keyTimes='0.0000;0.4300;0.6273;1.0000'/><rect width='42' height='42' rx='4' fill='#f5c6e9' stroke='#1f2328' stroke-width='1.6'/><text x='21.0' y='25.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t0h1</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5533;0.7507;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='125,183;125,183;567,183;567,183' keyTimes='0.0000;0.5533;0.7507;1.0000'/><rect width='42' height='42' rx='4' fill='#fff1a8' stroke='#1f2328' stroke-width='1.6'/><text x='21.0' y='25.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t1h1</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6767;0.8740;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='205,183;205,183;567,238;567,238' keyTimes='0.0000;0.6767;0.8740;1.0000'/><rect width='42' height='42' rx='4' fill='#d8d0ff' stroke='#1f2328' stroke-width='1.6'/><text x='21.0' y='25.0' text-anchor='middle' font-size='11' font-weight='600' fill='#1f2328'>t2h1</text></g>
+<text x='20' y='346' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: each coloured cell slides to where it ends up; head 0's cells gather into slice [0]</text></svg>
+</div>
+<p class="hint">Keys: ← previous step, → next step, space play / pause. Drag the slider to move freely. The picture stays still until you move it.</p>
+</div><script>
+const D=7.0, steps=[0.0, 0.28, 1.283, 1.801, 2.147, 2.665, 3.01, 3.528, 3.873, 4.391, 4.737, 5.255, 6.118], svg=document.querySelector('.fig svg'), EPS=0.02;
+const lab=document.getElementById('lab'), sl=document.getElementById('sl'), playB=document.getElementById('play'), sp=document.getElementById('sp');
+let t=EPS, playing=false, last=0;
+svg.pauseAnimations();
+function cur(){let i=0; for(let k=0;k<steps.length;k++) if(steps[k]<=t+1e-6) i=k; return i;}
+function show(){svg.setCurrentTime(t); sl.value=Math.round(t/D*1000); lab.textContent='step '+(cur()+1)+' / '+steps.length;}
+function go(i){playing=false; playB.textContent='Play'; i=(i+steps.length)%steps.length; t=steps[i]+EPS; show();}
+document.getElementById('next').onclick=()=>go(cur()+1);
+document.getElementById('prev').onclick=()=>go(cur()-1);
+sl.oninput=()=>{playing=false; playB.textContent='Play'; t=Math.min(D-EPS,Math.max(EPS,sl.value/1000*D)); show();};
+function tick(now){ if(!playing) return; t+=(now-last)/1000*parseFloat(sp.value); last=now; if(t>=D) t=EPS; show(); requestAnimationFrame(tick); }
+playB.onclick=()=>{playing=!playing; playB.textContent=playing?'Pause':'Play'; if(playing){last=performance.now(); requestAnimationFrame(tick);} };
+document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){go(cur()+1);e.preventDefault();} else if(e.key==='ArrowLeft'){go(cur()-1);e.preventDefault();} else if(e.key===' '){playB.click();e.preventDefault();} });
+show();
+</script></body></html>

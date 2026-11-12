@@ -1,0 +1,109 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>matmul</title><style>
+:root{--bg:#f6f8fa;--ink:#1f2328;--mute:#57606a;--line:#d0d7de;--acc:#0969da;--card:#fff}
+@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--ink:#e6edf3;--mute:#9198a1;--line:#30363d;--acc:#4493f8;--card:#161b22}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.fig{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fig svg{display:block;width:100%;height:auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+button,select{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc)} button.main{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--acc)}
+#lab{font-weight:700;min-width:110px;font-variant-numeric:tabular-nums} .hint{color:var(--mute);font-size:13px}
+</style></head><body><div class="wrap">
+<div class="bar"><button id="prev" title="Left arrow">◀ Previous</button><button id="next" class="main" title="Right arrow">Next ▶</button>
+<span id="lab"></span><input id="sl" type="range" min="0" max="1000" value="0" aria-label="position">
+<button id="play" title="Space">Play</button>
+<select id="sp" aria-label="speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></div>
+<div class="fig"><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 780 330' font-family='Inter, Helvetica, Arial, sans-serif'><title>matmul</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='780' height='330' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>torch.matmul(A, B) = A @ B: row of A · column of B</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>[2, 3] @ [3, 2] → [2, 2]; the shared inner size 3 is summed away</text>
+<text x='90.0' y='114' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>A</text>
+<rect x='30' y='122' width='120' height='97' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='35' y='127' width='110' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='40' y='132' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='56.0' y='152.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>1</text>
+<rect x='74' y='132' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='90.0' y='152.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<rect x='108' y='132' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='124.0' y='152.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>0</text>
+<rect x='35' y='172' width='110' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='40' y='177' width='32' height='32' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='56.0' y='197.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>0</text>
+<rect x='74' y='177' width='32' height='32' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='90.0' y='197.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>1</text>
+<rect x='108' y='177' width='32' height='32' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='124.0' y='197.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>3</text>
+<text x='90.0' y='234' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[2, 3]</text>
+<text x='180' y='150' text-anchor='middle' font-size='20' font-weight='700' fill='#1f2328'>@</text>
+<text x='243.0' y='89' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>B</text>
+<rect x='200' y='97' width='86' height='142' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='205' y='102' width='76' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='210' y='107' width='32' height='32' rx='4' fill='#fff1a8' stroke='#ffffff'/>
+<text x='226.0' y='127.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>1</text>
+<rect x='244' y='107' width='32' height='32' rx='4' fill='#d8d0ff' stroke='#ffffff'/>
+<text x='260.0' y='127.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>0</text>
+<rect x='205' y='147' width='76' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='210' y='152' width='32' height='32' rx='4' fill='#fff1a8' stroke='#ffffff'/>
+<text x='226.0' y='172.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<rect x='244' y='152' width='32' height='32' rx='4' fill='#d8d0ff' stroke='#ffffff'/>
+<text x='260.0' y='172.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>1</text>
+<rect x='205' y='192' width='76' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='210' y='197' width='32' height='32' rx='4' fill='#fff1a8' stroke='#ffffff'/>
+<text x='226.0' y='217.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>0</text>
+<rect x='244' y='197' width='32' height='32' rx='4' fill='#d8d0ff' stroke='#ffffff'/>
+<text x='260.0' y='217.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<text x='243.0' y='254' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[3, 2]</text>
+<line x1='300' y1='150' x2='434' y2='150' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/><text x='370.0' y='141' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>=</text>
+<text x='503.0' y='114' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>A @ B</text>
+<rect x='460' y='122' width='86' height='97' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='465' y='127' width='76' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='470' y='132' width='32' height='32' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='486.0' y='152.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>5</text>
+<rect x='504' y='132' width='32' height='32' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='520.0' y='152.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<rect x='465' y='172' width='76' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='470' y='177' width='32' height='32' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='486.0' y='197.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>2</text>
+<rect x='504' y='177' width='32' height='32' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='520.0' y='197.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>7</text>
+<text x='503.0' y='234' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[2, 2]</text>
+<rect x='37' y='129' width='106' height='38' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0600;0.2600;1.0000'/></rect>
+<rect x='207' y='104' width='38' height='128' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0600;0.2600;1.0000'/></rect>
+<rect x='467' y='129' width='38' height='38' rx='6' fill='none' stroke='#1a7f37' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0600;0.2600;1.0000'/></rect>
+<rect x='470' y='132' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.1400;1.0000'/></rect>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0600;0.2600;1.0000'/><text x='560' y='270' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>C[0,0] = 1·1 + 2·2 + 0·0 = 5</text></g>
+<rect x='37' y='129' width='106' height='38' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2800;0.4800;1.0000'/></rect>
+<rect x='241' y='104' width='38' height='128' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2800;0.4800;1.0000'/></rect>
+<rect x='501' y='129' width='38' height='38' rx='6' fill='none' stroke='#1a7f37' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2800;0.4800;1.0000'/></rect>
+<rect x='504' y='132' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.3600;1.0000'/></rect>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2800;0.4800;1.0000'/><text x='560' y='270' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>C[0,1] = 1·0 + 2·1 + 0·2 = 2</text></g>
+<rect x='37' y='174' width='106' height='38' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5000;0.7000;1.0000'/></rect>
+<rect x='207' y='104' width='38' height='128' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5000;0.7000;1.0000'/></rect>
+<rect x='467' y='174' width='38' height='38' rx='6' fill='none' stroke='#1a7f37' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5000;0.7000;1.0000'/></rect>
+<rect x='470' y='177' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.5800;1.0000'/></rect>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5000;0.7000;1.0000'/><text x='560' y='270' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>C[1,0] = 0·1 + 1·2 + 3·0 = 2</text></g>
+<rect x='37' y='174' width='106' height='38' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7200;0.9200;1.0000'/></rect>
+<rect x='241' y='104' width='38' height='128' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7200;0.9200;1.0000'/></rect>
+<rect x='501' y='174' width='38' height='38' rx='6' fill='none' stroke='#1a7f37' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7200;0.9200;1.0000'/></rect>
+<rect x='504' y='177' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.8000;1.0000'/></rect>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7200;0.9200;1.0000'/><text x='560' y='270' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>C[1,1] = 0·0 + 1·1 + 3·2 = 7</text></g>
+<text x='30' y='290' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>Batched: [32, 1, 64] @ [32, 64, 13] → [32, 1, 13] does this once per head.</text>
+<text x='20' y='316' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: red row × blue column → green cell</text></svg>
+</div>
+<p class="hint">Keys: ← previous step, → next step, space play / pause. Drag the slider to move freely. The picture stays still until you move it.</p>
+</div><script>
+const D=7.0, steps=[0.0, 0.28, 0.98, 1.82, 2.52, 3.36, 4.06, 4.9, 5.6, 6.44], svg=document.querySelector('.fig svg'), EPS=0.02;
+const lab=document.getElementById('lab'), sl=document.getElementById('sl'), playB=document.getElementById('play'), sp=document.getElementById('sp');
+let t=EPS, playing=false, last=0;
+svg.pauseAnimations();
+function cur(){let i=0; for(let k=0;k<steps.length;k++) if(steps[k]<=t+1e-6) i=k; return i;}
+function show(){svg.setCurrentTime(t); sl.value=Math.round(t/D*1000); lab.textContent='step '+(cur()+1)+' / '+steps.length;}
+function go(i){playing=false; playB.textContent='Play'; i=(i+steps.length)%steps.length; t=steps[i]+EPS; show();}
+document.getElementById('next').onclick=()=>go(cur()+1);
+document.getElementById('prev').onclick=()=>go(cur()-1);
+sl.oninput=()=>{playing=false; playB.textContent='Play'; t=Math.min(D-EPS,Math.max(EPS,sl.value/1000*D)); show();};
+function tick(now){ if(!playing) return; t+=(now-last)/1000*parseFloat(sp.value); last=now; if(t>=D) t=EPS; show(); requestAnimationFrame(tick); }
+playB.onclick=()=>{playing=!playing; playB.textContent=playing?'Pause':'Play'; if(playing){last=performance.now(); requestAnimationFrame(tick);} };
+document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){go(cur()+1);e.preventDefault();} else if(e.key==='ArrowLeft'){go(cur()-1);e.preventDefault();} else if(e.key===' '){playB.click();e.preventDefault();} });
+show();
+</script></body></html>

@@ -183,7 +183,7 @@ request 1 has **40**. Block size 16.
 
 **The same step with the real shapes** (animated; blocks are sized by their real dimensions, no values):
 
-![[d03s-path.svg]]
+![[d03s-path.svg]] [[d03s-path.html|▶ Step through it]]
 
 `src/mini_vllm/model/llama.py:271–273`
 ```python
@@ -229,9 +229,9 @@ def can_use_decode_kernel(query_lens: list[int], device: torch.device) -> bool:
 
 **One program and one tile, at real sizes** (animated; blocks are sized by their real dimensions, no values):
 
-![[d03s-grid.svg]]
+![[d03s-grid.svg]] [[d03s-grid.html|▶ Step through it]]
 
-![[d03s-gather.svg]]
+![[d03s-gather.svg]] [[d03s-gather.html|▶ Step through it]]
 
 > [!tip] Concept from scratch: [[#6. Deep dive: online softmax and the fused decode kernel from scratch|online softmax on 4 numbers, the kernel's loop on a toy block table, and where the 7.49× comes from]]
 
@@ -512,7 +512,7 @@ idx = ratios.index(median_ratio) if len(ratios) % 2 else min(
 
 **The server's data flow** (animated; blocks are sized by their real dimensions, no values):
 
-![[d03s-server.svg]]
+![[d03s-server.svg]] [[d03s-server.html|▶ Step through it]]
 
 > [!tip] Concept from scratch: [[#8. Deep dive: the async server from scratch|asyncio in five ideas and the one-loop design]]
 
@@ -704,7 +704,7 @@ works for any layout, not just this one.
 
 #### 5.6 This kernel's grid
 
-![[d3-5-grid.svg]]
+![[d3-5-grid.svg]] [[d3-5-grid.html|▶ Step through it]]
 
 `grid = (num_seqs, num_q_heads)`. One program computes **one head's output for one sequence**:
 - `seq = tl.program_id(0)`, `q_head = tl.program_id(1)`;
@@ -803,7 +803,7 @@ need.
 Scores `s = [2, 4, 1, 3]`, values `v = [[1,0], [0,1], [1,1], [2,0]]`, processed in **2 chunks of 2** (a chunk plays
 the role of the kernel's 128-token tile).
 
-![[d3-6-online.svg]]
+![[d3-6-online.svg]] [[d3-6-online.html|▶ Step through it]]
 
 Start with $m = -\infty$, $l = 0$, $acc = [0, 0]$.
 
@@ -843,16 +843,16 @@ The only memory used is one number `m`, one number `l` and one 64-vector `acc`, 
 
 **The loop at real sizes: tiles, scores, running state** (animated; blocks are sized by their real dimensions, no values):
 
-![[d03s-tiles.svg]]
+![[d03s-tiles.svg]] [[d03s-tiles.html|▶ Step through it]]
 
-![[d03s-scores.svg]]
+![[d03s-scores.svg]] [[d03s-scores.html|▶ Step through it]]
 
-![[d03s-online.svg]]
+![[d03s-online.svg]] [[d03s-online.html|▶ Step through it]]
 
 The kernel runs this loop with real paging. Toy: block size **B = 4**, `ctx_len = 10`, tiles of **BLOCK_N = 8**,
 block table **[7, 2, 5]** (logical block 0 is physical block 7, and so on).
 
-![[d3-6-addr.svg]]
+![[d3-6-addr.svg]] [[d3-6-addr.html|▶ Step through it]]
 
 `src/mini_vllm/paged_attention_triton.py:101–114`
 ```python
@@ -930,7 +930,7 @@ lane can never be the max.
 
 **Launches per decode step, naive vs fused** (animated; blocks are sized by their real dimensions, no values):
 
-![[d03s-launches.svg]]
+![[d03s-launches.svg]] [[d03s-launches.html|▶ Step through it]]
 
 The README measured (32 requests, up to 96 new tokens each, five paired rounds): naive **379.1** tok/s in 5.58 s,
 fused **2,839.9** tok/s in 0.74 s.

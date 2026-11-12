@@ -455,7 +455,7 @@ Two TCP features, each sensible alone:
 
 cpp-httplib writes the response in **two** `write()` calls: headers, then body. Then:
 
-![[d13-3-nagle.svg]]
+![[d13-3-nagle.svg]] [[d13-3-nagle.html|▶ Step through it]]
 
 1. The headers go out at once (nothing was outstanding).
 2. The body is small, and the headers aren't ACKed yet, so **Nagle holds it**.
@@ -776,7 +776,7 @@ flowchart TB
   OB --> POOL[("ObjectPool of Orders")]
 ```
 
-![[d13m-pipeline.svg]]
+![[d13m-pipeline.svg]] [[d13m-pipeline.html|▶ Step through it]]
 
 *Animated, 6 steps, loops. It follows one command from the producer to the book. The text of each step is in the bar at the bottom of the figure.*
 
@@ -847,7 +847,7 @@ The three order types (`OrdType`, `order.hpp:14`):
 
 An order's quantity can end in exactly four places: **filled**, **resting**, **cancelled** or **expired**.
 
-![[d13x-session.svg]]
+![[d13x-session.svg]] [[d13x-session.html|▶ Step through it]]
 
 *Animated, 11 steps, loops (about 5 s per step). The yellow box is the command that just arrived. The ladder is the book after it. A dashed box is an order that just left the book, with the reason. The five boxes underneath are the counters; the ones that changed are red.*
 
@@ -907,7 +907,7 @@ drop the lock entirely: **SPSC** (single producer, single consumer).
 - The slot for index i is `i & (Capacity − 1)`: the low bits, the same as `i % Capacity`, but one AND instruction.
 - size = head − tail; empty when head == tail; full when head − tail ≥ Capacity.
 
-![[d13-4-ring.svg]]
+![[d13-4-ring.svg]] [[d13-4-ring.html|▶ Step through it]]
 
 Because the counters never wrap back to 0, "full" and "empty" never look the same, and no slot is wasted. In the real
 ring, index 70,000 lands in slot 70,000 & 65,535 = **4,464**. A 64-bit counter at 10 M pushes per second overflows after
@@ -923,7 +923,7 @@ The producer thread and the matching thread run **at the same time**, on two dif
 
 Sharing is where things go wrong, because C++ has a hard rule: if one thread **writes** a plain variable while another thread **reads** it, that is a **data race**, and the program's behaviour is undefined. "Undefined" is not a figure of speech. The compiler is allowed to assume it never happens, and to optimise on that assumption.
 
-![[d13x-stale.svg]]
+![[d13x-stale.svg]] [[d13x-stale.html|▶ Step through it]]
 
 *Animated, 4 steps, loops. It shows a consumer loop on a plain variable being turned into a loop that never ends. The text of each step is in the bar at the bottom.*
 
@@ -958,7 +958,7 @@ You can't use an atomic like a normal variable in this code. You go through two 
 
 So `const size_t head = head_.load(...)` means: *read the shared counter once, and keep the answer in my own private variable called `head`*.
 
-![[d13x-load.svg]]
+![[d13x-load.svg]] [[d13x-load.html|▶ Step through it]]
 
 *Animated, 4 steps, loops. The blue box is shared memory; the yellow box is the function's own copy. The text of each step is in the bar at the bottom.*
 
@@ -1068,7 +1068,7 @@ size_t head_cache_ = 0;  // consumer's view of head_
 | `head & (Capacity − 1)` | size_t | | the slot number for index `head` | 4 & 3 = 0 |
 | `head − tail` | size_t | | items currently in the ring | 3 |
 
-![[d13m-ring.svg]]
+![[d13m-ring.svg]] [[d13m-ring.html|▶ Step through it]]
 
 *Animated, 10 steps, loops. It plays the ten rows of the table below: watch the two arrows chase each other around the four slots. The text of each step is in the bar at the bottom of the figure.*
 
@@ -1094,7 +1094,7 @@ Read three things off the table:
 
 #### 8.5 Every line of push: what it does, why, what uses it, what breaks
 
-![[d13x-push.svg]]
+![[d13x-push.svg]] [[d13x-push.html|▶ Step through it]]
 
 *Animated, 8 steps, loops. The code is on the left with the running line highlighted; the variables are on the right, and the one that just changed is red. The text of each step is in the bar at the bottom.*
 
@@ -1179,7 +1179,7 @@ The starting state is the "push E" moment of the trace above: `head_ = 4`, `tail
 | `relaxed` instead of `release` | the two writes (slot, `head_`) are to unrelated places, so the compiler or CPU may let the `head_` write become visible first. Same failure as the swap. |
 | delete the line | the slot is written but never announced. The consumer waits for ever. |
 
-![[d13x-swap.svg]]
+![[d13x-swap.svg]] [[d13x-swap.html|▶ Step through it]]
 
 *Animated, 5 steps, loops. The two lines of `push` in the wrong order: one command is applied twice and one is lost. The text of each step is in the bar at the bottom.*
 
@@ -1190,7 +1190,7 @@ The starting state is the "push E" moment of the trace above: `head_ = 4`, `tail
 
 #### 8.6 Every line of pop: the mirror image
 
-![[d13x-pop.svg]]
+![[d13x-pop.svg]] [[d13x-pop.html|▶ Step through it]]
 
 *Animated, 8 steps, loops. The first `pop` of the trace: the ring holds A B C D and the consumer's copy of head is still 0. The text of each step is in the bar at the bottom.*
 
@@ -1232,7 +1232,7 @@ for (;;) {
 
 #### 8.7 Why ordering is needed at all
 
-![[d13m-ordering.svg]]
+![[d13m-ordering.svg]] [[d13m-ordering.html|▶ Step through it]]
 
 *Animated, 5 steps, loops. Top lane: what may happen with no ordering rule. Bottom lane: the same steps with release and acquire. The text of each step is in the bar at the bottom of the figure.*
 
@@ -1272,7 +1272,7 @@ almost every time. The trick mostly helps the side that is rarely blocked.
 
 #### 8.10 False sharing
 
-![[d13m-falseshare.svg]]
+![[d13m-falseshare.svg]] [[d13m-falseshare.html|▶ Step through it]]
 
 *Animated, 4 steps, loops. Left: `head_` and `tail_` on one cache line. Right: one line each. The text of each step is in the bar at the bottom of the figure.*
 
@@ -1488,7 +1488,7 @@ if (side == Side::Buy) {
 | `resting_qty_`, `filled_qty_` | uint64 | book-wide counters (used by the fuzzer's conservation check) | |
 | `trades_` | `vector<Trade>` | {buy id, sell id, price, qty} per fill, if recording is on | empty |
 
-![[d13m-match.svg]]
+![[d13m-match.svg]] [[d13m-match.html|▶ Step through it]]
 
 *Animated, 8 steps, loops. The price ladder for the worked example, including the cancel that follows. The text of each step is in the bar at the bottom of the figure.*
 
@@ -1506,7 +1506,7 @@ if (side == Side::Buy) {
 
 Both trades execute at **101**, the maker's price, although the buyer offered 102. `filled_qty_` rose by 2 × 60 = 120 (both sides counted).
 
-![[d13x-match.svg]]
+![[d13x-match.svg]] [[d13x-match.html|▶ Step through it]]
 
 *Animated, 16 steps, loops. The same trace as the table, but with the code beside it: the highlighted line is the one running. The text of each step is in the bar at the bottom.*
 
@@ -1542,7 +1542,7 @@ void OrderBook::erase_order(Order* o) {
 }
 ```
 
-![[d13m-unlink.svg]]
+![[d13m-unlink.svg]] [[d13m-unlink.html|▶ Step through it]]
 
 *Animated, 6 steps, loops. A level with three orders: first the middle one is erased (both `if` branches), then the head (the `else` branch of line 84). The text of each step is in the bar at the bottom of the figure.*
 
@@ -1737,7 +1737,7 @@ The table has **two parallel arrays**: `keys_[i]` says who lives in slot i, `val
 
 A, B, C, D sit in one unbroken **run** (slots 2–5). A lookup walks the run from the home slot and stops at the first empty slot. So an empty slot **in the middle of a run** would hide everything after it. That is the whole problem of deleting.
 
-![[d13m-idtable.svg]]
+![[d13m-idtable.svg]] [[d13m-idtable.html|▶ Step through it]]
 
 *Animated, 7 steps, loops. Step 3 shows the wrong way to erase; steps 4–7 show the backward shift that `IdTable::erase` does. The text of each step is in the bar at the bottom of the figure.*
 
@@ -1782,7 +1782,7 @@ keys_[i] = kEmpty;
 
 #### 9.9 The object pool
 
-![[d13m-pool.svg]]
+![[d13m-pool.svg]] [[d13m-pool.html|▶ Step through it]]
 
 *Animated, 6 steps, loops. Four pre-allocated nodes and the stack of pointers to the free ones. The text of each step is in the bar at the bottom of the figure.*
 
@@ -1992,7 +1992,7 @@ bool append(const Command& c) {
 | `max_records_` | uint64 | the segment's capacity in records | | |
 | `records_` | `Command*` into the mmap'd file | the record array; record i is 40 bytes at `records_[i]` | | |
 
-![[d13m-wal.svg]]
+![[d13m-wal.svg]] [[d13m-wal.html|▶ Step through it]]
 
 *Animated, 5 steps, loops. It shows the file after each line of `append`, what a reader would see, and what a crash at that moment would mean. The text of each step is in the bar at the bottom of the figure.*
 
@@ -2038,7 +2038,7 @@ file, so the first touch of each page faults; `posix_fallocate` would reserve th
 
 #### 10.5 Segments, snapshots and the follower
 
-![[d13m-segments.svg]]
+![[d13m-segments.svg]] [[d13m-segments.html|▶ Step through it]]
 
 *Animated, 6 steps, loops. Two segments passing through Active, Sealed and Free, and which thread makes each change. The text of each step is in the bar at the bottom of the figure.*
 
@@ -2094,7 +2094,7 @@ for (const WalContents& s : segs) {
 | `i` | uint64 | index inside the segment of the first record not yet applied | 0 |
 | `r.replayed` | counter | commands replayed | 12,345 |
 
-![[d13m-recover.svg]]
+![[d13m-recover.svg]] [[d13m-recover.html|▶ Step through it]]
 
 *Animated, 6 steps, loops. The red line is `r.seq`: how much of the history the rebuilt book contains so far. The text of each step is in the bar at the bottom of the figure.*
 

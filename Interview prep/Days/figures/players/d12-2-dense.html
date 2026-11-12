@@ -1,0 +1,65 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dense retrieval</title><style>
+:root{--bg:#f6f8fa;--ink:#1f2328;--mute:#57606a;--line:#d0d7de;--acc:#0969da;--card:#fff}
+@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--ink:#e6edf3;--mute:#9198a1;--line:#30363d;--acc:#4493f8;--card:#161b22}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.fig{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fig svg{display:block;width:100%;height:auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+button,select{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc)} button.main{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--acc)}
+#lab{font-weight:700;min-width:110px;font-variant-numeric:tabular-nums} .hint{color:var(--mute);font-size:13px}
+</style></head><body><div class="wrap">
+<div class="bar"><button id="prev" title="Left arrow">◀ Previous</button><button id="next" class="main" title="Right arrow">Next ▶</button>
+<span id="lab"></span><input id="sl" type="range" min="0" max="1000" value="0" aria-label="position">
+<button id="play" title="Space">Play</button>
+<select id="sp" aria-label="speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></div>
+<div class="fig"><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 820 414' font-family='Inter, Helvetica, Arial, sans-serif'><title>dense retrieval</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='820' height='414' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>Dense retrieval: texts become directions; score = cosine of the angle</text>
+<text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>a made-up 2-D picture (the real vectors have 384 dimensions)</text>
+<line x1='70' y1='368' x2='340' y2='368' stroke='#57606a' marker-end='url(#ah)'/>
+<line x1='70' y1='368' x2='70' y2='98' stroke='#57606a' marker-end='url(#ah)'/>
+<text x='340' y='386' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>“server fetches something”</text>
+<text x='80' y='116' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>“who may access what”</text>
+<path d='M310,368 A240,240 0 0 0 70,128' fill='none' stroke='#d0d7de' stroke-dasharray='4 4'/>
+<line x1='70' y1='368' x2='297.7' y2='292.2' stroke='#cf222e' stroke-width='3'/>
+<circle cx='297.7' cy='292.2' r='5' fill='#cf222e'/>
+<text x='307.73024279467916' y='296.2442311326954' text-anchor='start' font-size='12' font-weight='600' fill='#cf222e'>query</text>
+<line x1='70' y1='368' x2='284.6' y2='260.5' stroke='#1a7f37' stroke-width='2'/>
+<circle cx='284.6' cy='260.5' r='5' fill='#1a7f37'/>
+<text x='294.59701684144835' y='264.5378189186953' text-anchor='start' font-size='12' font-weight='600' fill='#1a7f37'>cloud metadata  cos 0.990</text>
+<line x1='70' y1='368' x2='308.2' y2='338.3' stroke='#1a7f37' stroke-width='2'/>
+<circle cx='308.2' cy='338.3' r='5' fill='#1a7f37'/>
+<text x='318.1596650925173' y='352.33564558228176' text-anchor='start' font-size='12' font-weight='600' fill='#1a7f37'>SSRF doc  cos 0.981</text>
+<line x1='70' y1='368' x2='128.1' y2='135.1' stroke='#8c959f' stroke-width='2'/>
+<circle cx='128.1' cy='135.1' r='5' fill='#8c959f'/>
+<text x='138.06125494392023' y='139.12902569376084' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>IDOR doc  cos 0.537</text>
+<g opacity='0'><animate attributeName='opacity' dur='6.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0500;0.3300;1.0000'/><path d='M136.4,345.9 A70,70 0 0 0 132.6,336.7' fill='none' stroke='#bf8700' stroke-width='4'/><text x='530' y='330' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>angle query ↔ cloud metadata: 8.2° → cos 0.990</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='6.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3500;0.6300;1.0000'/><path d='M164.9,336.4 A100,100 0 0 1 169.2,355.6' fill='none' stroke='#bf8700' stroke-width='4'/><text x='530' y='330' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>angle query ↔ SSRF doc: 11.3° → cos 0.981</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='6.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6500;0.9300;1.0000'/><path d='M193.4,327.0 A130,130 0 0 0 101.4,241.9' fill='none' stroke='#bf8700' stroke-width='4'/><text x='530' y='330' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>angle query ↔ IDOR doc: 57.6° → cos 0.537</text></g>
+<text x='530' y='100' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>cos(q, d) = q · d  (unit vectors)</text>
+<text x='530' y='126' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>metadata: 0.949·0.894 + 0.316·0.447 = 0.990</text>
+<text x='530' y='148' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>SSRF:      0.949·0.992 + 0.316·0.124 = 0.981</text>
+<text x='530' y='170' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>IDOR:      0.949·0.243 + 0.316·0.970 = 0.537</text>
+<text x='530' y='206' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>The query shares no words with the SSRF doc,</text>
+<text x='530' y='224' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>so BM25 scores it 0; dense finds it.</text>
+<text x='20' y='402' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: the amber arc shows each doc's angle to the query</text></svg>
+</div>
+<p class="hint">Keys: ← previous step, → next step, space play / pause. Drag the slider to move freely. The picture stays still until you move it.</p>
+</div><script>
+const D=6.0, steps=[0.0, 0.3, 1.98, 3.78, 5.58], svg=document.querySelector('.fig svg'), EPS=0.02;
+const lab=document.getElementById('lab'), sl=document.getElementById('sl'), playB=document.getElementById('play'), sp=document.getElementById('sp');
+let t=EPS, playing=false, last=0;
+svg.pauseAnimations();
+function cur(){let i=0; for(let k=0;k<steps.length;k++) if(steps[k]<=t+1e-6) i=k; return i;}
+function show(){svg.setCurrentTime(t); sl.value=Math.round(t/D*1000); lab.textContent='step '+(cur()+1)+' / '+steps.length;}
+function go(i){playing=false; playB.textContent='Play'; i=(i+steps.length)%steps.length; t=steps[i]+EPS; show();}
+document.getElementById('next').onclick=()=>go(cur()+1);
+document.getElementById('prev').onclick=()=>go(cur()-1);
+sl.oninput=()=>{playing=false; playB.textContent='Play'; t=Math.min(D-EPS,Math.max(EPS,sl.value/1000*D)); show();};
+function tick(now){ if(!playing) return; t+=(now-last)/1000*parseFloat(sp.value); last=now; if(t>=D) t=EPS; show(); requestAnimationFrame(tick); }
+playB.onclick=()=>{playing=!playing; playB.textContent=playing?'Pause':'Play'; if(playing){last=performance.now(); requestAnimationFrame(tick);} };
+document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){go(cur()+1);e.preventDefault();} else if(e.key==='ArrowLeft'){go(cur()-1);e.preventDefault();} else if(e.key===' '){playB.click();e.preventDefault();} });
+show();
+</script></body></html>

@@ -1,0 +1,183 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPSC ring</title><style>
+:root{--bg:#f6f8fa;--ink:#1f2328;--mute:#57606a;--line:#d0d7de;--acc:#0969da;--card:#fff}
+@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--ink:#e6edf3;--mute:#9198a1;--line:#30363d;--acc:#4493f8;--card:#161b22}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.fig{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fig svg{display:block;width:100%;height:auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+button,select{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc)} button.main{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--acc)}
+#lab{font-weight:700;min-width:110px;font-variant-numeric:tabular-nums} .hint{color:var(--mute);font-size:13px}
+</style></head><body><div class="wrap">
+<div class="bar"><button id="prev" title="Left arrow">◀ Previous</button><button id="next" class="main" title="Right arrow">Next ▶</button>
+<span id="lab"></span><input id="sl" type="range" min="0" max="1000" value="0" aria-label="position">
+<button id="play" title="Space">Play</button>
+<select id="sp" aria-label="speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></div>
+<div class="fig"><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 400' font-family='Inter, Helvetica, Arial, sans-serif'><title>SPSC ring</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='900' height='400' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>SPSC ring with Capacity = 4: indices only grow; slot = index &amp; (Capacity − 1)</text>
+<text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>the producer only writes head, the consumer only writes tail; size = head − tail</text>
+<text x='470' y='80' text-anchor='start' font-size='11' font-weight='600' fill='#57606a'>step</text>
+<text x='590' y='80' text-anchor='start' font-size='11' font-weight='600' fill='#57606a'>head</text>
+<text x='635' y='80' text-anchor='start' font-size='11' font-weight='600' fill='#57606a'>tail</text>
+<text x='675' y='80' text-anchor='start' font-size='11' font-weight='600' fill='#57606a'>what happens</text>
+<g><animate attributeName='opacity' dur='14.0s' repeatCount='indefinite' calcMode='discrete' values='1;0;0' keyTimes='0.0000;0.1429;1.0000'/><rect x='464' y='86' width='424' height='30' rx='5' fill='none' stroke='#cf222e' stroke-width='2'/></g>
+<text x='470' y='102' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>start</text>
+<text x='600' y='102' text-anchor='middle' font-size='12' font-weight='600' fill='#0969da'>0</text>
+<text x='645' y='102' text-anchor='middle' font-size='12' font-weight='600' fill='#1a7f37'>0</text>
+<text x='675' y='102' text-anchor='start' font-size='11' font-weight='400' fill='#1f2328'>empty: head == tail</text>
+<g opacity='0'><animate attributeName='opacity' dur='14.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.1429;0.2857;1.0000'/><rect x='464' y='124' width='424' height='30' rx='5' fill='none' stroke='#cf222e' stroke-width='2'/></g>
+<text x='470' y='140' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>push A</text>
+<text x='600' y='140' text-anchor='middle' font-size='12' font-weight='600' fill='#0969da'>1</text>
+<text x='645' y='140' text-anchor='middle' font-size='12' font-weight='600' fill='#1a7f37'>0</text>
+<text x='675' y='140' text-anchor='start' font-size='11' font-weight='400' fill='#1f2328'>slot 0 &amp; 3 = 0; head → 1</text>
+<g opacity='0'><animate attributeName='opacity' dur='14.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2857;0.4286;1.0000'/><rect x='464' y='162' width='424' height='30' rx='5' fill='none' stroke='#cf222e' stroke-width='2'/></g>
+<text x='470' y='178' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>push B, C, D</text>
+<text x='600' y='178' text-anchor='middle' font-size='12' font-weight='600' fill='#0969da'>4</text>
+<text x='645' y='178' text-anchor='middle' font-size='12' font-weight='600' fill='#1a7f37'>0</text>
+<text x='675' y='178' text-anchor='start' font-size='11' font-weight='400' fill='#1f2328'>full: head − tail = 4 = Capacity</text>
+<g opacity='0'><animate attributeName='opacity' dur='14.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4286;0.5714;1.0000'/><rect x='464' y='200' width='424' height='30' rx='5' fill='none' stroke='#cf222e' stroke-width='2'/></g>
+<text x='470' y='216' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>push E?</text>
+<text x='600' y='216' text-anchor='middle' font-size='12' font-weight='600' fill='#0969da'>4</text>
+<text x='645' y='216' text-anchor='middle' font-size='12' font-weight='600' fill='#1a7f37'>0</text>
+<text x='675' y='216' text-anchor='start' font-size='11' font-weight='400' fill='#cf222e'>4 − 0 ≥ 4 → push returns false</text>
+<g opacity='0'><animate attributeName='opacity' dur='14.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5714;0.7143;1.0000'/><rect x='464' y='238' width='424' height='30' rx='5' fill='none' stroke='#cf222e' stroke-width='2'/></g>
+<text x='470' y='254' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>pop → A</text>
+<text x='600' y='254' text-anchor='middle' font-size='12' font-weight='600' fill='#0969da'>4</text>
+<text x='645' y='254' text-anchor='middle' font-size='12' font-weight='600' fill='#1a7f37'>1</text>
+<text x='675' y='254' text-anchor='start' font-size='11' font-weight='400' fill='#1f2328'>slot 0 &amp; 3 = 0; tail → 1</text>
+<g opacity='0'><animate attributeName='opacity' dur='14.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7143;0.8571;1.0000'/><rect x='464' y='276' width='424' height='30' rx='5' fill='none' stroke='#cf222e' stroke-width='2'/></g>
+<text x='470' y='292' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>push E</text>
+<text x='600' y='292' text-anchor='middle' font-size='12' font-weight='600' fill='#0969da'>5</text>
+<text x='645' y='292' text-anchor='middle' font-size='12' font-weight='600' fill='#1a7f37'>1</text>
+<text x='675' y='292' text-anchor='start' font-size='11' font-weight='400' fill='#1f2328'>slot 4 &amp; 3 = 0: wraps, no special case</text>
+<g opacity='0'><animate attributeName='opacity' dur='14.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.8571;1.0000;1.0000'/><rect x='464' y='314' width='424' height='30' rx='5' fill='none' stroke='#cf222e' stroke-width='2'/></g>
+<text x='470' y='330' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>pop → B, C</text>
+<text x='600' y='330' text-anchor='middle' font-size='12' font-weight='600' fill='#0969da'>5</text>
+<text x='645' y='330' text-anchor='middle' font-size='12' font-weight='600' fill='#1a7f37'>3</text>
+<text x='675' y='330' text-anchor='start' font-size='11' font-weight='400' fill='#1f2328'>tail → 3; 2 items left (5 − 3)</text>
+<g><animate attributeName='opacity' dur='14.0s' repeatCount='indefinite' calcMode='discrete' values='1;0;0' keyTimes='0.0000;0.1429;1.0000'/><text x='40' y='92' text-anchor='start' font-size='13' font-weight='700' fill='#1f2328'>after: start</text>
+<rect x='40' y='150' width='80' height='60' rx='5' fill='#f6f8fa' stroke='#8c959f' stroke-width='1.3'/><text x='80.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>·</text>
+<text x='80' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 0</text>
+<rect x='135' y='150' width='80' height='60' rx='5' fill='#f6f8fa' stroke='#8c959f' stroke-width='1.3'/><text x='175.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>·</text>
+<text x='175' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 1</text>
+<rect x='230' y='150' width='80' height='60' rx='5' fill='#f6f8fa' stroke='#8c959f' stroke-width='1.3'/><text x='270.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>·</text>
+<text x='270' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 2</text>
+<rect x='325' y='150' width='80' height='60' rx='5' fill='#f6f8fa' stroke='#8c959f' stroke-width='1.3'/><text x='365.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>·</text>
+<text x='365' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 3</text>
+<line x1='80' y1='128' x2='80' y2='146' stroke='#0969da' stroke-width='2.5'/><path d='M80.0,146.0 L75.0,136.0 L85.0,136.0 z' fill='#0969da'/>
+<text x='80' y='122' text-anchor='middle' font-size='11' font-weight='600' fill='#0969da'>head = 0 (next write)</text>
+<line x1='80' y1='250' x2='80' y2='214' stroke='#1a7f37' stroke-width='2.5'/><path d='M80.0,214.0 L85.0,224.0 L75.0,224.0 z' fill='#1a7f37'/>
+<text x='80' y='266' text-anchor='middle' font-size='11' font-weight='600' fill='#1a7f37'>tail = 0 (next read)</text>
+<text x='40' y='320' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>size = head − tail = 0</text>
+<text x='40' y='342' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>empty: head == tail</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='14.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.1429;0.2857;1.0000'/><text x='40' y='92' text-anchor='start' font-size='13' font-weight='700' fill='#1f2328'>after: push A</text>
+<rect x='40' y='150' width='80' height='60' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='80.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>A</text>
+<text x='80' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 0</text>
+<rect x='135' y='150' width='80' height='60' rx='5' fill='#f6f8fa' stroke='#8c959f' stroke-width='1.3'/><text x='175.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>·</text>
+<text x='175' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 1</text>
+<rect x='230' y='150' width='80' height='60' rx='5' fill='#f6f8fa' stroke='#8c959f' stroke-width='1.3'/><text x='270.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>·</text>
+<text x='270' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 2</text>
+<rect x='325' y='150' width='80' height='60' rx='5' fill='#f6f8fa' stroke='#8c959f' stroke-width='1.3'/><text x='365.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>·</text>
+<text x='365' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 3</text>
+<line x1='175' y1='128' x2='175' y2='146' stroke='#0969da' stroke-width='2.5'/><path d='M175.0,146.0 L170.0,136.0 L180.0,136.0 z' fill='#0969da'/>
+<text x='175' y='122' text-anchor='middle' font-size='11' font-weight='600' fill='#0969da'>head = 1 (next write)</text>
+<line x1='80' y1='250' x2='80' y2='214' stroke='#1a7f37' stroke-width='2.5'/><path d='M80.0,214.0 L85.0,224.0 L75.0,224.0 z' fill='#1a7f37'/>
+<text x='80' y='266' text-anchor='middle' font-size='11' font-weight='600' fill='#1a7f37'>tail = 0 (next read)</text>
+<text x='40' y='320' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>size = head − tail = 1</text>
+<text x='40' y='342' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>slot 0 &amp; 3 = 0; head → 1</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='14.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2857;0.4286;1.0000'/><text x='40' y='92' text-anchor='start' font-size='13' font-weight='700' fill='#1f2328'>after: push B, C, D</text>
+<rect x='40' y='150' width='80' height='60' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='80.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>A</text>
+<text x='80' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 0</text>
+<rect x='135' y='150' width='80' height='60' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='175.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>B</text>
+<text x='175' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 1</text>
+<rect x='230' y='150' width='80' height='60' rx='5' fill='#c7f0d2' stroke='#8c959f' stroke-width='1.3'/><text x='270.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>C</text>
+<text x='270' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 2</text>
+<rect x='325' y='150' width='80' height='60' rx='5' fill='#f5c6e9' stroke='#8c959f' stroke-width='1.3'/><text x='365.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>D</text>
+<text x='365' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 3</text>
+<line x1='80' y1='128' x2='80' y2='146' stroke='#0969da' stroke-width='2.5'/><path d='M80.0,146.0 L75.0,136.0 L85.0,136.0 z' fill='#0969da'/>
+<text x='80' y='122' text-anchor='middle' font-size='11' font-weight='600' fill='#0969da'>head = 4 (next write)</text>
+<line x1='80' y1='250' x2='80' y2='214' stroke='#1a7f37' stroke-width='2.5'/><path d='M80.0,214.0 L85.0,224.0 L75.0,224.0 z' fill='#1a7f37'/>
+<text x='80' y='266' text-anchor='middle' font-size='11' font-weight='600' fill='#1a7f37'>tail = 0 (next read)</text>
+<text x='40' y='320' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>size = head − tail = 4</text>
+<text x='40' y='342' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>full: head − tail = 4 = Capacity</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='14.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4286;0.5714;1.0000'/><text x='40' y='92' text-anchor='start' font-size='13' font-weight='700' fill='#1f2328'>after: push E?</text>
+<rect x='40' y='150' width='80' height='60' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='80.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>A</text>
+<text x='80' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 0</text>
+<rect x='135' y='150' width='80' height='60' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='175.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>B</text>
+<text x='175' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 1</text>
+<rect x='230' y='150' width='80' height='60' rx='5' fill='#c7f0d2' stroke='#8c959f' stroke-width='1.3'/><text x='270.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>C</text>
+<text x='270' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 2</text>
+<rect x='325' y='150' width='80' height='60' rx='5' fill='#f5c6e9' stroke='#8c959f' stroke-width='1.3'/><text x='365.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>D</text>
+<text x='365' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 3</text>
+<line x1='80' y1='128' x2='80' y2='146' stroke='#0969da' stroke-width='2.5'/><path d='M80.0,146.0 L75.0,136.0 L85.0,136.0 z' fill='#0969da'/>
+<text x='80' y='122' text-anchor='middle' font-size='11' font-weight='600' fill='#0969da'>head = 4 (next write)</text>
+<line x1='80' y1='250' x2='80' y2='214' stroke='#1a7f37' stroke-width='2.5'/><path d='M80.0,214.0 L85.0,224.0 L75.0,224.0 z' fill='#1a7f37'/>
+<text x='80' y='266' text-anchor='middle' font-size='11' font-weight='600' fill='#1a7f37'>tail = 0 (next read)</text>
+<text x='40' y='320' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>size = head − tail = 4</text>
+<text x='40' y='342' text-anchor='start' font-size='12' font-weight='400' fill='#cf222e'>4 − 0 ≥ 4 → push returns false</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='14.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5714;0.7143;1.0000'/><text x='40' y='92' text-anchor='start' font-size='13' font-weight='700' fill='#1f2328'>after: pop → A</text>
+<rect x='40' y='150' width='80' height='60' rx='5' fill='#f6f8fa' stroke='#8c959f' stroke-width='1.3'/><text x='80.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>·</text>
+<text x='80' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 0</text>
+<rect x='135' y='150' width='80' height='60' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='175.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>B</text>
+<text x='175' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 1</text>
+<rect x='230' y='150' width='80' height='60' rx='5' fill='#c7f0d2' stroke='#8c959f' stroke-width='1.3'/><text x='270.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>C</text>
+<text x='270' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 2</text>
+<rect x='325' y='150' width='80' height='60' rx='5' fill='#f5c6e9' stroke='#8c959f' stroke-width='1.3'/><text x='365.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>D</text>
+<text x='365' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 3</text>
+<line x1='80' y1='128' x2='80' y2='146' stroke='#0969da' stroke-width='2.5'/><path d='M80.0,146.0 L75.0,136.0 L85.0,136.0 z' fill='#0969da'/>
+<text x='80' y='122' text-anchor='middle' font-size='11' font-weight='600' fill='#0969da'>head = 4 (next write)</text>
+<line x1='175' y1='250' x2='175' y2='214' stroke='#1a7f37' stroke-width='2.5'/><path d='M175.0,214.0 L180.0,224.0 L170.0,224.0 z' fill='#1a7f37'/>
+<text x='175' y='266' text-anchor='middle' font-size='11' font-weight='600' fill='#1a7f37'>tail = 1 (next read)</text>
+<text x='40' y='320' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>size = head − tail = 3</text>
+<text x='40' y='342' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>slot 0 &amp; 3 = 0; tail → 1</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='14.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7143;0.8571;1.0000'/><text x='40' y='92' text-anchor='start' font-size='13' font-weight='700' fill='#1f2328'>after: push E</text>
+<rect x='40' y='150' width='80' height='60' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='80.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>E</text>
+<text x='80' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 0</text>
+<rect x='135' y='150' width='80' height='60' rx='5' fill='#c8e1ff' stroke='#8c959f' stroke-width='1.3'/><text x='175.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>B</text>
+<text x='175' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 1</text>
+<rect x='230' y='150' width='80' height='60' rx='5' fill='#c7f0d2' stroke='#8c959f' stroke-width='1.3'/><text x='270.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>C</text>
+<text x='270' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 2</text>
+<rect x='325' y='150' width='80' height='60' rx='5' fill='#f5c6e9' stroke='#8c959f' stroke-width='1.3'/><text x='365.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>D</text>
+<text x='365' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 3</text>
+<line x1='175' y1='128' x2='175' y2='146' stroke='#0969da' stroke-width='2.5'/><path d='M175.0,146.0 L170.0,136.0 L180.0,136.0 z' fill='#0969da'/>
+<text x='175' y='122' text-anchor='middle' font-size='11' font-weight='600' fill='#0969da'>head = 5 (next write)</text>
+<line x1='175' y1='250' x2='175' y2='214' stroke='#1a7f37' stroke-width='2.5'/><path d='M175.0,214.0 L180.0,224.0 L170.0,224.0 z' fill='#1a7f37'/>
+<text x='175' y='266' text-anchor='middle' font-size='11' font-weight='600' fill='#1a7f37'>tail = 1 (next read)</text>
+<text x='40' y='320' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>size = head − tail = 4</text>
+<text x='40' y='342' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>slot 4 &amp; 3 = 0: wraps, no special case</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='14.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.8571;1.0000;1.0000'/><text x='40' y='92' text-anchor='start' font-size='13' font-weight='700' fill='#1f2328'>after: pop → B, C</text>
+<rect x='40' y='150' width='80' height='60' rx='5' fill='#ffd8b5' stroke='#8c959f' stroke-width='1.3'/><text x='80.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>E</text>
+<text x='80' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 0</text>
+<rect x='135' y='150' width='80' height='60' rx='5' fill='#f6f8fa' stroke='#8c959f' stroke-width='1.3'/><text x='175.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>·</text>
+<text x='175' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 1</text>
+<rect x='230' y='150' width='80' height='60' rx='5' fill='#f6f8fa' stroke='#8c959f' stroke-width='1.3'/><text x='270.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>·</text>
+<text x='270' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 2</text>
+<rect x='325' y='150' width='80' height='60' rx='5' fill='#f5c6e9' stroke='#8c959f' stroke-width='1.3'/><text x='365.0' y='184.0' text-anchor='middle' font-size='16' font-weight='600' fill='#1f2328'>D</text>
+<text x='365' y='204' text-anchor='middle' font-size='10' font-weight='400' fill='#57606a'>slot 3</text>
+<line x1='175' y1='128' x2='175' y2='146' stroke='#0969da' stroke-width='2.5'/><path d='M175.0,146.0 L170.0,136.0 L180.0,136.0 z' fill='#0969da'/>
+<text x='175' y='122' text-anchor='middle' font-size='11' font-weight='600' fill='#0969da'>head = 5 (next write)</text>
+<line x1='365' y1='250' x2='365' y2='214' stroke='#1a7f37' stroke-width='2.5'/><path d='M365.0,214.0 L370.0,224.0 L360.0,224.0 z' fill='#1a7f37'/>
+<text x='365' y='266' text-anchor='middle' font-size='11' font-weight='600' fill='#1a7f37'>tail = 3 (next read)</text>
+<text x='40' y='320' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>size = head − tail = 2</text>
+<text x='40' y='342' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>tail → 3; 2 items left (5 − 3)</text></g>
+<text x='20' y='388' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: one step every 2 s (the table on the right highlights the current step)</text></svg>
+</div>
+<p class="hint">Keys: ← previous step, → next step, space play / pause. Drag the slider to move freely. The picture stays still until you move it.</p>
+</div><script>
+const D=14.0, steps=[0.0, 2.001, 4.0, 6.0, 8.0, 10.0, 11.999], svg=document.querySelector('.fig svg'), EPS=0.02;
+const lab=document.getElementById('lab'), sl=document.getElementById('sl'), playB=document.getElementById('play'), sp=document.getElementById('sp');
+let t=EPS, playing=false, last=0;
+svg.pauseAnimations();
+function cur(){let i=0; for(let k=0;k<steps.length;k++) if(steps[k]<=t+1e-6) i=k; return i;}
+function show(){svg.setCurrentTime(t); sl.value=Math.round(t/D*1000); lab.textContent='step '+(cur()+1)+' / '+steps.length;}
+function go(i){playing=false; playB.textContent='Play'; i=(i+steps.length)%steps.length; t=steps[i]+EPS; show();}
+document.getElementById('next').onclick=()=>go(cur()+1);
+document.getElementById('prev').onclick=()=>go(cur()-1);
+sl.oninput=()=>{playing=false; playB.textContent='Play'; t=Math.min(D-EPS,Math.max(EPS,sl.value/1000*D)); show();};
+function tick(now){ if(!playing) return; t+=(now-last)/1000*parseFloat(sp.value); last=now; if(t>=D) t=EPS; show(); requestAnimationFrame(tick); }
+playB.onclick=()=>{playing=!playing; playB.textContent=playing?'Pause':'Play'; if(playing){last=performance.now(); requestAnimationFrame(tick);} };
+document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){go(cur()+1);e.preventDefault();} else if(e.key==='ArrowLeft'){go(cur()-1);e.preventDefault();} else if(e.key===' '){playB.click();e.preventDefault();} });
+show();
+</script></body></html>

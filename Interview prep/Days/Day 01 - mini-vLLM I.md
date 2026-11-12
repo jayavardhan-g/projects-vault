@@ -358,7 +358,7 @@ because only the last token needs a prediction.
 
 **The same step with the real model's shapes** (animated; blocks are sized by their dimensions, no values):
 
-![[d1s-embed.svg]]
+![[d1s-embed.svg]] [[d1s-embed.html|▶ Step through it]]
 
 `src/mini_vllm/model/llama.py:264–264`
 ```python
@@ -416,7 +416,7 @@ gets **p × 0.0014**. Position 2 → angles [2.0, 0.0028] rad. `torch.cat((freqs
 pair hardly moves (one turn every ~4,440 positions). Right: a query at position m and a key at position n always keep
 the same gap, m − n, which is why attention ends up seeing **relative** position.
 
-![[d1t-anim-rope.svg]]
+![[d1t-anim-rope.svg]] [[d1t-anim-rope.html|▶ Step through it]]
 
 #### 1.3 The layer loop
 
@@ -447,7 +447,7 @@ from the embedding survives all 16 layers.
 
 **The same step with the real model's shapes** (animated; blocks are sized by their dimensions, no values):
 
-![[d1s-rmsnorm.svg]]
+![[d1s-rmsnorm.svg]] [[d1s-rmsnorm.html|▶ Step through it]]
 
 > [!tip] New to normalisation? [[#4. Deep dive: RMSNorm from scratch, on our three tokens|§4 builds RMSNorm from scratch]]: why normalise, what RMS means, RMSNorm vs LayerNorm, "the" number by number, and the code line by line.
 
@@ -486,7 +486,7 @@ The same happens independently to "cat" (rms 1.34) and "sat" (rms 1.28). Each ro
 
 **Animation: the five steps on token "the".**
 
-![[d1t-anim-rmsnorm.svg]]
+![[d1t-anim-rmsnorm.svg]] [[d1t-anim-rmsnorm.html|▶ Step through it]]
 
 **All three tokens at once:**
 
@@ -496,9 +496,9 @@ The same happens independently to "cat" (rms 1.34) and "sat" (rms 1.28). Each ro
 
 **The same step with the real model's shapes** (animated; blocks are sized by their dimensions, no values):
 
-![[d1s-qkv.svg]]
+![[d1s-qkv.svg]] [[d1s-qkv.html|▶ Step through it]]
 
-![[d1s-heads.svg]]
+![[d1s-heads.svg]] [[d1s-heads.html|▶ Step through it]]
 
 `src/mini_vllm/model/llama.py:283–285`
 ```python
@@ -525,7 +525,7 @@ both query heads will share. In the real model it's the same picture, scaled up:
 
 **The same step with the real model's shapes** (animated; blocks are sized by their dimensions, no values):
 
-![[d1s-rope.svg]]
+![[d1s-rope.svg]] [[d1s-rope.html|▶ Step through it]]
 
 > [!tip] New to RoPE? [[#3. Deep dive: RoPE from scratch, on our three tokens|§3 builds it from scratch on this example]]: why rotate, where the angles and the base come from, and the full arithmetic for "cat".
 
@@ -585,9 +585,9 @@ belong to nobody yet or to other requests. Attention in 1.8 then reads these row
 
 **The same step with the real model's shapes** (animated; blocks are sized by their dimensions, no values):
 
-![[d1s-gqa.svg]]
+![[d1s-gqa.svg]] [[d1s-gqa.html|▶ Step through it]]
 
-![[d1s-attn.svg]]
+![[d1s-attn.svg]] [[d1s-attn.html|▶ Step through it]]
 
 > [!tip] New to attention? [[#5. Deep dive: attention from scratch, on our three tokens|§5 builds attention from scratch]]: Q, K, V, the score table, why ÷√d, the causal mask, softmax step by step, the weighted average, heads and GQA, and the code line by line.
 
@@ -688,7 +688,7 @@ real model: 32 heads concatenated to `[T, 2048]`.
 
 **The same step with the real model's shapes** (animated; blocks are sized by their dimensions, no values):
 
-![[d1s-oproj.svg]]
+![[d1s-oproj.svg]] [[d1s-oproj.html|▶ Step through it]]
 
 `src/mini_vllm/model/llama.py:298–299`
 ```python
@@ -715,7 +715,7 @@ The attention block only *adds* a correction to the stream; it doesn't replace w
 
 **The same step with the real model's shapes** (animated; blocks are sized by their dimensions, no values):
 
-![[d1s-mlp.svg]]
+![[d1s-mlp.svg]] [[d1s-mlp.html|▶ Step through it]]
 
 > [!tip] New to MLPs? [[#6. Deep dive: the SwiGLU MLP from scratch, on our three tokens|§6 builds the SwiGLU MLP from scratch]]: why a nonlinearity, ReLU vs SiLU, what gating does, where the parameters are, and "sat" number by number.
 
@@ -749,7 +749,7 @@ hidden = residual + mlp.down_proj(
 
 **The same step with the real model's shapes** (animated; blocks are sized by their dimensions, no values):
 
-![[d1s-logits.svg]]
+![[d1s-logits.svg]] [[d1s-logits.html|▶ Step through it]]
 
 `src/mini_vllm/model/llama.py:308–311`
 ```python

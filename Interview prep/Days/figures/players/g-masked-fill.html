@@ -1,0 +1,120 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>masked_fill</title><style>
+:root{--bg:#f6f8fa;--ink:#1f2328;--mute:#57606a;--line:#d0d7de;--acc:#0969da;--card:#fff}
+@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--ink:#e6edf3;--mute:#9198a1;--line:#30363d;--acc:#4493f8;--card:#161b22}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.fig{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fig svg{display:block;width:100%;height:auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+button,select{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc)} button.main{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--acc)}
+#lab{font-weight:700;min-width:110px;font-variant-numeric:tabular-nums} .hint{color:var(--mute);font-size:13px}
+</style></head><body><div class="wrap">
+<div class="bar"><button id="prev" title="Left arrow">◀ Previous</button><button id="next" class="main" title="Right arrow">Next ▶</button>
+<span id="lab"></span><input id="sl" type="range" min="0" max="1000" value="0" aria-label="position">
+<button id="play" title="Space">Play</button>
+<select id="sp" aria-label="speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></div>
+<div class="fig"><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 840 290' font-family='Inter, Helvetica, Arial, sans-serif'><title>masked_fill</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='840' height='290' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>x.masked_fill(mask, value): put value wherever mask is True</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>causal attention: query i may not look at keys after i, so those scores become −∞ (softmax weight 0)</text>
+<text x='90.0' y='94' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>scores</text>
+<rect x='30' y='102' width='120' height='142' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='35' y='107' width='110' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='40' y='112' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='56.0' y='132.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>.5</text>
+<rect x='74' y='112' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='90.0' y='132.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>.1</text>
+<rect x='108' y='112' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='124.0' y='132.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>.3</text>
+<rect x='35' y='152' width='110' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='40' y='157' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='56.0' y='177.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>.2</text>
+<rect x='74' y='157' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='90.0' y='177.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>.4</text>
+<rect x='108' y='157' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='124.0' y='177.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>.6</text>
+<rect x='35' y='197' width='110' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='40' y='202' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='56.0' y='222.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>.9</text>
+<rect x='74' y='202' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='90.0' y='222.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>.7</text>
+<rect x='108' y='202' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='124.0' y='222.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>.1</text>
+<text x='90.0' y='259' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[3 queries, 3 keys]</text>
+<text x='175' y='150' text-anchor='middle' font-size='20' font-weight='700' fill='#1f2328'>+</text>
+<text x='260.0' y='94' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>mask (True = hide)</text>
+<rect x='200' y='102' width='120' height='142' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='205' y='107' width='110' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='210' y='112' width='32' height='32' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='226.0' y='132.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'></text>
+<rect x='244' y='112' width='32' height='32' rx='4' fill='#ffc9c9' stroke='#ffffff'/>
+<text x='260.0' y='132.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>T</text>
+<rect x='278' y='112' width='32' height='32' rx='4' fill='#ffc9c9' stroke='#ffffff'/>
+<text x='294.0' y='132.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>T</text>
+<rect x='205' y='152' width='110' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='210' y='157' width='32' height='32' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='226.0' y='177.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'></text>
+<rect x='244' y='157' width='32' height='32' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='260.0' y='177.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'></text>
+<rect x='278' y='157' width='32' height='32' rx='4' fill='#ffc9c9' stroke='#ffffff'/>
+<text x='294.0' y='177.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>T</text>
+<rect x='205' y='197' width='110' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='210' y='202' width='32' height='32' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='226.0' y='222.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'></text>
+<rect x='244' y='202' width='32' height='32' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='260.0' y='222.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'></text>
+<rect x='278' y='202' width='32' height='32' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='294.0' y='222.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'></text>
+<text x='260.0' y='259' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>key after query</text>
+<line x1='340' y1='150' x2='464' y2='150' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/><text x='405.0' y='141' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>masked_fill</text>
+<text x='550.0' y='94' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>masked_fill(mask, −∞)</text>
+<rect x='490' y='102' width='120' height='142' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='495' y='107' width='110' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='500' y='112' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='516.0' y='132.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>.5</text>
+<rect x='534' y='112' width='32' height='32' rx='4' fill='#d0d7de' stroke='#ffffff'/>
+<text x='550.0' y='132.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>−∞</text>
+<rect x='568' y='112' width='32' height='32' rx='4' fill='#d0d7de' stroke='#ffffff'/>
+<text x='584.0' y='132.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>−∞</text>
+<rect x='495' y='152' width='110' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='500' y='157' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='516.0' y='177.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>.2</text>
+<rect x='534' y='157' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='550.0' y='177.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>.4</text>
+<rect x='568' y='157' width='32' height='32' rx='4' fill='#d0d7de' stroke='#ffffff'/>
+<text x='584.0' y='177.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>−∞</text>
+<rect x='495' y='197' width='110' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='500' y='202' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='516.0' y='222.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>.9</text>
+<rect x='534' y='202' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='550.0' y='222.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>.7</text>
+<rect x='568' y='202' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='584.0' y='222.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>.1</text>
+<rect x='241' y='109' width='38' height='38' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.1000;0.3400;1.0000'/></rect>
+<rect x='531' y='109' width='38' height='38' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.1000;0.3400;1.0000'/></rect>
+<rect x='534' y='112' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.2000;1.0000'/></rect>
+<rect x='275' y='109' width='38' height='38' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3500;0.5900;1.0000'/></rect>
+<rect x='565' y='109' width='38' height='38' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3500;0.5900;1.0000'/></rect>
+<rect x='568' y='112' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.4500;1.0000'/></rect>
+<rect x='275' y='154' width='38' height='38' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6000;0.8400;1.0000'/></rect>
+<rect x='565' y='154' width='38' height='38' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6000;0.8400;1.0000'/></rect>
+<rect x='568' y='157' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.85;0;0' keyTimes='0.0000;0.0400;0.7000;1.0000'/></rect>
+<text x='20' y='276' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: each True cell of the mask overwrites one score. Shapes never change</text></svg>
+</div>
+<p class="hint">Keys: ← previous step, → next step, space play / pause. Drag the slider to move freely. The picture stays still until you move it.</p>
+</div><script>
+const D=7.0, steps=[0.0, 0.28, 0.7, 1.4, 2.38, 3.15, 4.13, 4.9, 5.88], svg=document.querySelector('.fig svg'), EPS=0.02;
+const lab=document.getElementById('lab'), sl=document.getElementById('sl'), playB=document.getElementById('play'), sp=document.getElementById('sp');
+let t=EPS, playing=false, last=0;
+svg.pauseAnimations();
+function cur(){let i=0; for(let k=0;k<steps.length;k++) if(steps[k]<=t+1e-6) i=k; return i;}
+function show(){svg.setCurrentTime(t); sl.value=Math.round(t/D*1000); lab.textContent='step '+(cur()+1)+' / '+steps.length;}
+function go(i){playing=false; playB.textContent='Play'; i=(i+steps.length)%steps.length; t=steps[i]+EPS; show();}
+document.getElementById('next').onclick=()=>go(cur()+1);
+document.getElementById('prev').onclick=()=>go(cur()-1);
+sl.oninput=()=>{playing=false; playB.textContent='Play'; t=Math.min(D-EPS,Math.max(EPS,sl.value/1000*D)); show();};
+function tick(now){ if(!playing) return; t+=(now-last)/1000*parseFloat(sp.value); last=now; if(t>=D) t=EPS; show(); requestAnimationFrame(tick); }
+playB.onclick=()=>{playing=!playing; playB.textContent=playing?'Pause':'Play'; if(playing){last=performance.now(); requestAnimationFrame(tick);} };
+document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){go(cur()+1);e.preventDefault();} else if(e.key==='ArrowLeft'){go(cur()-1);e.preventDefault();} else if(e.key===' '){playB.click();e.preventDefault();} });
+show();
+</script></body></html>

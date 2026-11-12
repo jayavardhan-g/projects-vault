@@ -366,7 +366,7 @@ holds that very token, inside the passage being retrieved (the **needle**). Both
 **Toy probe.** Prompt of 10 tokens; the needle is positions 4–7, "code is 47 21". The model is answering and now
 emits "47".
 
-![[d09-1-copy-hit.svg]]
+![[d09-1-copy-hit.svg]] [[d09-1-copy-hit.html|▶ Step through it]]
 
 | head | argmax $j$ | inside 4–7? | token at $j$ | = "47"? | hit? |
 |---|---|---|---|---|---|
@@ -563,7 +563,7 @@ Two layers. Layer 1 is small, with **large** weights; layer 2 is big, with small
 
 **Global** = rank all 16 together and keep the 4 largest |w|: 0.9, −0.8, 0.7, −0.4. Layer 1 keeps **3**, layer 2 keeps 1.
 
-![[d09-2-pruning.svg]]
+![[d09-2-pruning.svg]] [[d09-2-pruning.html|▶ Step through it]]
 
 Layer-wise pruning forces the same fraction everywhere, regardless of how important each layer's weights are. Global
 pruning lets layers with large weights keep more.
@@ -732,7 +732,7 @@ raise $x_2$. Step α = 0.04.
 **With ε = 0.1**, the box is [0.2, 0.4] × [0.1, 0.3]; step 3's (0.18, 0.32) is clipped to **(0.20, 0.30)** and stays
 there: $s$ = 0.10, still correct.
 
-![[d09-3-pgd.svg]]
+![[d09-3-pgd.svg]] [[d09-3-pgd.html|▶ Step through it]]
 
 #### 6.5 Why the linear case is easy
 
@@ -865,7 +865,7 @@ $$s = \frac{\max |w|}{127} = \frac{1.30}{127} = 0.010236$$
 | 0.07 | 6.84 | **7** | 0.0717 | −0.0017 |
 | 0.95 | 92.81 | **93** | 0.9520 | −0.0020 |
 
-![[d09-4-int8.svg]]
+![[d09-4-int8.svg]] [[d09-4-int8.html|▶ Step through it]]
 
 **Step 3, store** the four int8 values (4 bytes) plus one float32 scale (4 bytes).
 

@@ -1,0 +1,128 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>view</title><style>
+:root{--bg:#f6f8fa;--ink:#1f2328;--mute:#57606a;--line:#d0d7de;--acc:#0969da;--card:#fff}
+@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--ink:#e6edf3;--mute:#9198a1;--line:#30363d;--acc:#4493f8;--card:#161b22}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.fig{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fig svg{display:block;width:100%;height:auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+button,select{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc)} button.main{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--acc)}
+#lab{font-weight:700;min-width:110px;font-variant-numeric:tabular-nums} .hint{color:var(--mute);font-size:13px}
+</style></head><body><div class="wrap">
+<div class="bar"><button id="prev" title="Left arrow">◀ Previous</button><button id="next" class="main" title="Right arrow">Next ▶</button>
+<span id="lab"></span><input id="sl" type="range" min="0" max="1000" value="0" aria-label="position">
+<button id="play" title="Space">Play</button>
+<select id="sp" aria-label="speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></div>
+<div class="fig"><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 840 330' font-family='Inter, Helvetica, Arial, sans-serif'><title>view</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='840' height='330' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>x.view(shape): same numbers, same memory order, new brackets</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>like [6, 2048] → [6, 32, 64]: each token's row is cut into heads; nothing is copied</text>
+<text x='141.0' y='124' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>x</text>
+<rect x='30' y='132' width='222' height='97' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='35' y='137' width='212' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='40' y='142' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='56.0' y='162.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>a0</text>
+<rect x='74' y='142' width='32' height='32' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='90.0' y='162.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>a1</text>
+<rect x='108' y='142' width='32' height='32' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='124.0' y='162.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>a2</text>
+<rect x='142' y='142' width='32' height='32' rx='4' fill='#f5c6e9' stroke='#ffffff'/>
+<text x='158.0' y='162.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>a3</text>
+<rect x='176' y='142' width='32' height='32' rx='4' fill='#fff1a8' stroke='#ffffff'/>
+<text x='192.0' y='162.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>a4</text>
+<rect x='210' y='142' width='32' height='32' rx='4' fill='#d8d0ff' stroke='#ffffff'/>
+<text x='226.0' y='162.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>a5</text>
+<rect x='35' y='182' width='212' height='42' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='40' y='187' width='32' height='32' rx='4' fill='#b9f0ee' stroke='#ffffff'/>
+<text x='56.0' y='207.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>b0</text>
+<rect x='74' y='187' width='32' height='32' rx='4' fill='#ffc9c9' stroke='#ffffff'/>
+<text x='90.0' y='207.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>b1</text>
+<rect x='108' y='187' width='32' height='32' rx='4' fill='#e2e8c0' stroke='#ffffff'/>
+<text x='124.0' y='207.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>b2</text>
+<rect x='142' y='187' width='32' height='32' rx='4' fill='#d6dbe0' stroke='#ffffff'/>
+<text x='158.0' y='207.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>b3</text>
+<rect x='176' y='187' width='32' height='32' rx='4' fill='#ffe0f0' stroke='#ffffff'/>
+<text x='192.0' y='207.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>b4</text>
+<rect x='210' y='187' width='32' height='32' rx='4' fill='#cfe8d9' stroke='#ffffff'/>
+<text x='226.0' y='207.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>b5</text>
+<text x='141.0' y='244' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[2, 6]: 2 tokens × 6 features</text>
+<line x1='272' y1='150' x2='414' y2='150' stroke='#57606a' stroke-width='2' marker-end='url(#ah)'/><text x='346.0' y='141' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>view(2, 2, 3)</text><text x='346.0' y='168' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>cut each row in 3s</text>
+<text x='574.0' y='99' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>x.view(2, 2, 3)</text>
+<rect x='440' y='107' width='268' height='123' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<text x='505.0' y='123' text-anchor='middle' font-size='11' font-weight='600' fill='#57606a'>[0]</text>
+<rect x='445' y='128' width='120' height='97' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='450' y='133' width='110' height='42' rx='5' fill='none' stroke='#afb8c1' stroke-width='1.3'/>
+<rect x='455' y='138' width='32' height='32' rx='4' fill='#ffd8b5' stroke='#ffffff'/>
+<text x='471.0' y='158.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>a0</text>
+<rect x='489' y='138' width='32' height='32' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='505.0' y='158.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>a1</text>
+<rect x='523' y='138' width='32' height='32' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='539.0' y='158.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>a2</text>
+<rect x='450' y='178' width='110' height='42' rx='5' fill='none' stroke='#afb8c1' stroke-width='1.3'/>
+<rect x='455' y='183' width='32' height='32' rx='4' fill='#f5c6e9' stroke='#ffffff'/>
+<text x='471.0' y='203.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>a3</text>
+<rect x='489' y='183' width='32' height='32' rx='4' fill='#fff1a8' stroke='#ffffff'/>
+<text x='505.0' y='203.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>a4</text>
+<rect x='523' y='183' width='32' height='32' rx='4' fill='#d8d0ff' stroke='#ffffff'/>
+<text x='539.0' y='203.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>a5</text>
+<text x='643.0' y='123' text-anchor='middle' font-size='11' font-weight='600' fill='#57606a'>[1]</text>
+<rect x='583' y='128' width='120' height='97' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='588' y='133' width='110' height='42' rx='5' fill='none' stroke='#afb8c1' stroke-width='1.3'/>
+<rect x='593' y='138' width='32' height='32' rx='4' fill='#b9f0ee' stroke='#ffffff'/>
+<text x='609.0' y='158.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>b0</text>
+<rect x='627' y='138' width='32' height='32' rx='4' fill='#ffc9c9' stroke='#ffffff'/>
+<text x='643.0' y='158.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>b1</text>
+<rect x='661' y='138' width='32' height='32' rx='4' fill='#e2e8c0' stroke='#ffffff'/>
+<text x='677.0' y='158.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>b2</text>
+<rect x='588' y='178' width='110' height='42' rx='5' fill='none' stroke='#afb8c1' stroke-width='1.3'/>
+<rect x='593' y='183' width='32' height='32' rx='4' fill='#d6dbe0' stroke='#ffffff'/>
+<text x='609.0' y='203.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>b3</text>
+<rect x='627' y='183' width='32' height='32' rx='4' fill='#ffe0f0' stroke='#ffffff'/>
+<text x='643.0' y='203.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>b4</text>
+<rect x='661' y='183' width='32' height='32' rx='4' fill='#cfe8d9' stroke='#ffffff'/>
+<text x='677.0' y='203.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>b5</text>
+<text x='574.0' y='245' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>[2, 2, 3]: token × head × head_dim</text>
+<rect x='455' y='138' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.1587;1.0000'/></rect>
+<rect x='489' y='138' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.2203;1.0000'/></rect>
+<rect x='523' y='138' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.2820;1.0000'/></rect>
+<rect x='455' y='183' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.3437;1.0000'/></rect>
+<rect x='489' y='183' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.4053;1.0000'/></rect>
+<rect x='523' y='183' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.4670;1.0000'/></rect>
+<rect x='593' y='138' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.5287;1.0000'/></rect>
+<rect x='627' y='138' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.5903;1.0000'/></rect>
+<rect x='661' y='138' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.6520;1.0000'/></rect>
+<rect x='593' y='183' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.7137;1.0000'/></rect>
+<rect x='627' y='183' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.7753;1.0000'/></rect>
+<rect x='661' y='183' width='32' height='32' rx='4' fill='#ffffff' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;0.8;0;0' keyTimes='0.0000;0.0400;0.8370;1.0000'/></rect>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0600;0.1587;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='40,142;40,142;455,138;455,138' keyTimes='0.0000;0.0600;0.1587;1.0000'/><rect width='32' height='32' rx='4' fill='#ffd8b5' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>a0</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.1217;0.2203;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='74,142;74,142;489,138;489,138' keyTimes='0.0000;0.1217;0.2203;1.0000'/><rect width='32' height='32' rx='4' fill='#c8e1ff' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>a1</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.1833;0.2820;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='108,142;108,142;523,138;523,138' keyTimes='0.0000;0.1833;0.2820;1.0000'/><rect width='32' height='32' rx='4' fill='#c7f0d2' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>a2</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2450;0.3437;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='142,142;142,142;455,183;455,183' keyTimes='0.0000;0.2450;0.3437;1.0000'/><rect width='32' height='32' rx='4' fill='#f5c6e9' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>a3</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3067;0.4053;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='176,142;176,142;489,183;489,183' keyTimes='0.0000;0.3067;0.4053;1.0000'/><rect width='32' height='32' rx='4' fill='#fff1a8' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>a4</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.3683;0.4670;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='210,142;210,142;523,183;523,183' keyTimes='0.0000;0.3683;0.4670;1.0000'/><rect width='32' height='32' rx='4' fill='#d8d0ff' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>a5</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4300;0.5287;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='40,187;40,187;593,138;593,138' keyTimes='0.0000;0.4300;0.5287;1.0000'/><rect width='32' height='32' rx='4' fill='#b9f0ee' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>b0</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4917;0.5903;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='74,187;74,187;627,138;627,138' keyTimes='0.0000;0.4917;0.5903;1.0000'/><rect width='32' height='32' rx='4' fill='#ffc9c9' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>b1</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5533;0.6520;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='108,187;108,187;661,138;661,138' keyTimes='0.0000;0.5533;0.6520;1.0000'/><rect width='32' height='32' rx='4' fill='#e2e8c0' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>b2</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6150;0.7137;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='142,187;142,187;593,183;593,183' keyTimes='0.0000;0.6150;0.7137;1.0000'/><rect width='32' height='32' rx='4' fill='#d6dbe0' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>b3</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.6767;0.7753;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='176,187;176,187;627,183;627,183' keyTimes='0.0000;0.6767;0.7753;1.0000'/><rect width='32' height='32' rx='4' fill='#ffe0f0' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>b4</text></g>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7383;0.8370;1.0000'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='210,187;210,187;661,183;661,183' keyTimes='0.0000;0.7383;0.8370;1.0000'/><rect width='32' height='32' rx='4' fill='#cfe8d9' stroke='#1f2328' stroke-width='1.6'/><text x='16.0' y='20.0' text-anchor='middle' font-size='12' font-weight='600' fill='#1f2328'>b5</text></g>
+<text x='30' y='282' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>Read both left to right, top to bottom: a0 a1 … b5 in the same order. .reshape(2, 6) goes back.</text>
+<text x='20' y='316' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: each coloured cell slides to where it ends up (in memory order)</text></svg>
+</div>
+<p class="hint">Keys: ← previous step, → next step, space play / pause. Drag the slider to move freely. The picture stays still until you move it.</p>
+</div><script>
+const D=7.0, steps=[0.0, 0.28, 0.852, 1.111, 1.283, 1.542, 1.715, 1.974, 2.147, 2.406, 2.578, 2.837, 3.01, 3.269, 3.442, 3.701, 3.873, 4.132, 4.305, 4.564, 4.737, 4.996, 5.168, 5.427, 5.859], svg=document.querySelector('.fig svg'), EPS=0.02;
+const lab=document.getElementById('lab'), sl=document.getElementById('sl'), playB=document.getElementById('play'), sp=document.getElementById('sp');
+let t=EPS, playing=false, last=0;
+svg.pauseAnimations();
+function cur(){let i=0; for(let k=0;k<steps.length;k++) if(steps[k]<=t+1e-6) i=k; return i;}
+function show(){svg.setCurrentTime(t); sl.value=Math.round(t/D*1000); lab.textContent='step '+(cur()+1)+' / '+steps.length;}
+function go(i){playing=false; playB.textContent='Play'; i=(i+steps.length)%steps.length; t=steps[i]+EPS; show();}
+document.getElementById('next').onclick=()=>go(cur()+1);
+document.getElementById('prev').onclick=()=>go(cur()-1);
+sl.oninput=()=>{playing=false; playB.textContent='Play'; t=Math.min(D-EPS,Math.max(EPS,sl.value/1000*D)); show();};
+function tick(now){ if(!playing) return; t+=(now-last)/1000*parseFloat(sp.value); last=now; if(t>=D) t=EPS; show(); requestAnimationFrame(tick); }
+playB.onclick=()=>{playing=!playing; playB.textContent=playing?'Pause':'Play'; if(playing){last=performance.now(); requestAnimationFrame(tick);} };
+document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){go(cur()+1);e.preventDefault();} else if(e.key==='ArrowLeft'){go(cur()-1);e.preventDefault();} else if(e.key===' '){playB.click();e.preventDefault();} });
+show();
+</script></body></html>

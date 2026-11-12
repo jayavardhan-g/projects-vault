@@ -1,0 +1,64 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PGD</title><style>
+:root{--bg:#f6f8fa;--ink:#1f2328;--mute:#57606a;--line:#d0d7de;--acc:#0969da;--card:#fff}
+@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--ink:#e6edf3;--mute:#9198a1;--line:#30363d;--acc:#4493f8;--card:#161b22}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.fig{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fig svg{display:block;width:100%;height:auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+button,select{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc)} button.main{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--acc)}
+#lab{font-weight:700;min-width:110px;font-variant-numeric:tabular-nums} .hint{color:var(--mute);font-size:13px}
+</style></head><body><div class="wrap">
+<div class="bar"><button id="prev" title="Left arrow">◀ Previous</button><button id="next" class="main" title="Right arrow">Next ▶</button>
+<span id="lab"></span><input id="sl" type="range" min="0" max="1000" value="0" aria-label="position">
+<button id="play" title="Space">Play</button>
+<select id="sp" aria-label="speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></div>
+<div class="fig"><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 880 430' font-family='Inter, Helvetica, Arial, sans-serif'><title>PGD</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='880' height='430' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>PGD on a toy linear classifier: score s = 2·x₁ − x₂ (s > 0 is the true class)</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>start x = (0.3, 0.2), s = 0.4; step α = 0.04 along sign of the gradient; project back into the ε-box</text>
+<rect x='40' y='80' width='320' height='320' fill='#fbfcfd' stroke='#d0d7de'/>
+<line x1='40.0' y1='400.0' x2='200.0' y2='80.0' stroke='#1f2328' stroke-width='2'/><text x='199.6' y='94.0' text-anchor='start' font-size='11' font-weight='600' fill='#1f2328'>s = 0</text>
+<text x='308.8' y='390.4' text-anchor='middle' font-size='11' font-weight='600' fill='#1a7f37'>s > 0: correct</text><text x='84.80000000000001' y='112.0' text-anchor='middle' font-size='11' font-weight='600' fill='#cf222e'>s &lt; 0: fooled</text>
+<rect x='168.0' y='208.0' width='128.0' height='128.0' fill='none' stroke='#57606a' stroke-width='1.5' stroke-dasharray='4 3'/>
+<text x='300.0' y='219.99999999999997' text-anchor='start' font-size='11' font-weight='600' fill='#57606a'>ε = 0.1</text>
+<rect x='136.0' y='176.0' width='192.0' height='192.0' fill='none' stroke='#cf222e' stroke-width='1.5' stroke-dasharray=''/>
+<text x='332.0' y='188.0' text-anchor='start' font-size='11' font-weight='600' fill='#cf222e'>ε = 0.15</text>
+<line x1='232.0' y1='272.0' x2='206.4' y2='246.4' stroke='#bf8700' stroke-width='2'/>
+<line x1='206.4' y1='246.4' x2='180.8' y2='220.8' stroke='#bf8700' stroke-width='2'/>
+<line x1='180.8' y1='220.8' x2='155.2' y2='195.2' stroke='#bf8700' stroke-width='2'/>
+<line x1='155.2' y1='195.2' x2='136.0' y2='176.0' stroke='#bf8700' stroke-width='2'/>
+<circle cx='232.0' cy='272.0' r='4' fill='#1f2328' stroke='#ffffff' stroke-width='1.5'/>
+<circle cx='206.4' cy='246.4' r='4' fill='#1f2328' stroke='#ffffff' stroke-width='1.5'/>
+<circle cx='180.8' cy='220.8' r='4' fill='#1f2328' stroke='#ffffff' stroke-width='1.5'/>
+<circle cx='155.2' cy='195.2' r='4' fill='#1f2328' stroke='#ffffff' stroke-width='1.5'/>
+<circle cx='136.0' cy='176.0' r='4' fill='#1f2328' stroke='#ffffff' stroke-width='1.5'/>
+<text x='240.0' y='286.0' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>x</text>
+<text x='400' y='110' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>step</text><text x='450' y='110' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>x</text><text x='800' y='110' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>s</text>
+<text x='400' y='136' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>0</text><text x='450' y='136' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>(0.30, 0.20)</text><text x='800' y='136' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>0.40</text>
+<text x='400' y='162' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>1</text><text x='450' y='162' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>(0.26, 0.24)</text><text x='800' y='162' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>0.28</text>
+<text x='400' y='188' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>2</text><text x='450' y='188' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>(0.22, 0.28)</text><text x='800' y='188' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>0.16</text>
+<text x='400' y='214' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>3</text><text x='450' y='214' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>(0.18, 0.32)</text><text x='800' y='214' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>0.04</text>
+<text x='400' y='240' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>4</text><text x='450' y='240' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>(0.14, 0.36) → clip → (0.15, 0.35)</text><text x='800' y='240' text-anchor='start' font-size='12' font-weight='400' fill='#cf222e'>−0.05</text>
+<text x='400' y='290' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>With ε = 0.1 the box stops it at (0.20, 0.30): s = 0.10, still correct.</text>
+<text x='400' y='312' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>Linear model: worst case = s − ε·‖w‖₁ = 0.4 − 3ε → fooled once ε > 0.133.</text>
+<g opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0' keyTimes='0.0000;0.0500;0.9700'/><animateTransform attributeName='transform' type='translate' dur='7.0s' repeatCount='indefinite' values='232.0,272.0;206.4,246.4;180.8,220.8;155.2,195.2;136.0,176.0;136.0,176.0' keyTimes='0.0000;0.2500;0.4500;0.6500;0.8500;1'/><circle r='7' fill='#cf222e' stroke='#1f2328' stroke-width='1.5'/></g>
+<text x='20' y='416' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: the red dot is the attacked input climbing the loss, one signed step at a time</text></svg>
+</div>
+<p class="hint">Keys: ← previous step, → next step, space play / pause. Drag the slider to move freely. The picture stays still until you move it.</p>
+</div><script>
+const D=7.0, steps=[0.0, 0.35, 6.79], svg=document.querySelector('.fig svg'), EPS=0.02;
+const lab=document.getElementById('lab'), sl=document.getElementById('sl'), playB=document.getElementById('play'), sp=document.getElementById('sp');
+let t=EPS, playing=false, last=0;
+svg.pauseAnimations();
+function cur(){let i=0; for(let k=0;k<steps.length;k++) if(steps[k]<=t+1e-6) i=k; return i;}
+function show(){svg.setCurrentTime(t); sl.value=Math.round(t/D*1000); lab.textContent='step '+(cur()+1)+' / '+steps.length;}
+function go(i){playing=false; playB.textContent='Play'; i=(i+steps.length)%steps.length; t=steps[i]+EPS; show();}
+document.getElementById('next').onclick=()=>go(cur()+1);
+document.getElementById('prev').onclick=()=>go(cur()-1);
+sl.oninput=()=>{playing=false; playB.textContent='Play'; t=Math.min(D-EPS,Math.max(EPS,sl.value/1000*D)); show();};
+function tick(now){ if(!playing) return; t+=(now-last)/1000*parseFloat(sp.value); last=now; if(t>=D) t=EPS; show(); requestAnimationFrame(tick); }
+playB.onclick=()=>{playing=!playing; playB.textContent=playing?'Pause':'Play'; if(playing){last=performance.now(); requestAnimationFrame(tick);} };
+document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){go(cur()+1);e.preventDefault();} else if(e.key==='ArrowLeft'){go(cur()-1);e.preventDefault();} else if(e.key===' '){playB.click();e.preventDefault();} });
+show();
+</script></body></html>

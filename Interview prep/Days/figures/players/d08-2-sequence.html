@@ -1,0 +1,121 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LM sequence</title><style>
+:root{--bg:#f6f8fa;--ink:#1f2328;--mute:#57606a;--line:#d0d7de;--acc:#0969da;--card:#fff}
+@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--ink:#e6edf3;--mute:#9198a1;--line:#30363d;--acc:#4493f8;--card:#161b22}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.fig{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fig svg{display:block;width:100%;height:auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+button,select{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc)} button.main{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--acc)}
+#lab{font-weight:700;min-width:110px;font-variant-numeric:tabular-nums} .hint{color:var(--mute);font-size:13px}
+</style></head><body><div class="wrap">
+<div class="bar"><button id="prev" title="Left arrow">◀ Previous</button><button id="next" class="main" title="Right arrow">Next ▶</button>
+<span id="lab"></span><input id="sl" type="range" min="0" max="1000" value="0" aria-label="position">
+<button id="play" title="Space">Play</button>
+<select id="sp" aria-label="speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></div>
+<div class="fig"><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 490' font-family='Inter, Helvetica, Arial, sans-serif'><title>LM sequence</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='900' height='490' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>What the LM reads and what it is graded on</text><text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>toy clip: 3 text tokens, 4 speech tokens. Grey targets are IGNORE_ID (−1): no loss there</text>
+<text x='283.0' y='84' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>input (unistream)</text>
+<rect x='40' y='92' width='486' height='70' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='45' y='97' width='476' height='60' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='50' y='102' width='50' height='50' rx='4' fill='#d6dbe0' stroke='#ffffff'/>
+<text x='75.0' y='131.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>sos</text>
+<rect x='102' y='102' width='50' height='50' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='127.0' y='131.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>t1</text>
+<rect x='154' y='102' width='50' height='50' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='179.0' y='131.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>t2</text>
+<rect x='206' y='102' width='50' height='50' rx='4' fill='#c8e1ff' stroke='#ffffff'/>
+<text x='231.0' y='131.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>t3</text>
+<rect x='258' y='102' width='50' height='50' rx='4' fill='#d6dbe0' stroke='#ffffff'/>
+<text x='283.0' y='131.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>task</text>
+<rect x='310' y='102' width='50' height='50' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='335.0' y='131.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>s1</text>
+<rect x='362' y='102' width='50' height='50' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='387.0' y='131.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>s2</text>
+<rect x='414' y='102' width='50' height='50' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='439.0' y='131.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>s3</text>
+<rect x='466' y='102' width='50' height='50' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='491.0' y='131.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>s4</text>
+<text x='283.0' y='184' text-anchor='middle' font-size='13' font-weight='600' fill='#1f2328'>target</text>
+<rect x='40' y='192' width='486' height='70' rx='7' fill='none' stroke='#6e7781' stroke-width='1.3'/>
+<rect x='45' y='197' width='476' height='60' rx='6' fill='none' stroke='#8c959f' stroke-width='1.3'/>
+<rect x='50' y='202' width='50' height='50' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='75.0' y='231.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>−1</text>
+<rect x='102' y='202' width='50' height='50' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='127.0' y='231.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>−1</text>
+<rect x='154' y='202' width='50' height='50' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='179.0' y='231.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>−1</text>
+<rect x='206' y='202' width='50' height='50' rx='4' fill='#f3f4f6' stroke='#ffffff'/>
+<text x='231.0' y='231.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>−1</text>
+<rect x='258' y='202' width='50' height='50' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='283.0' y='231.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>s1</text>
+<rect x='310' y='202' width='50' height='50' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='335.0' y='231.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>s2</text>
+<rect x='362' y='202' width='50' height='50' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='387.0' y='231.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>s3</text>
+<rect x='414' y='202' width='50' height='50' rx='4' fill='#c7f0d2' stroke='#ffffff'/>
+<text x='439.0' y='231.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>s4</text>
+<rect x='466' y='202' width='50' height='50' rx='4' fill='#fff1a8' stroke='#ffffff'/>
+<text x='491.0' y='231.0' text-anchor='middle' font-size='12' font-weight='400' fill='#1f2328'>eos</text>
+<line x1='75.0' y1='149.0' x2='75.0' y2='205.0' stroke='#d0d7de' stroke-width='1.5' marker-end='url(#ah)'/>
+<line x1='127.0' y1='149.0' x2='127.0' y2='205.0' stroke='#d0d7de' stroke-width='1.5' marker-end='url(#ah)'/>
+<line x1='179.0' y1='149.0' x2='179.0' y2='205.0' stroke='#d0d7de' stroke-width='1.5' marker-end='url(#ah)'/>
+<line x1='231.0' y1='149.0' x2='231.0' y2='205.0' stroke='#d0d7de' stroke-width='1.5' marker-end='url(#ah)'/>
+<line x1='283.0' y1='149.0' x2='283.0' y2='205.0' stroke='#1a7f37' stroke-width='1.5' marker-end='url(#ah)'/>
+<line x1='335.0' y1='149.0' x2='335.0' y2='205.0' stroke='#1a7f37' stroke-width='1.5' marker-end='url(#ah)'/>
+<line x1='387.0' y1='149.0' x2='387.0' y2='205.0' stroke='#1a7f37' stroke-width='1.5' marker-end='url(#ah)'/>
+<line x1='439.0' y1='149.0' x2='439.0' y2='205.0' stroke='#1a7f37' stroke-width='1.5' marker-end='url(#ah)'/>
+<line x1='491.0' y1='149.0' x2='491.0' y2='205.0' stroke='#1a7f37' stroke-width='1.5' marker-end='url(#ah)'/>
+<text x='548' y='105' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>position 4 (task_id) must predict s1;</text><text x='548' y='123' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>position 8 (s4) must predict eos.</text>
+<text x='548' y='205' text-anchor='start' font-size='12' font-weight='600' fill='#1a7f37'>scored positions: 4 + 1 = 5</text>
+<rect x='255' y='99' width='56' height='56' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0800;0.2400;1.0000'/></rect><rect x='255' y='199' width='56' height='56' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.0800;0.2400;1.0000'/></rect>
+<rect x='307' y='99' width='56' height='56' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2500;0.4100;1.0000'/></rect><rect x='307' y='199' width='56' height='56' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.2500;0.4100;1.0000'/></rect>
+<rect x='359' y='99' width='56' height='56' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4200;0.5800;1.0000'/></rect><rect x='359' y='199' width='56' height='56' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.4200;0.5800;1.0000'/></rect>
+<rect x='411' y='99' width='56' height='56' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5900;0.7500;1.0000'/></rect><rect x='411' y='199' width='56' height='56' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.5900;0.7500;1.0000'/></rect>
+<rect x='463' y='99' width='56' height='56' rx='6' fill='none' stroke='#0969da' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7600;0.9200;1.0000'/></rect><rect x='463' y='199' width='56' height='56' rx='6' fill='none' stroke='#cf222e' stroke-width='2.5' opacity='0'><animate attributeName='opacity' dur='7.0s' repeatCount='indefinite' calcMode='discrete' values='0;1;0;0' keyTimes='0.0000;0.7600;0.9200;1.0000'/></rect>
+<text x='40' y='278' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>bistream (real 5 : 15 ratio): 7 text tokens, 40 speech tokens; widths ∝ token count</text>
+<text x='40' y='312' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>input</text>
+<rect x='110.0' y='290' width='13.5' height='34' rx='4' fill='#d6dbe0' stroke='#8c959f'/>
+<rect x='125.5' y='290' width='75.5' height='34' rx='4' fill='#c8e1ff' stroke='#8c959f'/>
+<text x='164.25' y='312' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>t1–t5</text>
+<rect x='203.0' y='290' width='230.5' height='34' rx='4' fill='#c7f0d2' stroke='#8c959f'/>
+<text x='319.25' y='312' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s1–s15</text>
+<rect x='435.5' y='290' width='29.0' height='34' rx='4' fill='#c8e1ff' stroke='#8c959f'/>
+<text x='451.0' y='312' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>t6 t7</text>
+<rect x='466.5' y='290' width='13.5' height='34' rx='4' fill='#d6dbe0' stroke='#8c959f'/>
+<rect x='482.0' y='290' width='385.5' height='34' rx='4' fill='#c7f0d2' stroke='#8c959f'/>
+<text x='675.75' y='312' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s16–s40</text>
+<text x='40' y='382' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>target</text>
+<rect x='110.0' y='360' width='13.5' height='34' rx='4' fill='#f3f4f6' stroke='#8c959f'/>
+<rect x='125.5' y='360' width='75.5' height='34' rx='4' fill='#f3f4f6' stroke='#8c959f'/>
+<text x='164.25' y='382' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>−1 ×4 | s1</text>
+<rect x='203.0' y='360' width='230.5' height='34' rx='4' fill='#c7f0d2' stroke='#8c959f'/>
+<text x='319.25' y='382' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s2–s15, fill</text>
+<rect x='435.5' y='360' width='29.0' height='34' rx='4' fill='#f3f4f6' stroke='#8c959f'/>
+<text x='451.0' y='382' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>−1 ×2</text>
+<rect x='466.5' y='360' width='13.5' height='34' rx='4' fill='#c7f0d2' stroke='#8c959f'/>
+<rect x='482.0' y='360' width='385.5' height='34' rx='4' fill='#c7f0d2' stroke='#8c959f'/>
+<text x='675.75' y='382' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>s17–s40, eos</text>
+<text x='40' y='422' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>Inputs 1 + 5 + 15 + 2 + 1 + 25 = 49; targets also 49. Scored: s1–s40, one fill token and eos = 42.</text>
+<text x='40' y='442' text-anchor='start' font-size='12' font-weight='400' fill='#1f2328'>The fill token teaches the model to ask for the next 5 text tokens; at the last text chunk it emits eos.</text>
+<text x='20' y='476' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: each blue input position is graded on the red target below it</text></svg>
+</div>
+<p class="hint">Keys: ← previous step, → next step, space play / pause. Drag the slider to move freely. The picture stays still until you move it.</p>
+</div><script>
+const D=7.0, steps=[0.0, 0.56, 1.68, 2.87, 4.06, 5.25, 6.44], svg=document.querySelector('.fig svg'), EPS=0.02;
+const lab=document.getElementById('lab'), sl=document.getElementById('sl'), playB=document.getElementById('play'), sp=document.getElementById('sp');
+let t=EPS, playing=false, last=0;
+svg.pauseAnimations();
+function cur(){let i=0; for(let k=0;k<steps.length;k++) if(steps[k]<=t+1e-6) i=k; return i;}
+function show(){svg.setCurrentTime(t); sl.value=Math.round(t/D*1000); lab.textContent='step '+(cur()+1)+' / '+steps.length;}
+function go(i){playing=false; playB.textContent='Play'; i=(i+steps.length)%steps.length; t=steps[i]+EPS; show();}
+document.getElementById('next').onclick=()=>go(cur()+1);
+document.getElementById('prev').onclick=()=>go(cur()-1);
+sl.oninput=()=>{playing=false; playB.textContent='Play'; t=Math.min(D-EPS,Math.max(EPS,sl.value/1000*D)); show();};
+function tick(now){ if(!playing) return; t+=(now-last)/1000*parseFloat(sp.value); last=now; if(t>=D) t=EPS; show(); requestAnimationFrame(tick); }
+playB.onclick=()=>{playing=!playing; playB.textContent=playing?'Pause':'Play'; if(playing){last=performance.now(); requestAnimationFrame(tick);} };
+document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){go(cur()+1);e.preventDefault();} else if(e.key==='ArrowLeft'){go(cur()-1);e.preventDefault();} else if(e.key===' '){playB.click();e.preventDefault();} });
+show();
+</script></body></html>

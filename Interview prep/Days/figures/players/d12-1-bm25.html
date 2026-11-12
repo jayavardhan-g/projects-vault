@@ -1,0 +1,90 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BM25</title><style>
+:root{--bg:#f6f8fa;--ink:#1f2328;--mute:#57606a;--line:#d0d7de;--acc:#0969da;--card:#fff}
+@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--ink:#e6edf3;--mute:#9198a1;--line:#30363d;--acc:#4493f8;--card:#161b22}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.fig{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fig svg{display:block;width:100%;height:auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+button,select{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc)} button.main{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--acc)}
+#lab{font-weight:700;min-width:110px;font-variant-numeric:tabular-nums} .hint{color:var(--mute);font-size:13px}
+</style></head><body><div class="wrap">
+<div class="bar"><button id="prev" title="Left arrow">◀ Previous</button><button id="next" class="main" title="Right arrow">Next ▶</button>
+<span id="lab"></span><input id="sl" type="range" min="0" max="1000" value="0" aria-label="position">
+<button id="play" title="Space">Play</button>
+<select id="sp" aria-label="speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></div>
+<div class="fig"><svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 880 376' font-family='Inter, Helvetica, Arial, sans-serif'><title>BM25</title><defs><marker id='ah' markerWidth='10' markerHeight='10' refX='8' refY='5' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#57606a'/></marker></defs><rect x='0' y='0' width='880' height='376' rx='12' fill='#ffffff' stroke='#d0d7de'/><text x='20' y='28' text-anchor='start' font-size='15' font-weight='700' fill='#1f2328'>BM25 on the toy corpus: saturation, then per-term contributions</text>
+<text x='20' y='48' text-anchor='start' font-size='12' font-weight='400' fill='#57606a'>query: ssrf server metadata · k1 = 1.5, b = 0.75, avgdl = 9</text>
+<line x1='60' y1='300' x2='390' y2='300' stroke='#57606a'/><line x1='60' y1='300' x2='60' y2='90' stroke='#57606a'/>
+<text x='60.0' y='316' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>0</text>
+<text x='126.0' y='316' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>2</text>
+<text x='192.0' y='316' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>4</text>
+<text x='258.0' y='316' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>6</text>
+<text x='324.0' y='316' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>8</text>
+<text x='390.0' y='316' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>10</text>
+<text x='52' y='304.0' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>0</text>
+<text x='52' y='223.23076923076923' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>1</text>
+<text x='52' y='142.46153846153848' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>2</text>
+<text x='52' y='102.0769230769231' text-anchor='end' font-size='11' font-weight='400' fill='#57606a'>2.5</text>
+<text x='225.0' y='334' text-anchor='middle' font-size='11' font-weight='400' fill='#57606a'>f = times the word appears</text>
+<text x='66' y='92.0' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>tf factor  f(k1+1)/(f+k1)</text>
+<line x1='60' y1='98.0769230769231' x2='390' y2='98.0769230769231' stroke='#cf222e' stroke-dasharray='5 4'/>
+<text x='386' y='92.0769230769231' text-anchor='end' font-size='11' font-weight='600' fill='#cf222e'>ceiling k1 + 1 = 2.5</text>
+<polyline points='60.0,300.0 63.3,287.4 66.6,276.2 69.9,266.3 73.2,257.5 76.5,249.5 79.8,242.3 83.1,235.8 86.4,229.8 89.7,224.3 93.0,219.2 96.3,214.6 99.6,210.3 102.9,206.2 106.2,202.5 109.5,199.0 112.8,195.8 116.1,192.7 119.4,189.9 122.7,187.2 126.0,184.6 129.3,182.2 132.6,179.9 135.9,177.8 139.2,175.7 142.5,173.8 145.8,172.0 149.1,170.2 152.4,168.5 155.7,166.9 159.0,165.4 162.3,163.9 165.6,162.5 168.9,161.2 172.2,159.9 175.5,158.7 178.8,157.5 182.1,156.3 185.4,155.2 188.7,154.2 192.0,153.1 195.3,152.2 198.6,151.2 201.9,150.3 205.2,149.4 208.5,148.6 211.8,147.7 215.1,146.9 218.4,146.2 221.7,145.4 225.0,144.7 228.3,144.0 231.6,143.3 234.9,142.6 238.2,142.0 241.5,141.3 244.8,140.7 248.1,140.1 251.4,139.6 254.7,139.0 258.0,138.5 261.3,137.9 264.6,137.4 267.9,136.9 271.2,136.4 274.5,135.9 277.8,135.5 281.1,135.0 284.4,134.6 287.7,134.1 291.0,133.7 294.3,133.3 297.6,132.9 300.9,132.5 304.2,132.1 307.5,131.7 310.8,131.4 314.1,131.0 317.4,130.6 320.7,130.3 324.0,130.0 327.3,129.6 330.6,129.3 333.9,129.0 337.2,128.7 340.5,128.4 343.8,128.1 347.1,127.8 350.4,127.5 353.7,127.2 357.0,126.9 360.3,126.7 363.6,126.4 366.9,126.1 370.2,125.9 373.5,125.6 376.8,125.4 380.1,125.1 383.4,124.9 386.7,124.6 390.0,124.4' fill='none' stroke='#0969da' stroke-width='2.5'/>
+<circle cx='93.0' cy='219.2' r='4' fill='#0969da'/>
+<text x='98.0' y='235.23076923076923' text-anchor='start' font-size='10' font-weight='400' fill='#1f2328'>1.00</text>
+<circle cx='126.0' cy='184.6' r='4' fill='#0969da'/>
+<text x='131.0' y='200.61538461538458' text-anchor='start' font-size='10' font-weight='400' fill='#1f2328'>1.43</text>
+<circle cx='159.0' cy='165.4' r='4' fill='#0969da'/>
+<text x='164.0' y='181.3846153846154' text-anchor='start' font-size='10' font-weight='400' fill='#1f2328'>1.67</text>
+<circle cx='225.0' cy='144.7' r='4' fill='#0969da'/>
+<text x='230.0' y='160.67455621301775' text-anchor='start' font-size='10' font-weight='400' fill='#1f2328'>1.92</text>
+<circle cx='390.0' cy='124.4' r='4' fill='#0969da'/>
+<text x='395.0' y='140.41471571906357' text-anchor='start' font-size='10' font-weight='400' fill='#1f2328'>2.17</text>
+<circle r='6' fill='#bf8700' stroke='#1f2328'><animateMotion dur='6.0s' repeatCount='indefinite' path='M60.0,300.0 L63.3,287.4 L66.6,276.2 L69.9,266.3 L73.2,257.5 L76.5,249.5 L79.8,242.3 L83.1,235.8 L86.4,229.8 L89.7,224.3 L93.0,219.2 L96.3,214.6 L99.6,210.3 L102.9,206.2 L106.2,202.5 L109.5,199.0 L112.8,195.8 L116.1,192.7 L119.4,189.9 L122.7,187.2 L126.0,184.6 L129.3,182.2 L132.6,179.9 L135.9,177.8 L139.2,175.7 L142.5,173.8 L145.8,172.0 L149.1,170.2 L152.4,168.5 L155.7,166.9 L159.0,165.4 L162.3,163.9 L165.6,162.5 L168.9,161.2 L172.2,159.9 L175.5,158.7 L178.8,157.5 L182.1,156.3 L185.4,155.2 L188.7,154.2 L192.0,153.1 L195.3,152.2 L198.6,151.2 L201.9,150.3 L205.2,149.4 L208.5,148.6 L211.8,147.7 L215.1,146.9 L218.4,146.2 L221.7,145.4 L225.0,144.7 L228.3,144.0 L231.6,143.3 L234.9,142.6 L238.2,142.0 L241.5,141.3 L244.8,140.7 L248.1,140.1 L251.4,139.6 L254.7,139.0 L258.0,138.5 L261.3,137.9 L264.6,137.4 L267.9,136.9 L271.2,136.4 L274.5,135.9 L277.8,135.5 L281.1,135.0 L284.4,134.6 L287.7,134.1 L291.0,133.7 L294.3,133.3 L297.6,132.9 L300.9,132.5 L304.2,132.1 L307.5,131.7 L310.8,131.4 L314.1,131.0 L317.4,130.6 L320.7,130.3 L324.0,130.0 L327.3,129.6 L330.6,129.3 L333.9,129.0 L337.2,128.7 L340.5,128.4 L343.8,128.1 L347.1,127.8 L350.4,127.5 L353.7,127.2 L357.0,126.9 L360.3,126.7 L363.6,126.4 L366.9,126.1 L370.2,125.9 L373.5,125.6 L376.8,125.4 L380.1,125.1 L383.4,124.9 L386.7,124.6 L390.0,124.4'/></circle>
+<text x='470' y='78' text-anchor='start' font-size='13' font-weight='600' fill='#1f2328'>score = Σ idf × tf factor</text>
+<text x='470' y='114' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>doc 7</text>
+<rect x='540.0' y='96' width='52.3' height='28' rx='3' fill='#f5a97f' stroke='#fff'/>
+<text x='566.166' y='114' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>0.623</text>
+<rect x='592.3' y='96' width='76.4' height='28' rx='3' fill='#7fb3f5' stroke='#fff'/>
+<text x='630.552' y='114' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>0.910</text>
+<rect x='668.8' y='96' width='128.8' height='28' rx='3' fill='#8fd19e' stroke='#fff'/>
+<text x='733.1579999999999' y='114' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>1.533</text>
+<text x='805.5439999999999' y='114' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>3.066</text>
+<text x='470' y='166' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>doc 0</text>
+<rect x='540.0' y='148' width='36.1' height='28' rx='3' fill='#f5a97f' stroke='#fff'/>
+<text x='558.06' y='166' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>0.430</text>
+<rect x='576.1' y='148' width='76.4' height='28' rx='3' fill='#7fb3f5' stroke='#fff'/>
+<text x='614.34' y='166' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>0.910</text>
+<text x='660.56' y='166' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>1.340</text>
+<text x='470' y='218' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>doc 1</text>
+<rect x='540.0' y='200' width='36.1' height='28' rx='3' fill='#f5a97f' stroke='#fff'/>
+<text x='558.06' y='218' text-anchor='middle' font-size='10' font-weight='400' fill='#1f2328'>0.430</text>
+<text x='584.12' y='218' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>0.430</text>
+<text x='470' y='270' text-anchor='start' font-size='12' font-weight='600' fill='#1f2328'>docs 2–6</text>
+<text x='548' y='270' text-anchor='start' font-size='12' font-weight='700' fill='#1f2328'>0</text>
+<rect x='470' y='306' width='12' height='12' fill='#f5a97f'/><text x='486' y='316' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>ssrf  idf 0.452</text>
+<rect x='600' y='306' width='12' height='12' fill='#7fb3f5'/><text x='616' y='316' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>server  idf 0.956</text>
+<rect x='730' y='306' width='12' height='12' fill='#8fd19e'/><text x='746' y='316' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>metadata  idf 1.609</text>
+<text x='20' y='364' text-anchor='start' font-size='11' font-weight='400' fill='#57606a'>animated: the dot climbs the tf curve; each extra occurrence adds less</text></svg>
+</div>
+<p class="hint">Keys: ← previous step, → next step, space play / pause. Drag the slider to move freely. The picture stays still until you move it.</p>
+</div><script>
+const D=6.0, steps=[0.0, 0.375, 0.75, 1.125, 1.5, 1.875, 2.25, 2.625, 3.0, 3.375, 3.75, 4.125, 4.5, 4.875, 5.25, 5.625], svg=document.querySelector('.fig svg'), EPS=0.02;
+const lab=document.getElementById('lab'), sl=document.getElementById('sl'), playB=document.getElementById('play'), sp=document.getElementById('sp');
+let t=EPS, playing=false, last=0;
+svg.pauseAnimations();
+function cur(){let i=0; for(let k=0;k<steps.length;k++) if(steps[k]<=t+1e-6) i=k; return i;}
+function show(){svg.setCurrentTime(t); sl.value=Math.round(t/D*1000); lab.textContent='step '+(cur()+1)+' / '+steps.length;}
+function go(i){playing=false; playB.textContent='Play'; i=(i+steps.length)%steps.length; t=steps[i]+EPS; show();}
+document.getElementById('next').onclick=()=>go(cur()+1);
+document.getElementById('prev').onclick=()=>go(cur()-1);
+sl.oninput=()=>{playing=false; playB.textContent='Play'; t=Math.min(D-EPS,Math.max(EPS,sl.value/1000*D)); show();};
+function tick(now){ if(!playing) return; t+=(now-last)/1000*parseFloat(sp.value); last=now; if(t>=D) t=EPS; show(); requestAnimationFrame(tick); }
+playB.onclick=()=>{playing=!playing; playB.textContent=playing?'Pause':'Play'; if(playing){last=performance.now(); requestAnimationFrame(tick);} };
+document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){go(cur()+1);e.preventDefault();} else if(e.key==='ArrowLeft'){go(cur()-1);e.preventDefault();} else if(e.key===' '){playB.click();e.preventDefault();} });
+show();
+</script></body></html>

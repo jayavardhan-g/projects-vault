@@ -580,7 +580,7 @@ Launch syntax: `kernel<<<grid, block, shared_bytes, stream>>>(args)`. The 4th ar
 
 #### 5.2 A toy timeline
 
-![[d6-5-streams.svg]]
+![[d6-5-streams.svg]] [[d6-5-streams.html|▶ Step through it]]
 
 **Case A:** four kernels, each with only enough blocks to fill **30** of the 132 SMs. In one stream they run back
 to back: 4 time units. In four streams the GPU runs them side by side on different SMs: about **1** unit.
@@ -742,7 +742,7 @@ Two **segments** get rebuilt in backward:
 Config N4096: batch 4096, widths 1024 → 4096 → 4096 → 4096 → 1024. One 4096 × 4096 float tensor = 4096² × 4 B
 = **64 MiB**; `Z4` (4096 × 1024) = **16 MiB**.
 
-![[d6-6-ckpt.svg]]
+![[d6-6-ckpt.svg]] [[d6-6-ckpt.html|▶ Step through it]]
 
 - **Baseline:** Z1, A1, Z2, A2, Z3, A3 at 64 each + Z4 at 16 = **400 MiB**.
 - **Checkpointed:** A2 (64) + Z4 (16) + one **arena** for the recomputed segments.
@@ -881,7 +881,7 @@ before you start. Online softmax removes that catch.
 
 One query row, 4 keys, in 2 tiles of 2. Scores s = [2, 1 | 3, 0], values (one feature) v = [1, 3 | 2, 0].
 
-![[d6-7-online-softmax.svg]]
+![[d6-7-online-softmax.svg]] [[d6-7-online-softmax.html|▶ Step through it]]
 
 **Tile 1** (s = [2, 1]): its max is 2. p = [e⁰, e⁻¹] = [1, 0.368]. Sum 1.368. Σ p·v = 1·1 + 0.368·3 = 2.104. The
 state starts empty (m = −∞), so it becomes m = 2, l = 1.368, o = 2.104.
@@ -920,7 +920,7 @@ Inside one tile, the lanes change roles:
 
 #### 7.6 Warp shuffles: a reduction with no shared memory
 
-![[d6-8-shuffle.svg]]
+![[d6-8-shuffle.svg]] [[d6-8-shuffle.html|▶ Step through it]]
 
 `__shfl_xor_sync(mask, v, off)` returns the value `v` held by lane `lane XOR off`. Each lane swaps with a partner
 and keeps the max:
@@ -1054,7 +1054,7 @@ lanes read `Qi[row·64 + x]`" costs 1 cycle, not 32.
 
 #### 8.4 The score loop: stride 64 vs 65
 
-![[d6-9-banks.svg]]
+![[d6-9-banks.svg]] [[d6-9-banks.html|▶ Step through it]]
 
 In the score phase, lane c owns key c and walks over features x. At a fixed x, lane c reads `Kj[c · stride + x]`.
 

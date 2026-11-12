@@ -884,7 +884,7 @@ True
 
 `torch.arange(start, end, step)`: a 1-D tensor counting from `start` up to (not including) `end` in steps of `step`. `torch.arange(0, 8, 2)` → `tensor([0, 2, 4, 6])`. With `head_dim = 64` it gives 0, 2, …, 62: one entry per feature pair.
 
-![[g-arange.svg]]
+![[g-arange.svg]] [[g-arange.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1070,9 +1070,9 @@ device(type='cpu')
 
 `.unsqueeze(d)`: inserts a new axis of size 1 at position `d`. A `[3]` tensor → `.unsqueeze(1)` → `[3, 1]` (a column); `.unsqueeze(0)` → `[1, 3]` (a row). Needed so tensors broadcast against each other.
 
-![[g-unsqueeze.svg]]
+![[g-unsqueeze.svg]] [[g-unsqueeze.html|▶ Step through it]]
 
-![[g-broadcast.svg]]
+![[g-broadcast.svg]] [[g-broadcast.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1100,7 +1100,7 @@ torch.Size([3, 1])
 
 `.view(shape)`: reinterprets the same numbers with a new shape, **no copy**. A `[6, 2048]` tensor `.view(6, 32, 64)` reads each row of 2048 as 32 heads × 64.
 
-![[g-view.svg]]
+![[g-view.svg]] [[g-view.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1132,7 +1132,7 @@ tensor([[ 0,  1,  2],
 
 `.reshape(shape)`: like `.view`, but copies if the memory layout requires it. `[6, 32, 64]` → `.reshape(6, 2048)` puts the heads side by side again.
 
-![[g-view.svg]]
+![[g-view.svg]] [[g-view.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1154,7 +1154,7 @@ tensor([[0, 1],
 
 `.transpose(a, b)`: swaps two axes. `[13, 32, 64].transpose(0, 1)` → `[32, 13, 64]` (heads first).
 
-![[g-transpose.svg]]
+![[g-transpose.svg]] [[g-transpose.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1172,7 +1172,7 @@ tensor([[0, 2, 4],
 
 `torch.cat((a, b), dim=d)`: joins tensors **along an existing axis**. `torch.cat(([1, 2], [3, 4]), dim=-1)` → `[1, 2, 3, 4]`; on `[3, 2]` tensors with `dim=-1` the result is `[3, 4]`.
 
-![[g-cat.svg]]
+![[g-cat.svg]] [[g-cat.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1199,7 +1199,7 @@ torch.Size([4, 2])
 
 `torch.stack(xs)`: joins tensors along a **new** axis: four `(V,)` vectors → one `(4, V)` tensor.
 
-![[g-stack.svg]]
+![[g-stack.svg]] [[g-stack.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1222,7 +1222,7 @@ torch.Size([6])
 
 `.repeat_interleave(n, dim)`: repeats **each** element `n` times in place: `[a, b].repeat_interleave(2)` → `[a, a, b, b]`. (Plain `.repeat(2)` would give `[a, b, a, b]`.)
 
-![[g-repeat.svg]]
+![[g-repeat.svg]] [[g-repeat.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1245,7 +1245,7 @@ torch.Size([32, 13, 64])
 
 `.stride(d)`: how many elements you skip in memory to move one step along axis `d`. For a contiguous `[4, 16, 8, 64]` tensor, `stride(0)` = 16 × 8 × 64 = 8192. Kernels use strides to compute addresses.
 
-![[g-stride.svg]]
+![[g-stride.svg]] [[g-stride.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1269,7 +1269,7 @@ torch.Size([32, 13, 64])
 
 `.to(dtype or device)`: converts a tensor's number type or moves it. `x.to(torch.float32)` makes a float32 copy (from bfloat16); `x.to('cuda')` moves it to the GPU. In Triton code, `.to(tl.float32)` converts a loaded value.
 
-![[g-elementwise.svg]]
+![[g-elementwise.svg]] [[g-elementwise.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1301,7 +1301,7 @@ tensor([1., 2.])
 
 `.pow(p)`: raises every element to the power `p`. `x.pow(2)` squares each element.
 
-![[g-elementwise.svg]]
+![[g-elementwise.svg]] [[g-elementwise.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1317,7 +1317,7 @@ tensor([2., 3.])
 
 `torch.rsqrt(x)`: **reciprocal** square root, 1 / √x, element by element. `torch.rsqrt(tensor([4.]))` → 0.5.
 
-![[g-elementwise.svg]]
+![[g-elementwise.svg]] [[g-elementwise.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1336,7 +1336,7 @@ tensor([inf])
 
 `.cos()`: cosine of every element.
 
-![[g-elementwise.svg]]
+![[g-elementwise.svg]] [[g-elementwise.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1394,7 +1394,7 @@ tensor([-0.2384, -0.2689,  0.0000,  0.7311,  1.7616])
 
 `.mean(dim, keepdim=True)`: the average along an axis. On `[3, 8]` with `dim=-1` it averages each row's 8 numbers → `[3]`, or `[3, 1]` with `keepdim=True` (keeps the axis so the result broadcasts back over the row).
 
-![[g-mean.svg]]
+![[g-mean.svg]] [[g-mean.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1420,7 +1420,7 @@ tensor([[0.2500, 0.7500, 1.2500, 1.7500],
 
 `.sum(dim)`: adds the elements (along `dim` if given).
 
-![[g-sum.svg]]
+![[g-sum.svg]] [[g-sum.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1439,7 +1439,7 @@ tensor([ 6, 15])
 
 `.argmax(dim=-1)`: the **index** of the largest value along an axis. `tensor([0.1, 2.1, 0.6]).argmax()` = 1. On logits it picks the most likely token (greedy decoding).
 
-![[g-argmax.svg]]
+![[g-argmax.svg]] [[g-argmax.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1459,7 +1459,7 @@ tensor([1, 0])
 
 `torch.softmax(x, dim=-1)`: softmax along an axis: each row becomes positive weights that sum to 1. `softmax([0, 0])` = `[0.5, 0.5]`.
 
-![[g-softmax.svg]]
+![[g-softmax.svg]] [[g-softmax.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1480,7 +1480,7 @@ tensor([1., 1.])
 
 `.cumsum(dim)`: running total. `[0.5, 0.3, 0.2].cumsum()` = `[0.5, 0.8, 1.0]`.
 
-![[g-cumsum.svg]]
+![[g-cumsum.svg]] [[g-cumsum.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1496,7 +1496,7 @@ tensor([1, 2, 3, 4])
 
 `torch.topk(x, k)`: the `k` largest values (and their indices). `.values[..., -1:]` is the k-th largest, used as a cut-off.
 
-![[g-topk.svg]]
+![[g-topk.svg]] [[g-topk.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1514,7 +1514,7 @@ tensor([1, 3])
 
 `torch.sort(x, descending=True)`: sorted values and the indices they came from.
 
-![[g-topk.svg]]
+![[g-topk.svg]] [[g-topk.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1532,7 +1532,7 @@ tensor([1, 2, 0])
 
 `torch.matmul(a, b) (also a @ b)`: matrix multiplication. For `[32, 1, 64] @ [32, 64, 13]`, it does 32 separate `[1, 64] × [64, 13]` products (one per head) → `[32, 1, 13]`.
 
-![[g-matmul.svg]]
+![[g-matmul.svg]] [[g-matmul.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1556,7 +1556,7 @@ torch.Size([32, 1, 13])
 
 `.masked_fill(mask, value)`: replaces elements where `mask` is True with `value`. `scores.masked_fill(~allowed, -inf)` hides disallowed keys; `~` flips True/False.
 
-![[g-masked-fill.svg]]
+![[g-masked-fill.svg]] [[g-masked-fill.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1579,7 +1579,7 @@ tensor([[0.0000, 0.1000],
 
 `.scatter_(dim, index, value)`: writes `value` at the positions given by `index`, in place. `zeros.scatter_(-1, argmax, 1.0)` makes a one-hot vector.
 
-![[g-scatter.svg]]
+![[g-scatter.svg]] [[g-scatter.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1740,7 +1740,7 @@ tensor([0., 6.])
 
 Triton code only runs inside a GPU kernel, so the example shows the same idea in plain PyTorch.
 
-![[g-program-id.svg]]
+![[g-program-id.svg]] [[g-program-id.html|▶ Step through it]]
 
 ```python
 >>> grid = (2, 3)  # (num_seqs, num_heads)
@@ -1778,7 +1778,7 @@ tensor([ 8,  9, 10, 11])
 
 Triton code only runs inside a GPU kernel, so the example shows the same idea in plain PyTorch.
 
-![[g-tl-load.svg]]
+![[g-tl-load.svg]] [[g-tl-load.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1834,7 +1834,7 @@ tensor([0., 0., 0., 0.])
 
 Triton code only runs inside a GPU kernel, so the example shows the same idea in plain PyTorch.
 
-![[g-sum.svg]]
+![[g-sum.svg]] [[g-sum.html|▶ Step through it]]
 
 ```python
 >>> import torch
@@ -1894,7 +1894,7 @@ tensor([1.0000, 2.7183, 0.3679])
 
 Triton code only runs inside a GPU kernel, so the example shows the same idea in plain PyTorch.
 
-![[g-where.svg]]
+![[g-where.svg]] [[g-where.html|▶ Step through it]]
 
 ```python
 >>> import torch
