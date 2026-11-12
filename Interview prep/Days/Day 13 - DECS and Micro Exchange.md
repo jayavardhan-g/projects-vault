@@ -847,6 +847,14 @@ The three order types (`OrdType`, `order.hpp:14`):
 
 An order's quantity can end in exactly four places: **filled**, **resting**, **cancelled** or **expired**.
 
+![[d13x-session.svg]]
+
+*Animated, 11 steps, loops (about 5 s per step). The yellow box is the command that just arrived. The ladder is the book after it. A dashed box is an order that just left the book, with the reason. The five boxes underneath are the counters; the ones that changed are red.*
+
+How to read the ladder: prices run down the middle, highest at the top. Sellers (asks) sit on the right, buyers (bids) on the left. On each side, the order nearest the price column is the oldest at that price and trades first. A trade can happen only when the best bid is at or above the best ask.
+
+The same session as tables, for reference:
+
 | # | command | what happens | asks after (oldest first) | bids after | best ask / best bid |
 |---|---|---|---|---|---|
 | 1 | New Sell Limit id 1, 40 @ 101 | nothing to match; rests | 101: [#1 40] | | 101 / none |

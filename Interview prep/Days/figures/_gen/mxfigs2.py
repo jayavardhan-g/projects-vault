@@ -179,5 +179,70 @@ def swap():
     ]
     save('d13x-swap.svg', W, H, 'What breaks if head is published before the slot is written', 'the two lines of push in the wrong order', '', fr, 5.0)
 
+def session():
+    W, H = 960, 600
+    prices = [103, 102, 101, 100, 99]
+    def draw(cmd, result, asks, bids, ghosts, hot, ba, bb, cnt, chg, bad=False):
+        b = B(30, 62, 430, 40, cmd, YEL, RED, 2, 13) + T(476, 87, result, 13, 700, RED if bad else INK)
+        b += T(250, 128, 'bids (buys)', 12, 700, GT, 'middle') + T(480, 128, 'price', 12, 700, MUTE, 'middle') + T(710, 128, 'asks (sells)', 12, 700, RED, 'middle')
+        for r, p in enumerate(prices):
+            y = 138 + r * 50
+            b += R(440, y, 80, 42, GREY, MUTE, 1) + T(480, y + 27, p, 15, 700, INK, 'middle')
+            k = 0
+            for name, q in asks.get(p, []):
+                h = name in hot
+                b += B(540 + k * 124, y + 2, 116, 38, f'{name}  qty {q}', '#ffd8d3', RED if h else MUTE, 2.6 if h else 1.2, 12); k += 1
+            for side, gp, lab in ghosts:
+                if side == 'A' and gp == p:
+                    b += R(540 + k * 124, y + 2, 116, 38, WHITE, MUTE, 1.2, 4, '5 4') + T(598 + k * 124, y + 26, lab, 10, 600, MUTE, 'middle'); k += 1
+            k = 0
+            for name, q in bids.get(p, []):
+                h = name in hot
+                b += B(304 - k * 124, y + 2, 116, 38, f'{name}  qty {q}', GREEN, RED if h else MUTE, 2.6 if h else 1.2, 12); k += 1
+            for side, gp, lab in ghosts:
+                if side == 'B' and gp == p:
+                    b += R(304 - k * 124, y + 2, 116, 38, WHITE, MUTE, 1.2, 4, '5 4') + T(362 - k * 124, y + 26, lab, 10, 600, MUTE, 'middle'); k += 1
+            if p == ba: b += T(930, y + 27, '← best ask', 11, 700, RED, 'end')
+            if p == bb: b += T(30, y + 27, 'best bid →', 11, 700, GT)
+        b += T(30, 404, f"best ask: {ba or 'none'}     best bid: {bb or 'none'}", 12, 600, MUTE)
+        names = ['submitted', 'filled', 'resting', 'cancelled', 'expired']
+        for i, nme in enumerate(names):
+            x = 30 + i * 150 + (30 if i else 0)
+            h = nme in chg
+            b += R(x, 424, 140, 54, BLUE if i == 0 else WHITE, RED if h else MUTE, 2.6 if h else 1.2)
+            b += T(x + 70, 444, nme, 11, 600, MUTE, 'middle') + T(x + 70, 468, cnt[i], 18, 700, RED if h else INK, 'middle')
+        b += T(178, 458, '=', 20, 700, INK, 'middle')
+        for i in (2, 3, 4): b += T(60 + i * 150 - 5, 456, '+', 13, 700, INK, 'middle')
+        ok = cnt[0] == sum(cnt[1:])
+        b += T(820, 458, '✓ balances' if ok else '✗', 13, 700, GT, 'start')
+        b += T(30, 500, 'dashed box = an order that just left the book, and why      red border = new or changed in this step', 11, 400, MUTE)
+        return b
+    A1 = {101: [('#1', 40)]}; A2 = {101: [('#1', 40), ('#2', 20)]}; A3 = {101: [('#1', 40), ('#2', 20)], 103: [('#3', 50)]}
+    B4 = {99: [('#4', 30)]}; A6 = {103: [('#3', 50)]}
+    fr = [
+        ('Start: an empty book. Nothing submitted yet.', draw('(no command yet)', '', {}, {}, [], (), None, None, [0, 0, 0, 0, 0], ())),
+        ('1. Nobody is buying, so the sell cannot trade. It rests at 101 and becomes the best ask.',
+         draw('1  New  Sell  Limit  id 1   40 @ 101', 'rests', A1, {}, [], ('#1',), 101, None, [40, 0, 40, 0, 0], ('submitted', 'resting'))),
+        ('2. Same price as #1, but it arrived later: it queues BEHIND #1. That queue order is time priority.',
+         draw('2  New  Sell  Limit  id 2   20 @ 101', 'rests behind #1', A2, {}, [], ('#2',), 101, None, [60, 0, 60, 0, 0], ('submitted', 'resting'))),
+        ('3. A worse (higher) sell price. It rests on its own level; the best ask stays 101.',
+         draw('3  New  Sell  Limit  id 3   50 @ 103', 'rests', A3, {}, [], ('#3',), 101, None, [110, 0, 110, 0, 0], ('submitted', 'resting'))),
+        ('4. A buy at 99. The cheapest seller wants 101 > 99, so no trade. It rests and becomes the best bid.',
+         draw('4  New  Buy  Limit  id 4   30 @ 99', 'no cross (101 > 99): rests', A3, B4, [], ('#4',), 101, 99, [140, 0, 140, 0, 0], ('submitted', 'resting'))),
+        ('5. Id 1 is already resting in the book. A Limit order with a duplicate id is rejected: its 5 expires.',
+         draw('5  New  Sell  Limit  id 1   5 @ 105', 'REJECTED: duplicate id', A3, B4, [], (), 101, 99, [145, 0, 140, 0, 5], ('submitted', 'expired'), True)),
+        ('6. Crosses: fills 40 with #1, then 20 with #2, both at 101. Level 101 empties; the last 10 rests at 102.',
+         draw('6  New  Buy  Limit  id 9   70 @ 102', 'filled 60 @ 101, rests 10', A6, {102: [('#9', 10)], 99: [('#4', 30)]}, [('A', 101, '#1 filled 40'), ('A', 101, '#2 filled 20')], ('#9',), 103, 102, [215, 120, 90, 0, 5], ('submitted', 'filled', 'resting'))),
+        ('7. Found through the id table and unlinked. Its 10 moves from resting to cancelled; best bid falls back to 99.',
+         draw('7  Cancel  id 9', 'cancelled 10', A6, B4, [('B', 102, '#9 cancelled 10')], (), 103, 99, [215, 120, 80, 10, 5], ('resting', 'cancelled'))),
+        ('8. IOC: fills 50 with #3 at 103. It wanted 80, but an IOC never rests: the other 30 expire. No sellers remain.',
+         draw('8  New  Buy  IOC  id 10   80 @ 103', 'filled 50 @ 103, 30 expire', {}, B4, [('A', 103, '#3 filled 50')], (), None, 99, [295, 220, 30, 10, 35], ('submitted', 'filled', 'resting', 'expired'))),
+        ('9. Market: takes any price. Fills 30 with #4 at 99; nobody else is buying, so the other 20 expire.',
+         draw('9  New  Sell  Market  id 11   qty 50', 'filled 30 @ 99, 20 expire', {}, {}, [('B', 99, '#4 filled 30')], (), None, None, [345, 280, 0, 10, 55], ('submitted', 'filled', 'resting', 'expired'))),
+        ('10. Id 2 was filled in step 6, so it is no longer in the id table. cancel returns false; nothing changes.',
+         draw('10  Cancel  id 2', 'returns false: not in the book', {}, {}, [], (), None, None, [345, 280, 0, 10, 55], (), True)),
+    ]
+    save('d13x-session.svg', W, H, 'Ten commands, and the book after each one', 'every order type and every way a quantity can end; a trade of x adds 2x to filled (buyer and seller)', '', fr, 5.0)
+
 if __name__ == '__main__':
-    for fn in (push_dbg, pop_dbg, match_dbg, snapshot, stale, swap): fn()
+    for fn in (push_dbg, pop_dbg, match_dbg, snapshot, stale, swap, session): fn()
