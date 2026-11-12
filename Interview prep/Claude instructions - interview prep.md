@@ -53,6 +53,9 @@ microexchange and raftkv. Read that branch. The numbers in the upgraded docs rep
   - Day 2 eviction, said precisely: `evict()` frees as many leaf candidates as it needs from one scan before re-scanning, so a parent becomes a candidate only when the current leaves can't cover the request.
   - Day 7 A1: Whisper's stem has two convolutions but only the second has stride 2 (not "two strided convolutions").
   - Day 9 A2: the 2019 lottery-ticket paper resets weights to their original initial values; "rewinding" to an early iteration came in later work.
+- **11-12: new day-note format: one interleaved study guide.** He rejected separate theory / code / deep-dive sections. A day note now has one `## Study guide` made of `### Part N`. Inside a Part: the idea on tiny numbers → the exact code → a **Variables** table (name, type or shape, what it holds, value in the example) → **Traced** (the code run step by step on a small example, state after each step) → **Where the output goes** (the next function) → questions → check → five things. Readings sit at the end as optional "Sources". **Converted: Day 5 and Day 13** (use them as models). All other days still have the old layout.
+  - **How to convert a day:** reuse the note's existing text and numbers as they are. Do not re-audit results or re-read the repo; open the code only for extra lines a trace needs (a struct, the caller). Work inline, **one day at a time, only the day he names**. Do not launch parallel agents for this unless he asks (they burned the usage limit twice on 11-12 with nothing delivered).
+  - Links from other notes now point at `#Study guide` for converted days and `#Code, explained` for the rest.
 - **11-11: section A of every day stands alone:** each reading has a "What it says" summary (own words), and each Concepts list links to its deep dives. Days that lacked Concepts lists got them.
 - **11-11: Days 2–5 also have shape animations** (`d02s-`…`d05s-*.svg`, real sizes, no values) under their code headings, like Day 1's `d1s-*`.
 - **11-10: [[Function glossary]]** (`Interview prep/Function glossary.md`) is generated from scripts in the session scratch dir (glossary.py, glossary_ext.py, gen_glossary.py, gloss_figs.py → figures `g-*.svg`). Each day note's code excerpts get a *New functions in this code* box (first use per note) linking to it. Add new functions there, not inline.
@@ -92,7 +95,9 @@ microexchange and raftkv. Read that branch. The numbers in the upgraded docs rep
    - add weak topics to the plan;
    - append a short dated entry to `Log/<today>.md` (what was covered, what was weak, what is next).
 
-   Don't commit or push the vault unless he asks.
+   **Always sync the vault (standing instruction, 2026-11-12).** He reads the notes on his laptop by pulling.
+   - **Before editing anything in the vault:** `git pull --rebase`.
+   - **After every edit:** `git add -A`, commit with a short message, `git push`. Don't leave edits unpushed.
 11. **Machine rules** (from his global CLAUDE.md on gpuserver1; follow them on any account):
     - no sudo;
     - shared server: touch only `/data/jayavardhan/` and `/mnt/warm_storage/jayavardhan/`;

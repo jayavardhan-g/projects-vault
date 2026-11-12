@@ -2079,7 +2079,7 @@ add1<<<4, 256>>>(x, 1000);   // 1,024 threads, 1,000 do work
 > [!warning] Watch out
 > A launch returns immediately; the kernel runs later. Errors show up at the next sync or CUDA call.
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]]
 
 ### threadIdx
 
@@ -2094,7 +2094,7 @@ add1<<<4, 256>>>(x, 1000);   // 1,024 threads, 1,000 do work
 > [!warning] Watch out
 > x varies fastest. Whatever index is computed from threadIdx.x decides whether a warp's loads coalesce.
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]], [[Day 06 - CUDA II#Code, explained|Day 6]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]], [[Day 06 - CUDA II#Code, explained|Day 6]]
 
 ### blockIdx
 
@@ -2108,7 +2108,7 @@ dim3 grid(1024, 1024);   // N = 32768, 32x32 blocks
 > [!warning] Watch out
 > Blocks run in no guaranteed order and can't wait for each other inside a kernel.
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]], [[Day 06 - CUDA II#Code, explained|Day 6]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]], [[Day 06 - CUDA II#Code, explained|Day 6]]
 
 ### blockDim
 
@@ -2122,7 +2122,7 @@ int col = blockIdx.x * blockDim.x + threadIdx.x;   // 2*32 + 5 = 69
 > [!warning] Watch out
 > Inside templated kernels the code often uses the constant TILE instead; they must match the launch.
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]]
 
 ### fmaf
 
@@ -2137,7 +2137,7 @@ acc = fmaf(1.f, 4.f, acc);   // 10
 > [!warning] Watch out
 > One rounding instead of two, so results can differ from a*b+c in the last bit (cuBLAS also uses FMA).
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]], [[Day 06 - CUDA II#Code, explained|Day 6]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]], [[Day 06 - CUDA II#Code, explained|Day 6]]
 
 ### CUDA syncthreads
 
@@ -2153,7 +2153,7 @@ __syncthreads();          // everyone done reading
 > [!warning] Watch out
 > Every thread of the block must reach it; a `return` before it in some threads can hang the block.
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]], [[Day 06 - CUDA II#Code, explained|Day 6]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]], [[Day 06 - CUDA II#Code, explained|Day 6]]
 
 ### CUDA shared
 
@@ -2167,7 +2167,7 @@ s[threadIdx.y][threadIdx.x] = g[...];
 > [!warning] Watch out
 > Limited (up to 228 KB per SM); more per block means fewer blocks per SM.
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]], [[Day 06 - CUDA II#Code, explained|Day 6]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]], [[Day 06 - CUDA II#Code, explained|Day 6]]
 
 ### template
 
@@ -2181,7 +2181,7 @@ k<4><<<grid, blk>>>(...);   // R = 4 at compile time
 > [!warning] Watch out
 > Each template value is a separate compiled kernel; the value can't come from a runtime variable.
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]], [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]], [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### size_t
 
@@ -2196,7 +2196,7 @@ size_t ok = (size_t)N * N;  // 2,500,000,000
 > [!warning] Watch out
 > Cast before the multiply: `(size_t)(N * N)` overflows first, then casts.
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]], [[Day 06 - CUDA II#Code, explained|Day 6]], [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]], [[Day 06 - CUDA II#Code, explained|Day 6]], [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### pragma unroll
 
@@ -2212,7 +2212,7 @@ for (int i = 0; i < 4; ++i) av[i] = sA[ty*4 + i][k];
 > [!warning] Watch out
 > With a runtime trip count it can't fully unroll; arrays indexed by a loop variable may spill to slow local memory.
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]], [[Day 06 - CUDA II#Code, explained|Day 6]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]], [[Day 06 - CUDA II#Code, explained|Day 6]]
 
 ### cudaMemcpy
 
@@ -2226,7 +2226,7 @@ cudaMemcpy(hC, dC, bytes, cudaMemcpyDeviceToHost);   // GPU -> CPU
 > [!warning] Watch out
 > Device-to-host waits for earlier kernels to finish, so it doubles as a sync.
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]]
 
 ### cudaEventCreate
 
@@ -2253,7 +2253,7 @@ cudaEventRecord(end);
 > [!warning] Watch out
 > Records into the default stream unless you pass a stream; time only what's between the two in that queue.
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]]
 
 ### cudaEventSynchronize
 
@@ -2267,7 +2267,7 @@ cudaEventSynchronize(end);   // CPU waits here
 > [!warning] Watch out
 > Without it, ElapsedTime may return an error (event not yet reached).
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]]
 
 ### cudaEventElapsedTime
 
@@ -2281,7 +2281,7 @@ cudaEventElapsedTime(&ms, beg, end);   // e.g. 2736.6 for block2d at N = 32768
 > [!warning] Watch out
 > Resolution about 0.5 µs; for tiny kernels time many launches and divide.
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]]
 
 ### cudaEventDestroy
 
@@ -2294,7 +2294,7 @@ cudaEventDestroy(beg); cudaEventDestroy(end);
 > [!warning] Watch out
 > Leaking events is harmless in a benchmark but bad in a server.
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]]
 
 ### cublasSgemm
 
@@ -2309,7 +2309,7 @@ cublasSgemm(h, CUBLAS_OP_N, CUBLAS_OP_N, N, N, N,
 > [!warning] Watch out
 > Column-major: a row-major matrix looks transposed to cuBLAS. Swap the operands rather than transposing.
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]]
 
 ### CUDA_CHECK
 
@@ -2323,7 +2323,7 @@ CUDA_CHECK(cudaMalloc(&d, bytes));
 > [!warning] Watch out
 > Kernel launches return nothing; check them with CUDA_CHECK(cudaGetLastError()).
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]], [[Day 06 - CUDA II#Code, explained|Day 6]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]], [[Day 06 - CUDA II#Code, explained|Day 6]]
 
 ### fprintf
 
@@ -2337,7 +2337,7 @@ fprintf(stderr, "N=%d time=%.4f ms\n", 1024, 0.0973);
 > [!warning] Watch out
 > %zu for size_t, %d for int; a mismatch prints garbage.
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]]
 
 ### std::min
 
@@ -2351,7 +2351,7 @@ int n = (int)std::min(elems, (size_t)4000000);   // N = 32768 -> 4,000,000
 > [!warning] Watch out
 > Both arguments must be the same type, or it won't compile.
 
-*Used in:* [[Day 05 - CUDA I#Code, explained|Day 5]], [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]], [[Day 14 - Raft#Code, explained|Day 14]]
+*Used in:* [[Day 05 - CUDA I#Study guide|Day 5]], [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]], [[Day 14 - Raft#Code, explained|Day 14]]
 
 ## 15. CUDA runtime, streams and warp intrinsics (Day 6)
 
@@ -2485,7 +2485,7 @@ n1 * sizeof(float)   // 67,108,864 bytes = 64 MiB
 > [!warning] Watch out
 > Multiply element counts by sizeof before cudaMalloc/cudaMemcpy, which take bytes.
 
-*Used in:* [[Day 06 - CUDA II#Code, explained|Day 6]], [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 06 - CUDA II#Code, explained|Day 6]], [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### CUDA extern shared
 
@@ -4480,13 +4480,13 @@ l.splice(l.begin(), l, it);         // l = {1, 3, 2}; it still points at 1
 > [!warning] Watch out
 > No random access: reaching the k-th element walks k nodes.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### std::pair
 
 `std::pair<A, B>`: two values in one object, read as `.first` and `.second`. The LRU list stores `std::pair<int, std::string>` = (key, value).
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### std::unordered_map
 
@@ -4503,25 +4503,25 @@ m[8];         // creates key 8 with "" !
 > [!warning] Watch out
 > `m[key]` inserts a default value when the key is missing; use `find` to just look.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.find
 
 `.find(key)`: on a map: an iterator to the entry for `key`, or `.end()` if there is none. `if (it == index.end()) return false;` is the "miss" test.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.end
 
 `.end()`: an iterator **one past** the last element: not a real element, used as "not found" and as the stop point of loops.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.begin
 
 `.begin()`: an iterator to the first element. On the LRU list, the front = most recently used.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.splice
 
@@ -4535,37 +4535,37 @@ l.splice(l.begin(), l, std::prev(l.end()));   // {1, 3, 2}
 > [!warning] Watch out
 > Moving between two different lists also works and is still O(1) for a single node.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.erase
 
 `.erase(it) / .erase(key)`: removes an element: from a list by iterator (O(1)), from a map by key or iterator. `index.erase(2)` deletes key 2.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.size
 
 `.size()`: the number of elements. `items.size() >= capacity` means the cache is full.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]], [[Day 14 - Raft#Code, explained|Day 14]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]], [[Day 14 - Raft#Code, explained|Day 14]]
 
 ### x.back
 
 `.back()`: a reference to the **last** element. On the LRU list that's the least recently used entry, the next to evict.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]], [[Day 14 - Raft#Code, explained|Day 14]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]], [[Day 14 - Raft#Code, explained|Day 14]]
 
 ### x.front
 
 `.front()`: a reference to the **first** element. On `std::queue`, the oldest item (the next connection to lend).
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.pop_back
 
 `.pop_back()`: removes the last element (O(1) on a list). Used after reading `back()` to evict.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.emplace_front
 
@@ -4579,31 +4579,31 @@ items.emplace_front(4, "d");   // items = {(4, "d")}
 > [!warning] Watch out
 > `push_front(std::make_pair(4, "d"))` does the same with an extra temporary.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.push_back
 
 `.push_back(x)`: appends a copy of `x` at the end of a vector or list. `trades_.push_back(Trade{...})`; a vector may reallocate when it outgrows its capacity (hence `reserve`).
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]], [[Day 14 - Raft#Code, explained|Day 14]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]], [[Day 14 - Raft#Code, explained|Day 14]]
 
 ### x.push
 
 `.push(x)`: on `std::queue`: adds `x` at the back. `pool.push(conn)` returns a connection to the pool.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.empty
 
 `.empty()`: true when there are no elements. `!pool.empty()` = a connection is available.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]], [[Day 14 - Raft#Code, explained|Day 14]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]], [[Day 14 - Raft#Code, explained|Day 14]]
 
 ### std::mutex
 
 `std::mutex`: a lock: only one thread can hold it at a time; others block in `lock()` until it's free. Protects data several threads touch.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### std::lock_guard
 
@@ -4620,7 +4620,7 @@ void put(int k) {
 > [!warning] Watch out
 > Hold the lock as briefly as possible; a lock_guard can't be released early (use unique_lock for that).
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### std::unique_lock
 
@@ -4636,13 +4636,13 @@ lock.unlock();
 > [!warning] Watch out
 > `cv.wait` needs a unique_lock, not a lock_guard: it must unlock and re-lock the mutex.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.unlock
 
 `.unlock()`: releases a `unique_lock` before its scope ends. The pool unlocks before `notify_one` so the woken thread doesn't block on the mutex.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.notify_one
 
@@ -4656,7 +4656,7 @@ cv.notify_one();   // wake one waiter
 > [!warning] Watch out
 > A notify with nobody waiting is lost; the predicate in `wait` is what makes that safe.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### std::atomic
 
@@ -4671,13 +4671,13 @@ std::atomic<int> n{0};
 > [!warning] Watch out
 > Atomic does not mean ordered: the default is seq_cst, but relaxed operations order nothing else.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]], [[Day 14 - Raft#Code, explained|Day 14]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]], [[Day 14 - Raft#Code, explained|Day 14]]
 
 ### x.load
 
 `x.load(order)`: reads an atomic. `head_.load(std::memory_order_acquire)` reads it and makes later reads see everything the writer did before its release store.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.store
 
@@ -4692,7 +4692,7 @@ head_.store(1, std::memory_order_release);         // publish
 > [!warning] Watch out
 > Release only helps a reader that loads the same atomic with acquire (or stronger).
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### std::memory_order_relaxed
 
@@ -4706,19 +4706,19 @@ const size_t head = head_.load(std::memory_order_relaxed);
 > [!warning] Watch out
 > Relaxed on the *publishing* store would let the consumer see the new head before the slot data.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### std::memory_order_acquire
 
 `std::memory_order_acquire`: for loads: reads after it can't move before it, and if it reads a released value it sees all writes before that release.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### std::memory_order_release
 
 `std::memory_order_release`: for stores: writes before it can't move after it, so a reader that acquires this value sees them all.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### std::atomic_ref
 
@@ -4732,7 +4732,7 @@ std::atomic_ref<uint64_t>(count).store(5, std::memory_order_release);
 > [!warning] Watch out
 > While any atomic_ref to an object is in use, all access to it should go through atomic_ref.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### alignas
 
@@ -4749,19 +4749,19 @@ static_assert(sizeof(Ring) == 128);
 > [!warning] Watch out
 > It pads only around those members; data elsewhere (the 40-byte slots) can still share lines.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### rdtsc
 
 `rdtsc()`: reads the CPU's time-stamp counter (cycles since reset) in ~20 cycles: far cheaper than `std::chrono`. Here a helper wrapping the x86 instruction; `TscClock::to_ns` converts cycles to ns.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### pqxx::connection
 
 `pqxx::connection`: one open connection to Postgres (a server-side backend process). Opening one costs milliseconds, hence the pool. `db::` is the project's alias for `pqxx::`.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### db::work
 
@@ -4776,7 +4776,7 @@ txn.commit();                                            // COMMIT
 > [!warning] Watch out
 > For a single read-only query, `pqxx::nontransaction` skips BEGIN/COMMIT: 1 round trip instead of 3.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.exec_params
 
@@ -4791,31 +4791,31 @@ std::string v = r[0][0].as<std::string>();
 > [!warning] Watch out
 > Never build SQL by concatenating user input; always use placeholders.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.commit
 
 `txn.commit()`: sends `COMMIT`: the transaction's changes become permanent. Postgres replies only after its WAL record is flushed (unless synchronous_commit is off).
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.set_content
 
 `res.set_content(body, "text/plain")`: cpp-httplib: sets the HTTP response body and its Content-Type. The status defaults to 200.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### std::exception
 
 `catch (const std::exception &e)`: the base class of standard errors. Catching it catches libpqxx's errors too; `e.what()` is the message.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ### x.what
 
 `e.what()`: the error message of an exception, as a C string.
 
-*Used in:* [[Day 13 - DECS and Micro Exchange#Code, explained|Day 13]]
+*Used in:* [[Day 13 - DECS and Micro Exchange#Study guide|Day 13]]
 
 ## 23. C++ standard library (Day 14: Raft)
 

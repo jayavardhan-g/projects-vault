@@ -37,7 +37,7 @@ One sheet each, 5 minutes each, no notes. Then check against the source.
 |---|---|---|
 | mini-vLLM | engine → scheduler → block table / allocator / radix cache → model → KV cache | [[Day 01 - mini-vLLM I#Code, explained]], [[Day 02 - mini-vLLM II#Code, explained]] |
 | Speculative decoding | draft γ tokens → one verify pass → accept/reject → residual → KV rollback | [[Day 04 - Speculative decoding#Code, explained]] |
-| CUDA | the matmul chain, and the FlashAttention block (warps × 4 rows, the KV loop, online softmax) | [[Day 05 - CUDA I#Code, explained]], [[Day 06 - CUDA II#Code, explained]] |
+| CUDA | the matmul chain, and the FlashAttention block (warps × 4 rows, the KV loop, online softmax) | [[Day 05 - CUDA I#Study guide]], [[Day 06 - CUDA II#Code, explained]] |
 | CosyVoice | text → Qwen2 LM (+LoRA) → 25 Hz speech tokens → flow matching → mel → vocoder | [[Day 08 - CosyVoice#Code, explained]] |
 | Seminar | the design-space map: representation → modelling → rendering → evaluation | [[Day 07 - Seminar and speech basics#Code, explained]] |
 | CS728 | probe → hit counts per head → top-10 heads → attention mass per tool → ranking | [[Day 09 - CS728 and LeNet-5#Code, explained]] |
@@ -45,8 +45,8 @@ One sheet each, 5 minutes each, no notes. Then check against the source.
 | Photo-Seek | ingest → CLIP/FAISS and SCRFD/ArcFace → clustering ↔ active learning; query → parser → SQL prefilter → FAISS | [[Day 10 - Photo-Seek I#Code, explained]], [[Day 11 - Photo-Seek II and emotion steering#Code, explained]] |
 | Emotion steering | calibrate (diff of means per layer) → hook at layer L → guard ladder | [[Day 11 - Photo-Seek II and emotion steering#Code, explained]] part 2 |
 | BountyBrain | the graph build; query → BM25 + dense → RRF → rerank → cited prompt | [[Day 12 - BountyBrain#Code, explained]] |
-| DECS | k6 → thread pool → LRU → DB pool → Postgres (pinned) | [[Day 13 - DECS and Micro Exchange#Code, explained]] part 1 |
-| Micro Exchange | producer → SPSC ring → matching (log first, then book) → follower → snapshot | [[Day 13 - DECS and Micro Exchange#Code, explained]] part 2 |
+| DECS | k6 → thread pool → LRU → DB pool → Postgres (pinned) | [[Day 13 - DECS and Micro Exchange#Study guide]] part 1 |
+| Micro Exchange | producer → SPSC ring → matching (log first, then book) → follower → snapshot | [[Day 13 - DECS and Micro Exchange#Study guide]] part 2 |
 | Raft | election; AppendEntries with prev index/term; the commit rule | [[Day 14 - Raft#Code, explained]] |
 
 ## B. Numbers cheat sheet (block 3)

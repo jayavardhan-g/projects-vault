@@ -185,7 +185,7 @@ Follow prep pack §2 "End-to-end trace at N = 8192" side by side with `flashatte
 Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 Repo `sysml` (`16870fb`): `mlp/mlp_bench.cu` (PA3) and
-`flashattention/flash_lib.cu` (PA4). Builds on [[Day 05 - CUDA I#Code, explained]].
+`flashattention/flash_lib.cu` (PA4). Builds on [[Day 05 - CUDA I#Study guide]].
 
 ```mermaid
 flowchart TB
