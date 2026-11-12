@@ -633,7 +633,6 @@ The other ~51 VUs are in k6's gap between requests. At 10 VUs, flip it around:
 
 $$X = \frac{N}{R} = \frac{10}{0.0434\ \text{s}} \approx 230\ \text{req/s} \quad(\text{measured: } 225)$$
 
-
 So at low load, **TPS is just VUs ÷ 43 ms**. The server isn't busy; every request simply takes 43 ms (Part 4).
 
 #### 6.3 The utilisation law
@@ -778,25 +777,6 @@ flowchart TB
 
 ![[d13m-pipeline.svg]] [[d13m-pipeline.html|▶ Step through it]]
 
-> [!example]- Step by step: open this to see the 6 steps as still pictures, one under the other
-> **Step 1 of 6**
-> ![[d13m-pipeline-step01.svg]]
->
-> **Step 2 of 6**
-> ![[d13m-pipeline-step02.svg]]
->
-> **Step 3 of 6**
-> ![[d13m-pipeline-step03.svg]]
->
-> **Step 4 of 6**
-> ![[d13m-pipeline-step04.svg]]
->
-> **Step 5 of 6**
-> ![[d13m-pipeline-step05.svg]]
->
-> **Step 6 of 6**
-> ![[d13m-pipeline-step06.svg]]
-
 *Animated, 6 steps, loops. It follows one command from the producer to the book. The text of each step is in the bar at the bottom of the figure.*
 
 #### 7.2 The data: the 40-byte Command
@@ -867,40 +847,6 @@ The three order types (`OrdType`, `order.hpp:14`):
 An order's quantity can end in exactly four places: **filled**, **resting**, **cancelled** or **expired**.
 
 ![[d13x-session.svg]] [[d13x-session.html|▶ Step through it]]
-
-> [!example]- Step by step: open this to see the 11 steps as still pictures, one under the other
-> **Step 1 of 11**
-> ![[d13x-session-step01.svg]]
->
-> **Step 2 of 11**
-> ![[d13x-session-step02.svg]]
->
-> **Step 3 of 11**
-> ![[d13x-session-step03.svg]]
->
-> **Step 4 of 11**
-> ![[d13x-session-step04.svg]]
->
-> **Step 5 of 11**
-> ![[d13x-session-step05.svg]]
->
-> **Step 6 of 11**
-> ![[d13x-session-step06.svg]]
->
-> **Step 7 of 11**
-> ![[d13x-session-step07.svg]]
->
-> **Step 8 of 11**
-> ![[d13x-session-step08.svg]]
->
-> **Step 9 of 11**
-> ![[d13x-session-step09.svg]]
->
-> **Step 10 of 11**
-> ![[d13x-session-step10.svg]]
->
-> **Step 11 of 11**
-> ![[d13x-session-step11.svg]]
 
 *Animated, 11 steps, loops (about 5 s per step). The yellow box is the command that just arrived. The ladder is the book after it. A dashed box is an order that just left the book, with the reason. The five boxes underneath are the counters; the ones that changed are red.*
 
@@ -978,19 +924,6 @@ Sharing is where things go wrong, because C++ has a hard rule: if one thread **w
 
 ![[d13x-stale.svg]] [[d13x-stale.html|▶ Step through it]]
 
-> [!example]- Step by step: open this to see the 4 steps as still pictures, one under the other
-> **Step 1 of 4**
-> ![[d13x-stale-step01.svg]]
->
-> **Step 2 of 4**
-> ![[d13x-stale-step02.svg]]
->
-> **Step 3 of 4**
-> ![[d13x-stale-step03.svg]]
->
-> **Step 4 of 4**
-> ![[d13x-stale-step04.svg]]
-
 *Animated, 4 steps, loops. It shows a consumer loop on a plain variable being turned into a loop that never ends. The text of each step is in the bar at the bottom.*
 
 ##### Idea 2: `std::atomic<size_t>`
@@ -1025,19 +958,6 @@ You can't use an atomic like a normal variable in this code. You go through two 
 So `const size_t head = head_.load(...)` means: *read the shared counter once, and keep the answer in my own private variable called `head`*.
 
 ![[d13x-load.svg]] [[d13x-load.html|▶ Step through it]]
-
-> [!example]- Step by step: open this to see the 4 steps as still pictures, one under the other
-> **Step 1 of 4**
-> ![[d13x-load-step01.svg]]
->
-> **Step 2 of 4**
-> ![[d13x-load-step02.svg]]
->
-> **Step 3 of 4**
-> ![[d13x-load-step03.svg]]
->
-> **Step 4 of 4**
-> ![[d13x-load-step04.svg]]
 
 *Animated, 4 steps, loops. The blue box is shared memory; the yellow box is the function's own copy. The text of each step is in the bar at the bottom.*
 
@@ -1149,37 +1069,6 @@ size_t head_cache_ = 0;  // consumer's view of head_
 
 ![[d13m-ring.svg]] [[d13m-ring.html|▶ Step through it]]
 
-> [!example]- Step by step: open this to see the 10 steps as still pictures, one under the other
-> **Step 1 of 10**
-> ![[d13m-ring-step01.svg]]
->
-> **Step 2 of 10**
-> ![[d13m-ring-step02.svg]]
->
-> **Step 3 of 10**
-> ![[d13m-ring-step03.svg]]
->
-> **Step 4 of 10**
-> ![[d13m-ring-step04.svg]]
->
-> **Step 5 of 10**
-> ![[d13m-ring-step05.svg]]
->
-> **Step 6 of 10**
-> ![[d13m-ring-step06.svg]]
->
-> **Step 7 of 10**
-> ![[d13m-ring-step07.svg]]
->
-> **Step 8 of 10**
-> ![[d13m-ring-step08.svg]]
->
-> **Step 9 of 10**
-> ![[d13m-ring-step09.svg]]
->
-> **Step 10 of 10**
-> ![[d13m-ring-step10.svg]]
-
 *Animated, 10 steps, loops. It plays the ten rows of the table below: watch the two arrows chase each other around the four slots. The text of each step is in the bar at the bottom of the figure.*
 
 **Traced: nine calls on a ring of Capacity 4.** A cell in bold changed in that step.
@@ -1205,31 +1094,6 @@ Read three things off the table:
 #### 8.5 Every line of push: what it does, why, what uses it, what breaks
 
 ![[d13x-push.svg]] [[d13x-push.html|▶ Step through it]]
-
-> [!example]- Step by step: open this to see the 8 steps as still pictures, one under the other
-> **Step 1 of 8**
-> ![[d13x-push-step01.svg]]
->
-> **Step 2 of 8**
-> ![[d13x-push-step02.svg]]
->
-> **Step 3 of 8**
-> ![[d13x-push-step03.svg]]
->
-> **Step 4 of 8**
-> ![[d13x-push-step04.svg]]
->
-> **Step 5 of 8**
-> ![[d13x-push-step05.svg]]
->
-> **Step 6 of 8**
-> ![[d13x-push-step06.svg]]
->
-> **Step 7 of 8**
-> ![[d13x-push-step07.svg]]
->
-> **Step 8 of 8**
-> ![[d13x-push-step08.svg]]
 
 *Animated, 8 steps, loops. The code is on the left with the running line highlighted; the variables are on the right, and the one that just changed is red. The text of each step is in the bar at the bottom.*
 
@@ -1316,22 +1180,6 @@ The starting state is the "push E" moment of the trace above: `head_ = 4`, `tail
 
 ![[d13x-swap.svg]] [[d13x-swap.html|▶ Step through it]]
 
-> [!example]- Step by step: open this to see the 5 steps as still pictures, one under the other
-> **Step 1 of 5**
-> ![[d13x-swap-step01.svg]]
->
-> **Step 2 of 5**
-> ![[d13x-swap-step02.svg]]
->
-> **Step 3 of 5**
-> ![[d13x-swap-step03.svg]]
->
-> **Step 4 of 5**
-> ![[d13x-swap-step04.svg]]
->
-> **Step 5 of 5**
-> ![[d13x-swap-step05.svg]]
-
 *Animated, 5 steps, loops. The two lines of `push` in the wrong order: one command is applied twice and one is lost. The text of each step is in the bar at the bottom.*
 
 ##### Line 35: `return true;`
@@ -1342,31 +1190,6 @@ The starting state is the "push E" moment of the trace above: `head_ = 4`, `tail
 #### 8.6 Every line of pop: the mirror image
 
 ![[d13x-pop.svg]] [[d13x-pop.html|▶ Step through it]]
-
-> [!example]- Step by step: open this to see the 8 steps as still pictures, one under the other
-> **Step 1 of 8**
-> ![[d13x-pop-step01.svg]]
->
-> **Step 2 of 8**
-> ![[d13x-pop-step02.svg]]
->
-> **Step 3 of 8**
-> ![[d13x-pop-step03.svg]]
->
-> **Step 4 of 8**
-> ![[d13x-pop-step04.svg]]
->
-> **Step 5 of 8**
-> ![[d13x-pop-step05.svg]]
->
-> **Step 6 of 8**
-> ![[d13x-pop-step06.svg]]
->
-> **Step 7 of 8**
-> ![[d13x-pop-step07.svg]]
->
-> **Step 8 of 8**
-> ![[d13x-pop-step08.svg]]
 
 *Animated, 8 steps, loops. The first `pop` of the trace: the ring holds A B C D and the consumer's copy of head is still 0. The text of each step is in the bar at the bottom.*
 
@@ -1410,22 +1233,6 @@ for (;;) {
 
 ![[d13m-ordering.svg]] [[d13m-ordering.html|▶ Step through it]]
 
-> [!example]- Step by step: open this to see the 5 steps as still pictures, one under the other
-> **Step 1 of 5**
-> ![[d13m-ordering-step01.svg]]
->
-> **Step 2 of 5**
-> ![[d13m-ordering-step02.svg]]
->
-> **Step 3 of 5**
-> ![[d13m-ordering-step03.svg]]
->
-> **Step 4 of 5**
-> ![[d13m-ordering-step04.svg]]
->
-> **Step 5 of 5**
-> ![[d13m-ordering-step05.svg]]
-
 *Animated, 5 steps, loops. Top lane: what may happen with no ordering rule. Bottom lane: the same steps with release and acquire. The text of each step is in the bar at the bottom of the figure.*
 
 Your code says "write the slot, then write head". Neither the compiler nor the CPU promises others will **see** it in
@@ -1465,19 +1272,6 @@ almost every time. The trick mostly helps the side that is rarely blocked.
 #### 8.10 False sharing
 
 ![[d13m-falseshare.svg]] [[d13m-falseshare.html|▶ Step through it]]
-
-> [!example]- Step by step: open this to see the 4 steps as still pictures, one under the other
-> **Step 1 of 4**
-> ![[d13m-falseshare-step01.svg]]
->
-> **Step 2 of 4**
-> ![[d13m-falseshare-step02.svg]]
->
-> **Step 3 of 4**
-> ![[d13m-falseshare-step03.svg]]
->
-> **Step 4 of 4**
-> ![[d13m-falseshare-step04.svg]]
 
 *Animated, 4 steps, loops. Left: `head_` and `tail_` on one cache line. Right: one line each. The text of each step is in the bar at the bottom of the figure.*
 
@@ -1695,31 +1489,6 @@ if (side == Side::Buy) {
 
 ![[d13m-match.svg]] [[d13m-match.html|▶ Step through it]]
 
-> [!example]- Step by step: open this to see the 8 steps as still pictures, one under the other
-> **Step 1 of 8**
-> ![[d13m-match-step01.svg]]
->
-> **Step 2 of 8**
-> ![[d13m-match-step02.svg]]
->
-> **Step 3 of 8**
-> ![[d13m-match-step03.svg]]
->
-> **Step 4 of 8**
-> ![[d13m-match-step04.svg]]
->
-> **Step 5 of 8**
-> ![[d13m-match-step05.svg]]
->
-> **Step 6 of 8**
-> ![[d13m-match-step06.svg]]
->
-> **Step 7 of 8**
-> ![[d13m-match-step07.svg]]
->
-> **Step 8 of 8**
-> ![[d13m-match-step08.svg]]
-
 *Animated, 8 steps, loops. The price ladder for the worked example, including the cancel that follows. The text of each step is in the bar at the bottom of the figure.*
 
 **Traced: buy 70 @ 102.**
@@ -1737,55 +1506,6 @@ if (side == Side::Buy) {
 Both trades execute at **101**, the maker's price, although the buyer offered 102. `filled_qty_` rose by 2 × 60 = 120 (both sides counted).
 
 ![[d13x-match.svg]] [[d13x-match.html|▶ Step through it]]
-
-> [!example]- Step by step: open this to see the 16 steps as still pictures, one under the other
-> **Step 1 of 16**
-> ![[d13x-match-step01.svg]]
->
-> **Step 2 of 16**
-> ![[d13x-match-step02.svg]]
->
-> **Step 3 of 16**
-> ![[d13x-match-step03.svg]]
->
-> **Step 4 of 16**
-> ![[d13x-match-step04.svg]]
->
-> **Step 5 of 16**
-> ![[d13x-match-step05.svg]]
->
-> **Step 6 of 16**
-> ![[d13x-match-step06.svg]]
->
-> **Step 7 of 16**
-> ![[d13x-match-step07.svg]]
->
-> **Step 8 of 16**
-> ![[d13x-match-step08.svg]]
->
-> **Step 9 of 16**
-> ![[d13x-match-step09.svg]]
->
-> **Step 10 of 16**
-> ![[d13x-match-step10.svg]]
->
-> **Step 11 of 16**
-> ![[d13x-match-step11.svg]]
->
-> **Step 12 of 16**
-> ![[d13x-match-step12.svg]]
->
-> **Step 13 of 16**
-> ![[d13x-match-step13.svg]]
->
-> **Step 14 of 16**
-> ![[d13x-match-step14.svg]]
->
-> **Step 15 of 16**
-> ![[d13x-match-step15.svg]]
->
-> **Step 16 of 16**
-> ![[d13x-match-step16.svg]]
 
 *Animated, 16 steps, loops. The same trace as the table, but with the code beside it: the highlighted line is the one running. The text of each step is in the bar at the bottom.*
 
@@ -1822,25 +1542,6 @@ void OrderBook::erase_order(Order* o) {
 ```
 
 ![[d13m-unlink.svg]] [[d13m-unlink.html|▶ Step through it]]
-
-> [!example]- Step by step: open this to see the 6 steps as still pictures, one under the other
-> **Step 1 of 6**
-> ![[d13m-unlink-step01.svg]]
->
-> **Step 2 of 6**
-> ![[d13m-unlink-step02.svg]]
->
-> **Step 3 of 6**
-> ![[d13m-unlink-step03.svg]]
->
-> **Step 4 of 6**
-> ![[d13m-unlink-step04.svg]]
->
-> **Step 5 of 6**
-> ![[d13m-unlink-step05.svg]]
->
-> **Step 6 of 6**
-> ![[d13m-unlink-step06.svg]]
 
 *Animated, 6 steps, loops. A level with three orders: first the middle one is erased (both `if` branches), then the head (the `else` branch of line 84). The text of each step is in the bar at the bottom of the figure.*
 
@@ -2037,28 +1738,6 @@ A, B, C, D sit in one unbroken **run** (slots 2–5). A lookup walks the run fro
 
 ![[d13m-idtable.svg]] [[d13m-idtable.html|▶ Step through it]]
 
-> [!example]- Step by step: open this to see the 7 steps as still pictures, one under the other
-> **Step 1 of 7**
-> ![[d13m-idtable-step01.svg]]
->
-> **Step 2 of 7**
-> ![[d13m-idtable-step02.svg]]
->
-> **Step 3 of 7**
-> ![[d13m-idtable-step03.svg]]
->
-> **Step 4 of 7**
-> ![[d13m-idtable-step04.svg]]
->
-> **Step 5 of 7**
-> ![[d13m-idtable-step05.svg]]
->
-> **Step 6 of 7**
-> ![[d13m-idtable-step06.svg]]
->
-> **Step 7 of 7**
-> ![[d13m-idtable-step07.svg]]
-
 *Animated, 7 steps, loops. Step 3 shows the wrong way to erase; steps 4–7 show the backward shift that `IdTable::erase` does. The text of each step is in the bar at the bottom of the figure.*
 
 The table is one array of keys. An id's **home** slot is `mix(id) & mask`. If it's taken, try the next slot, and so
@@ -2103,25 +1782,6 @@ keys_[i] = kEmpty;
 #### 9.9 The object pool
 
 ![[d13m-pool.svg]] [[d13m-pool.html|▶ Step through it]]
-
-> [!example]- Step by step: open this to see the 6 steps as still pictures, one under the other
-> **Step 1 of 6**
-> ![[d13m-pool-step01.svg]]
->
-> **Step 2 of 6**
-> ![[d13m-pool-step02.svg]]
->
-> **Step 3 of 6**
-> ![[d13m-pool-step03.svg]]
->
-> **Step 4 of 6**
-> ![[d13m-pool-step04.svg]]
->
-> **Step 5 of 6**
-> ![[d13m-pool-step05.svg]]
->
-> **Step 6 of 6**
-> ![[d13m-pool-step06.svg]]
 
 *Animated, 6 steps, loops. Four pre-allocated nodes and the stack of pointers to the free ones. The text of each step is in the bar at the bottom of the figure.*
 
@@ -2333,22 +1993,6 @@ bool append(const Command& c) {
 
 ![[d13m-wal.svg]] [[d13m-wal.html|▶ Step through it]]
 
-> [!example]- Step by step: open this to see the 5 steps as still pictures, one under the other
-> **Step 1 of 5**
-> ![[d13m-wal-step01.svg]]
->
-> **Step 2 of 5**
-> ![[d13m-wal-step02.svg]]
->
-> **Step 3 of 5**
-> ![[d13m-wal-step03.svg]]
->
-> **Step 4 of 5**
-> ![[d13m-wal-step04.svg]]
->
-> **Step 5 of 5**
-> ![[d13m-wal-step05.svg]]
-
 *Animated, 5 steps, loops. It shows the file after each line of `append`, what a reader would see, and what a crash at that moment would mean. The text of each step is in the bar at the bottom of the figure.*
 
 **Traced: appending to a segment that holds 2 records.**
@@ -2394,25 +2038,6 @@ file, so the first touch of each page faults; `posix_fallocate` would reserve th
 #### 10.5 Segments, snapshots and the follower
 
 ![[d13m-segments.svg]] [[d13m-segments.html|▶ Step through it]]
-
-> [!example]- Step by step: open this to see the 6 steps as still pictures, one under the other
-> **Step 1 of 6**
-> ![[d13m-segments-step01.svg]]
->
-> **Step 2 of 6**
-> ![[d13m-segments-step02.svg]]
->
-> **Step 3 of 6**
-> ![[d13m-segments-step03.svg]]
->
-> **Step 4 of 6**
-> ![[d13m-segments-step04.svg]]
->
-> **Step 5 of 6**
-> ![[d13m-segments-step05.svg]]
->
-> **Step 6 of 6**
-> ![[d13m-segments-step06.svg]]
 
 *Animated, 6 steps, loops. Two segments passing through Active, Sealed and Free, and which thread makes each change. The text of each step is in the bar at the bottom of the figure.*
 
@@ -2469,25 +2094,6 @@ for (const WalContents& s : segs) {
 | `r.replayed` | counter | commands replayed | 12,345 |
 
 ![[d13m-recover.svg]] [[d13m-recover.html|▶ Step through it]]
-
-> [!example]- Step by step: open this to see the 6 steps as still pictures, one under the other
-> **Step 1 of 6**
-> ![[d13m-recover-step01.svg]]
->
-> **Step 2 of 6**
-> ![[d13m-recover-step02.svg]]
->
-> **Step 3 of 6**
-> ![[d13m-recover-step03.svg]]
->
-> **Step 4 of 6**
-> ![[d13m-recover-step04.svg]]
->
-> **Step 5 of 6**
-> ![[d13m-recover-step05.svg]]
->
-> **Step 6 of 6**
-> ![[d13m-recover-step06.svg]]
 
 *Animated, 6 steps, loops. The red line is `r.seq`: how much of the history the rebuilt book contains so far. The text of each step is in the bar at the bottom of the figure.*
 
