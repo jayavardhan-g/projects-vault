@@ -1099,6 +1099,7 @@ The starting state is the "push E" moment of the trace above: `head_ = 4`, `tail
   - *A private copy:* the function needs this number three more times. One read, then a local, is cheaper and can't change under it.
   - *`relaxed`:* the producer is the **only** thread that ever writes `head_`. A thread always sees its own last write, so it needs no promise about anyone else.
 - **What uses it next.** Line 29 and 31 (`head − tail_cache_`), line 33 (`head & (Capacity − 1)`), line 34 (`head + 1`).
+
 **What breaks if you change it:**
 
 | change | result |
@@ -1112,6 +1113,7 @@ The starting state is the "push E" moment of the trace above: `head_ = 4`, `tail
 - **What it does.** Counts the items the producer *believes* are in the ring: pushed minus popped = 4 − 0 = 4. Four items in four slots: it looks full.
 - **Why it is written this way.** `tail_cache_` is the producer's **old copy** of the consumer's counter. Using it avoids touching `tail_`, a variable the other core keeps writing (expensive: see *Cached indices*). The old copy can only be **too small**, because `tail_` only grows. So the count can only be **too big**. The mistake is always on the safe side: "looks full" when it isn't, never "has room" when it doesn't.
 - **What uses it next.** If false (the common case), jump straight to line 33: no shared read at all. If true, lines 30–31 check properly.
+
 **What breaks if you change it:**
 
 | change | result |
@@ -1124,6 +1126,7 @@ The starting state is the "push E" moment of the trace above: `head_ = 4`, `tail
 - **What it does.** Reads the consumer's real counter (1) and refreshes the copy: `tail_cache_ = 1`.
 - **Why it is written this way.** This is the **acquire** half of a pair. The consumer stores `tail_` with **release** on line 45, *after* it has finished copying a slot out. So when the producer sees `tail_ = 1` here, it also knows the consumer is completely done with slot 0. Only then is it safe to write into slot 0 again.
 - **What uses it next.** Line 31 re-checks with the fresh value. The refreshed copy is also kept for later pushes.
+
 **What breaks if you change it:**
 
 | change | result |
@@ -1136,6 +1139,7 @@ The starting state is the "push E" moment of the trace above: `head_ = 4`, `tail
 - **What it does.** Counts again with the fresh value: 4 − 1 = 3, which is less than 4. There is room, so it goes on. Had it still been 4, the ring would be **really** full and the function would stop here.
 - **Why it is written this way.** The first test used an old number. This one is the real decision. Returning `false` writes nothing and leaves `head_` alone, so the caller can simply try again.
 - **What uses it next.** `false` → the caller retries. Otherwise line 33.
+
 **What breaks if you change it:**
 
 | change | result |
@@ -1158,6 +1162,7 @@ The starting state is the "push E" moment of the trace above: `head_ = 4`, `tail
   - *`release`:* promises that the 40 bytes written on line 33 are visible to any thread that reads `head_ = 5` with acquire. Without it, "after" in the source code is not a promise to another thread.
   - *`head + 1` from the local:* no need to read `head_` again; nobody else changes it.
 - **What uses it next.** The consumer's line 41 (`head_.load(acquire)`). Its `pop` can now read slot 0.
+
 **What breaks if you change it:**
 
 | change | result |
