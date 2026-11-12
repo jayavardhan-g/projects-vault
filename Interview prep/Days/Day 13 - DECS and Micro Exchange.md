@@ -761,6 +761,10 @@ distributions; the operational laws don't.
 
 #### 7.1 The picture
 
+**What this program is, in plain words.** An exchange receives **orders**: "buy 70 shares at 102 or less", "sell 40 at 101 or more", "cancel order 9". A **matching engine** is the part that decides who trades with whom. It keeps a **book** of orders that are waiting, and for each new order it checks whether a waiting order on the other side has a good enough price. If so, they trade. If not, the new order waits in the book.
+
+This engine has two threads on two cores. One thread (the **producer**) only receives commands. The other (the **matching thread**) is the only one that touches the book. They are joined by a queue (the ring). Before the matching thread changes the book it writes the command to a log on disk, so a crash can be undone.
+
 ```mermaid
 flowchart TB
   PR["producer thread, core A"] -->|"push: write slot, release-store head"| RB[("SPSC ring, 65,536 slots")]
@@ -771,6 +775,10 @@ flowchart TB
   OB --> IX[("IdTable: id → Order*")]
   OB --> POOL[("ObjectPool of Orders")]
 ```
+
+![[d13m-pipeline.svg]]
+
+*Animated, 6 steps, loops. It follows one command from the producer to the book. The text of each step is in the bar at the bottom of the figure.*
 
 #### 7.2 The data: the 40-byte Command
 
@@ -827,6 +835,45 @@ A **buy 70 @ 102** arrives; resting sells at 101 are S1 (40, the older) and S2 (
 | 3 | `out` → `records_[n]` in the mmap'd log | matching thread, `append` | 10 |
 | 4 | fields `id, side, price, qty` → `OrderBook::submit` | matching thread, `apply` | 9 |
 | 5 | `rdtsc() − c.tsc` → latency histogram | matching thread | 10 |
+
+#### 7.4 A whole session: ten commands, and the book after each
+
+This is one small session on one symbol. It uses every order type and every way an order can end. Follow the book column by column.
+
+The three order types (`OrdType`, `order.hpp:14`):
+- **Limit:** trade what you can at your price or better; whatever is left **rests** in the book.
+- **IOC** (immediate or cancel): trade what you can up to your price; whatever is left **expires**. It never rests.
+- **Market:** trade at any price; whatever is left expires. In code its price is set to the extreme (`kMaxPrice − 1` for a buy, `1` for a sell, `order_book.cpp:117`), so the price test always passes.
+
+An order's quantity can end in exactly four places: **filled**, **resting**, **cancelled** or **expired**.
+
+| # | command | what happens | asks after (oldest first) | bids after | best ask / best bid |
+|---|---|---|---|---|---|
+| 1 | New Sell Limit id 1, 40 @ 101 | nothing to match; rests | 101: [#1 40] | | 101 / none |
+| 2 | New Sell Limit id 2, 20 @ 101 | rests **behind** #1 (later arrival) | 101: [#1 40, #2 20] | | 101 / none |
+| 3 | New Sell Limit id 3, 50 @ 103 | rests | 101: [#1 40, #2 20]; 103: [#3 50] | | 101 / none |
+| 4 | New Buy Limit id 4, 30 @ 99 | best ask 101 > 99: no trade; rests | same | 99: [#4 30] | 101 / 99 |
+| 5 | New Sell Limit id **1**, 5 @ 105 | id 1 is already resting → **rejected**; 5 expires | same | same | 101 / 99 |
+| 6 | New Buy Limit id 9, 70 @ 102 | fills 40 with #1, 20 with #2 (both at 101); 10 rests | 103: [#3 50] | 102: [#9 10]; 99: [#4 30] | 103 / 102 |
+| 7 | Cancel id 9 | found by id, unlinked; 10 cancelled | 103: [#3 50] | 99: [#4 30] | 103 / 99 |
+| 8 | New Buy **IOC** id 10, 80 @ 103 | fills 50 with #3 at 103; the other 30 **expire** | empty | 99: [#4 30] | none / 99 |
+| 9 | New Sell **Market** id 11, 50 | fills 30 with #4 at 99; the other 20 expire | empty | empty | none / none |
+| 10 | Cancel id 2 | id 2 was filled in step 6, so it is not in the id table → returns `false` | empty | empty | none / none |
+
+("none" for the ask side is `best_ask_ = kMaxPrice`; for the bid side `best_bid_ = 0`. Those are the values the scans in `raise_best_ask` and `lower_best_bid` stop at.)
+
+**The four counters after each command.** A trade of x counts **2x** in `filled_qty_`: x for the buyer and x for the seller.
+
+| after # | submitted so far | filled | resting | cancelled | expired | sum |
+|---|---|---|---|---|---|---|
+| 4 | 140 | 0 | 140 | 0 | 0 | 140 ✓ |
+| 5 | 145 | 0 | 140 | 0 | 5 | 145 ✓ |
+| 6 | 215 | 120 | 90 | 0 | 5 | 215 ✓ |
+| 7 | 215 | 120 | 80 | 10 | 5 | 215 ✓ |
+| 8 | 295 | 220 | 30 | 10 | 35 | 295 ✓ |
+| 9 | 345 | 280 | 0 | 10 | 55 | 345 ✓ |
+
+`filled + resting + cancelled + expired == submitted` after **every** command. This is the conservation rule the fuzzer checks (the comment at `exchange.hpp:44–45` states it). If any line of the book loses or invents quantity, this sum breaks at once. Step 6 is the example Parts 8–10 trace in detail.
 
 ---
 
@@ -919,6 +966,10 @@ size_t head_cache_ = 0;  // consumer's view of head_
 | `head & (Capacity − 1)` | size_t | | the slot number for index `head` | 4 & 3 = 0 |
 | `head − tail` | size_t | | items currently in the ring | 3 |
 
+![[d13m-ring.svg]]
+
+*Animated, 10 steps, loops. It plays the ten rows of the table below: watch the two arrows chase each other around the four slots. The text of each step is in the bar at the bottom of the figure.*
+
 **Traced: nine calls on a ring of Capacity 4.** A cell in bold changed in that step.
 
 | call | own index read | cache test → reload? | slot used | `head_` | `tail_` | `tail_cache_` | `head_cache_` | `slots_[0…3]` | returns |
@@ -970,6 +1021,10 @@ tail_.store(tail + 1, std::memory_order_release);
 
 #### 8.5 Why ordering is needed at all
 
+![[d13m-ordering.svg]]
+
+*Animated, 5 steps, loops. Top lane: what may happen with no ordering rule. Bottom lane: the same steps with release and acquire. The text of each step is in the bar at the bottom of the figure.*
+
 Your code says "write the slot, then write head". Neither the compiler nor the CPU promises others will **see** it in
 that order:
 - the **compiler** may reorder two stores to different variables if this thread can't tell the difference;
@@ -1005,6 +1060,10 @@ The catch: when the consumer keeps up, the queue looks empty on almost every `po
 almost every time. The trick mostly helps the side that is rarely blocked.
 
 #### 8.8 False sharing
+
+![[d13m-falseshare.svg]]
+
+*Animated, 4 steps, loops. Left: `head_` and `tail_` on one cache line. Right: one line each. The text of each step is in the bar at the bottom of the figure.*
 
 Cores move memory in **64-byte cache lines**. To write a line, a core must own it exclusively, which invalidates every
 other core's copy. If `head_` and `tail_` sat on one line, each push would steal the line from the consumer and each
@@ -1209,6 +1268,10 @@ if (side == Side::Buy) {
 | `resting_qty_`, `filled_qty_` | uint64 | book-wide counters (used by the fuzzer's conservation check) | |
 | `trades_` | `vector<Trade>` | {buy id, sell id, price, qty} per fill, if recording is on | empty |
 
+![[d13m-match.svg]]
+
+*Animated, 8 steps, loops. The price ladder for the worked example, including the cancel that follows. The text of each step is in the bar at the bottom of the figure.*
+
 **Traced: buy 70 @ 102.**
 
 | step | test | `maker` | `x = min(qty, maker->qty)` | `qty` | `maker->qty` | `lvl.qty` | `filled` | then |
@@ -1237,6 +1300,10 @@ void OrderBook::erase_order(Order* o) {
     pool_.release(o);
 }
 ```
+
+![[d13m-unlink.svg]]
+
+*Animated, 6 steps, loops. A level with three orders: first the middle one is erased (both `if` branches), then the head (the `else` branch of line 84). The text of each step is in the bar at the bottom of the figure.*
 
 **Traced: `erase_order(S1)` on asks_[101] = [S1, S2].**
 
@@ -1343,6 +1410,64 @@ bool OrderBook::cancel(uint64_t id) {
 
 #### 9.8 The id table (open addressing with backward-shift delete)
 
+**What it is for.** `cancel(9)` arrives with only an id. The table answers "where is the `Order` with id 9?" in one or two steps, without walking any list.
+
+`src/order_book.cpp:26–47` (`upgrade-2026-10`)
+```cpp
+IdTable::IdTable(size_t capacity)
+    : keys_(round_up_pow2(capacity * 2), kEmpty),
+      vals_(keys_.size(), nullptr),
+      mask_(keys_.size() - 1) {}
+
+size_t IdTable::slot(uint64_t id) const { return mix(id) & mask_; }
+
+void IdTable::insert(uint64_t id, Order* o) {
+    size_t i = slot(id);
+    while (keys_[i] != kEmpty && keys_[i] != id) i = (i + 1) & mask_;
+    keys_[i] = id;
+    vals_[i] = o;
+}
+
+Order* IdTable::find(uint64_t id) const {
+    size_t i = slot(id);
+    while (keys_[i] != kEmpty) {
+        if (keys_[i] == id) return vals_[i];
+        i = (i + 1) & mask_;
+    }
+    return nullptr;
+}
+```
+
+**Variables and what they hold**
+
+| name | type | what it holds | toy (8 slots) | real (default `max_orders` = 2²⁰) |
+|---|---|---|---|---|
+| `keys_` | `vector<uint64_t>` | the order id stored in each slot; `kEmpty` = 0 means free (id 0 is never valid) | 8 entries | 2 × 2²⁰ = 2²¹ = 2,097,152 entries |
+| `vals_` | `vector<Order*>` | for the same slot, the pointer to that order | 8 entries | 2²¹ entries |
+| `mask_` | size_t | size − 1; `x & mask_` = `x % size` | 7 | 2²¹ − 1 |
+| `mix(id)` | uint64 | a scrambled copy of the id, so nearby ids land far apart | | |
+| `slot(id)` | size_t | the id's **home** slot: `mix(id) & mask_` | made up below | |
+| `i` | size_t | the slot being looked at; `(i + 1) & mask_` steps forward and wraps | | |
+
+The table has **two parallel arrays**: `keys_[i]` says who lives in slot i, `vals_[i]` says where that order is.
+
+**Traced on the toy.** Four ids A, B, C, D with homes 2, 2, 3, 5 (made up; real homes come from `mix`).
+
+| call | home | slots looked at | result | `keys_[0…7]` after |
+|---|---|---|---|---|
+| `insert(A)` | 2 | 2 (empty) | stored at 2 | `[–, –, A, –, –, –, –, –]` |
+| `insert(B)` | 2 | 2 (A) → 3 (empty) | stored at 3 | `[–, –, A, B, –, –, –, –]` |
+| `insert(C)` | 3 | 3 (B) → 4 (empty) | stored at 4 | `[–, –, A, B, C, –, –, –]` |
+| `insert(D)` | 5 | 5 (empty) | stored at 5 | `[–, –, A, B, C, D, –, –]` |
+| `find(C)` | 3 | 3 (B, not C) → 4 (C) | returns `vals_[4]` | |
+| `find(X)`, home 4 | 4 | 4 (C) → 5 (D) → 6 (empty) | returns `nullptr` | |
+
+A, B, C, D sit in one unbroken **run** (slots 2–5). A lookup walks the run from the home slot and stops at the first empty slot. So an empty slot **in the middle of a run** would hide everything after it. That is the whole problem of deleting.
+
+![[d13m-idtable.svg]]
+
+*Animated, 7 steps, loops. Step 3 shows the wrong way to erase; steps 4–7 show the backward shift that `IdTable::erase` does. The text of each step is in the bar at the bottom of the figure.*
+
 The table is one array of keys. An id's **home** slot is `mix(id) & mask`. If it's taken, try the next slot, and so
 on (**linear probing**). A lookup walks from the home slot until it finds the id or an **empty** slot.
 
@@ -1372,6 +1497,10 @@ keys_[i] = kEmpty;
 - `& mask_` makes the distances wrap correctly around the end of the array.
 
 #### 9.9 The object pool
+
+![[d13m-pool.svg]]
+
+*Animated, 6 steps, loops. Four pre-allocated nodes and the stack of pointers to the free ones. The text of each step is in the bar at the bottom of the figure.*
 
 ```cpp
 T* acquire() { return top_ > 0 ? free_[--top_] : nullptr; }
@@ -1563,6 +1692,10 @@ bool append(const Command& c) {
 | `max_records_` | uint64 | the segment's capacity in records | | |
 | `records_` | `Command*` into the mmap'd file | the record array; record i is 40 bytes at `records_[i]` | | |
 
+![[d13m-wal.svg]]
+
+*Animated, 5 steps, loops. It shows the file after each line of `append`, what a reader would see, and what a crash at that moment would mean. The text of each step is in the bar at the bottom of the figure.*
+
 **Traced: appending to a segment that holds 2 records.**
 
 | line | what runs | file after | what a reader sees |
@@ -1594,6 +1727,10 @@ So the honest claim is **crash recovery from process crashes**, not power-loss d
 file, so the first touch of each page faults; `posix_fallocate` would reserve the blocks up front.
 
 #### 10.5 Segments, snapshots and the follower
+
+![[d13m-segments.svg]]
+
+*Animated, 6 steps, loops. Two segments passing through Active, Sealed and Free, and which thread makes each change. The text of each step is in the bar at the bottom of the figure.*
 
 A log can't grow forever. Every so often a **snapshot** captures the whole book, and log records it covers can be
 dropped.
@@ -1646,6 +1783,10 @@ for (const WalContents& s : segs) {
 | `end` | uint64 | one past the segment's last sequence number | 52,345 |
 | `i` | uint64 | index inside the segment of the first record not yet applied | 0 |
 | `r.replayed` | counter | commands replayed | 12,345 |
+
+![[d13m-recover.svg]]
+
+*Animated, 6 steps, loops. The red line is `r.seq`: how much of the history the rebuilt book contains so far. The text of each step is in the bar at the bottom of the figure.*
 
 **Traced: snapshot at 60,000, segment A (base 50,000, 15,000 records), segment B (base 65,000, 2,000 records).**
 
