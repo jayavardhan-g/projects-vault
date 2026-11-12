@@ -905,7 +905,101 @@ Because the counters never wrap back to 0, "full" and "empty" never look the sam
 ring, index 70,000 lands in slot 70,000 & 65,535 = **4,464**. A 64-bit counter at 10 M pushes per second overflows after
 about **58,000 years**.
 
-#### 8.3 The code
+#### 8.3 Before the code: the C++ these lines are made of
+
+The ring's code looks strange because almost every word in it is about **two threads touching the same memory**. This section explains each word once. The line-by-line walk comes right after.
+
+##### Idea 1: two threads, one variable
+
+The producer thread and the matching thread run **at the same time**, on two different cores. Most variables belong to one thread. A few are **shared**: both threads can reach them. In the ring the shared things are `head_`, `tail_` and the slots.
+
+Sharing is where things go wrong, because C++ has a hard rule: if one thread **writes** a plain variable while another thread **reads** it, that is a **data race**, and the program's behaviour is undefined. "Undefined" is not a figure of speech. The compiler is allowed to assume it never happens, and to optimise on that assumption.
+
+![[d13x-stale.svg]]
+
+*Animated, 4 steps, loops. It shows a consumer loop on a plain variable being turned into a loop that never ends. The text of each step is in the bar at the bottom.*
+
+##### Idea 2: `std::atomic<size_t>`
+
+`std::atomic<T>` is a wrapper that makes one variable **safe to read in one thread while another thread writes it**. The declaration in this ring is:
+
+```cpp
+alignas(kCacheLine) std::atomic<size_t> head_{0};
+```
+
+Read it from the inside out:
+
+| piece | meaning |
+|---|---|
+| `size_t` | an unsigned 64-bit whole number (0 … 1.8 × 10¹⁹). Used for counts and array positions. |
+| `std::atomic<size_t>` | a `size_t` that two threads may read and write at once without a data race |
+| `head_` | its name. The trailing `_` is this code's way of marking a **member** of the class (it lives in the ring object, not in one function call) |
+| `{0}` | it starts at 0 |
+| `alignas(kCacheLine)` | put it at the start of its own 64-byte cache line (see *False sharing* below) |
+
+An atomic gives two promises. A reader never sees a half-written value. And the compiler must really read memory each time you ask, so the loop in the figure can't go stale.
+
+##### Idea 3: `.load()` and `.store()`
+
+You can't use an atomic like a normal variable in this code. You go through two functions:
+
+| call | what it does | plain-variable equivalent |
+|---|---|---|
+| `head_.load(order)` | **read** the shared value and return a copy | `x = head_;` |
+| `head_.store(v, order)` | **write** `v` into the shared value | `head_ = v;` |
+
+So `const size_t head = head_.load(...)` means: *read the shared counter once, and keep the answer in my own private variable called `head`*.
+
+![[d13x-load.svg]]
+
+*Animated, 4 steps, loops. The blue box is shared memory; the yellow box is the function's own copy. The text of each step is in the bar at the bottom.*
+
+Note the two names. **`head_`** (with the underscore) is the shared atomic. **`head`** (no underscore) is the private copy inside one call of `push`. They are different variables.
+
+##### Idea 4: the argument, `std::memory_order_...`
+
+Reading the number itself is always safe with an atomic. The argument answers a second question: **what else is guaranteed along with this read or write?**
+
+Think of a letterbox with a flag. The producer puts a letter in the box (writes the slot), then raises the flag (stores `head_`). The consumer looks at the flag (loads `head_`), then opens the box (reads the slot). The flag is only useful if "flag up" really means "the letter is completely inside".
+
+| order | used on | the promise | in the letterbox picture | where the ring uses it |
+|---|---|---|---|---|
+| `memory_order_relaxed` | load or store | **none** beyond the number itself | just glancing at your own notebook | reading your **own** index (lines 28, 39) |
+| `memory_order_release` | a store | everything I wrote **before** this store is visible to whoever reads this value | "I raise the flag only after the letter is fully in" | publishing `head_` (34) and `tail_` (45) |
+| `memory_order_acquire` | a load | if I read a released value, I also see everything written before that release | "I check the flag before I open the box" | reading the **other** side's index (30, 41) |
+| `memory_order_seq_cst` | load or store | all of the above, plus one global order for every such operation | a single shared logbook everyone signs | not used here; it is what you get if you write nothing |
+
+A release store and the acquire load that reads it form a pair. That pair is the only thing that carries a guarantee from one thread to the other.
+
+##### Idea 5: `const` and the private copy
+
+`const size_t head` says the copy can't be changed after it is made. Nothing in `push` needs to change it: the function computes `head + 1` and stores that into the shared `head_`. `const` lets the compiler stop you if you try.
+
+##### Idea 6: `index & (Capacity − 1)`
+
+`&` is bitwise AND: a result bit is 1 only where both inputs have a 1. With Capacity 4, `Capacity − 1` is 3, binary `011`. ANDing with it keeps the lowest two bits and drops the rest:
+
+| index | binary | `& 011` | slot |
+|---|---|---|---|
+| 0 | 000 | 000 | 0 |
+| 1 | 001 | 001 | 1 |
+| 2 | 010 | 010 | 2 |
+| 3 | 011 | 011 | 3 |
+| 4 | **1**00 | 000 | 0 |
+| 5 | **1**01 | 001 | 1 |
+| 6 | **1**10 | 010 | 2 |
+| 7 | **1**11 | 011 | 3 |
+
+That is the same as `index % 4`, but one cheap instruction instead of a division. It works **only** when Capacity is a power of two. With Capacity 6, `Capacity − 1` is 5, binary `101`, and indices 0…7 would land on slots 0, 1, 0, 1, 4, 5, 4, 5. Slots 2 and 3 are never used, and index 2 overwrites the unread item of index 0.
+
+##### Idea 7: `bool`, `const T&` and `T&`
+
+- `bool push(...)` returns `true` (done) or `false` (the ring is full, nothing was written). The caller decides what to do with `false`; here it tries again.
+- `T` is a placeholder type. In this engine `T` is `Command`, the 40-byte struct of Part 7.
+- `const T& item` is a **reference**: `push` looks at the caller's command where it already is, with no copy, and promises not to change it.
+- `T& out` (in `pop`) is a reference the function **writes through**: the popped command lands in the caller's variable.
+
+#### 8.4 The code
 
 `include/core/ring_buffer.hpp:27–47` (`upgrade-2026-10`)
 ```cpp
@@ -990,36 +1084,140 @@ Read three things off the table:
 - The second pop did not read `head_` at all: its cached copy (4) already showed items waiting.
 - Push G fails with 4 items in 4 slots: no slot is wasted, because the counters never wrap.
 
-#### 8.4 Push and pop, line by line (the "push E" step)
+#### 8.5 Every line of push: what it does, why, what uses it, what breaks
 
-State: Capacity 4, head = 4, tail = 1 (the consumer just popped A), and the producer's cached `tail_cache_ = 0`.
+![[d13x-push.svg]]
+
+*Animated, 8 steps, loops. The code is on the left with the running line highlighted; the variables are on the right, and the one that just changed is red. The text of each step is in the bar at the bottom.*
+
+The starting state is the "push E" moment of the trace above: `head_ = 4`, `tail_ = 1` (the consumer just popped A), and the producer's `tail_cache_` is still 0.
+
+##### Line 28: `const size_t head = head_.load(std::memory_order_relaxed);`
+
+- **What it does.** Reads the shared counter `head_` (4) once and keeps a private copy, `head = 4`.
+- **Why it is written this way.**
+  - *A private copy:* the function needs this number three more times. One read, then a local, is cheaper and can't change under it.
+  - *`relaxed`:* the producer is the **only** thread that ever writes `head_`. A thread always sees its own last write, so it needs no promise about anyone else.
+- **What uses it next.** Line 29 and 31 (`head − tail_cache_`), line 33 (`head & (Capacity − 1)`), line 34 (`head + 1`).
+**What breaks if you change it:**
+
+| change | result |
+|---|---|
+| use `acquire` or the default instead of `relaxed` | still correct. It only asks for a promise nobody needs. |
+| no local; call `head_.load()` at each use | still correct with one producer, but four reads instead of one |
+| declare `head_` as a plain `size_t` | a data race with the consumer, which reads it on line 41. Undefined behaviour; the figure in 8.3 shows one real outcome. |
+
+##### Line 29: `if (head - tail_cache_ >= Capacity) {`
+
+- **What it does.** Counts the items the producer *believes* are in the ring: pushed minus popped = 4 − 0 = 4. Four items in four slots: it looks full.
+- **Why it is written this way.** `tail_cache_` is the producer's **old copy** of the consumer's counter. Using it avoids touching `tail_`, a variable the other core keeps writing (expensive: see *Cached indices*). The old copy can only be **too small**, because `tail_` only grows. So the count can only be **too big**. The mistake is always on the safe side: "looks full" when it isn't, never "has room" when it doesn't.
+- **What uses it next.** If false (the common case), jump straight to line 33: no shared read at all. If true, lines 30–31 check properly.
+**What breaks if you change it:**
+
+| change | result |
+|---|---|
+| `>` instead of `>=` | allows a fifth item into four slots: it overwrites an item that was never read |
+| delete the cache and always load `tail_` | still correct, but every push pulls a cache line from the other core |
+
+##### Line 30: `tail_cache_ = tail_.load(std::memory_order_acquire);`
+
+- **What it does.** Reads the consumer's real counter (1) and refreshes the copy: `tail_cache_ = 1`.
+- **Why it is written this way.** This is the **acquire** half of a pair. The consumer stores `tail_` with **release** on line 45, *after* it has finished copying a slot out. So when the producer sees `tail_ = 1` here, it also knows the consumer is completely done with slot 0. Only then is it safe to write into slot 0 again.
+- **What uses it next.** Line 31 re-checks with the fresh value. The refreshed copy is also kept for later pushes.
+**What breaks if you change it:**
+
+| change | result |
+|---|---|
+| delete the line | the copy stays 0 for ever. After 4 pushes (65,536 in the real ring) every push returns `false`, even if the consumer has emptied the ring. The producer is stuck. |
+| `relaxed` instead of `acquire` | the producer learns the number, but gets no promise that the consumer's copy-out of that slot is finished. Line 33 could overwrite a slot that is still being read. |
+
+##### Line 31: `if (head - tail_cache_ >= Capacity) return false;`
+
+- **What it does.** Counts again with the fresh value: 4 − 1 = 3, which is less than 4. There is room, so it goes on. Had it still been 4, the ring would be **really** full and the function would stop here.
+- **Why it is written this way.** The first test used an old number. This one is the real decision. Returning `false` writes nothing and leaves `head_` alone, so the caller can simply try again.
+- **What uses it next.** `false` → the caller retries. Otherwise line 33.
+**What breaks if you change it:**
+
+| change | result |
+|---|---|
+| delete the line | a push into a truly full ring writes the slot anyway. Example: `head = 6`, `tail = 2`: slot 6 & 3 = 2 still holds C, unread. C is lost. |
+| wait in a loop here instead of returning | works, but then `push` can block. Returning `false` leaves the choice to the caller. |
+
+##### Line 33: `slots_[head & (Capacity - 1)] = item;`
+
+- **What it does.** Picks slot 4 & 3 = **0** and copies the 40 bytes of the command into it. The old bytes of A, already popped, are overwritten.
+- **Why it is written this way.** `head & (Capacity − 1)` turns the ever-growing counter into a position in the array (Idea 6). `=` on a `Command` is a plain 40-byte copy, which is why `Command` has to be a simple struct.
+- **What uses it next.** Nothing yet. `head_` is still 4, so the consumer believes only indices 1–3 exist. The new bytes are in memory but **invisible**.
+- **What breaks if you change it.** See line 34: the two lines are a pair, and their order is the whole point.
+
+##### Line 34: `head_.store(head + 1, std::memory_order_release);`
+
+- **What it does.** Writes 5 into the shared `head_`. This is the moment E becomes visible to the consumer.
+- **Why it is written this way.**
+  - *After line 33:* first the letter goes in the box, then the flag goes up.
+  - *`release`:* promises that the 40 bytes written on line 33 are visible to any thread that reads `head_ = 5` with acquire. Without it, "after" in the source code is not a promise to another thread.
+  - *`head + 1` from the local:* no need to read `head_` again; nobody else changes it.
+- **What uses it next.** The consumer's line 41 (`head_.load(acquire)`). Its `pop` can now read slot 0.
+**What breaks if you change it:**
+
+| change | result |
+|---|---|
+| put it **before** line 33 | the consumer can see `head_ = 5` and read slot 0 before E is there (figure below) |
+| `relaxed` instead of `release` | the two writes (slot, `head_`) are to unrelated places, so the compiler or CPU may let the `head_` write become visible first. Same failure as the swap. |
+| delete the line | the slot is written but never announced. The consumer waits for ever. |
+
+![[d13x-swap.svg]]
+
+*Animated, 5 steps, loops. The two lines of `push` in the wrong order: one command is applied twice and one is lost. The text of each step is in the bar at the bottom.*
+
+##### Line 35: `return true;`
+
+- **What it does.** Tells the caller the command is in the ring.
+- **What uses it next.** The caller moves on to its next command. With `false` (line 31) it would call `push` again with the same command.
+
+#### 8.6 Every line of pop: the mirror image
+
+![[d13x-pop.svg]]
+
+*Animated, 8 steps, loops. The first `pop` of the trace: the ring holds A B C D and the consumer's copy of head is still 0. The text of each step is in the bar at the bottom.*
+
+`pop` is `push` seen in a mirror. Swap the roles: `tail` for `head`, "empty" for "full", "read the slot" for "write the slot".
+
+| line | code | what it does | why it is written this way | what breaks without it |
+|---|---|---|---|---|
+| 39 | `const size_t tail = tail_.load(relaxed);` | private copy of the consumer's **own** counter | only the consumer writes `tail_`, so no promise is needed | a plain `tail_` would race with the producer's line 30 |
+| 40 | `if (tail == head_cache_) {` | "have I read everything I know about?" using the **old copy** of head | avoids touching `head_`, which the producer keeps writing. The old copy can only be too small, so the mistake is "looks empty", never "reads a slot that was not written". | skip this test and it would read slots that were never written |
+| 41 | `head_cache_ = head_.load(acquire);` | refresh the copy from the producer's real counter | the **acquire** half of the pair with line 34: seeing the new head means the slot bytes are visible too | deleted: the consumer never learns about new items and returns `false` for ever. `relaxed`: it may read a half-written command. |
+| 42 | `if (tail == head_cache_) return false;` | still equal → really empty; give up for now | the caller decides whether to spin, pause or exit | deleted: it would read a slot nobody wrote and hand garbage to the book |
+| 44 | `out = slots_[tail & (Capacity - 1)];` | copy the 40 bytes out into the caller's variable | a **copy**, not a pointer into the ring: once `tail_` moves, the producer may overwrite the slot | returning a pointer instead would let the producer overwrite the command while the book is still using it |
+| 45 | `tail_.store(tail + 1, release);` | give the slot back to the producer | *after* line 44, with **release**: the producer's acquire on line 30 then knows the copy-out is finished | before line 44, or `relaxed`: the producer may overwrite the slot mid-copy |
+| 46 | `return true;` | `out` holds a command | | |
+
+**Who calls it** (`matching_engine.hpp:35–46`):
 
 ```cpp
-const size_t head = head_.load(std::memory_order_relaxed);
-if (head - tail_cache_ >= Capacity) {
-    tail_cache_ = tail_.load(std::memory_order_acquire);
-    if (head - tail_cache_ >= Capacity) return false;
+for (;;) {
+    if (q.pop(c)) {
+        apply(c);
+    } else if (producer_done.load(std::memory_order_acquire) && q.empty()) {
+        break;
+    } else {
+        cpu_pause();
+    }
 }
-slots_[head & (Capacity - 1)] = item;
-head_.store(head + 1, std::memory_order_release);
 ```
-- `head = 4`, loaded **relaxed**: only this thread writes `head_`, so it always sees its own last value.
-- `4 − 0 ≥ 4`: it *looks* full by the stale cached tail. So it reloads the real `tail_` with **acquire** → 1.
-- `4 − 1 = 3 < 4`: there is room. Write E into slot `4 & 3 = 0`.
-- Publish: `head_ = 5` with **release**.
 
-```cpp
-const size_t tail = tail_.load(std::memory_order_relaxed);
-if (tail == head_cache_) {
-    head_cache_ = head_.load(std::memory_order_acquire);
-    if (tail == head_cache_) return false;
-}
-out = slots_[tail & (Capacity - 1)];
-tail_.store(tail + 1, std::memory_order_release);
-```
-- The consumer, with tail = 1 and `head_cache_ = 4`: 1 ≠ 4, so items remain and it **doesn't touch** `head_` at all. It copies slot `1 & 3 = 1` (B), then publishes tail = 2 with release.
+- `pop` returned `true` → `apply(c)` logs the command and changes the book (Parts 10 and 9).
+- `pop` returned `false` → if the producer has said it is finished and the ring is empty, stop. Otherwise `cpu_pause()` (a hint to the CPU that this is a short wait) and go round again. The matching thread never sleeps: it **spins**, so it reacts within nanoseconds, at the price of one core running at 100%.
 
-#### 8.5 Why ordering is needed at all
+**The two pairs, side by side.** Each shared counter has one writer, and each is written with release and read by the other side with acquire:
+
+| counter | written on | with | read by the other side on | with | the guarantee it carries |
+|---|---|---|---|---|---|
+| `head_` | line 34 (producer) | release, after writing the slot | line 41 (consumer) | acquire, before reading the slot | "the command is completely in the slot" |
+| `tail_` | line 45 (consumer) | release, after copying the slot out | line 30 (producer) | acquire, before reusing the slot | "I have finished reading that slot" |
+
+#### 8.7 Why ordering is needed at all
 
 ![[d13m-ordering.svg]]
 
@@ -1032,7 +1230,7 @@ that order:
 
 Without a rule, the consumer could see head = 5 **before** E's 40 bytes arrive, and copy a half-written command.
 
-#### 8.6 Release and acquire
+#### 8.8 Release and acquire
 
 ![[d13-5-ordering.svg]]
 
@@ -1051,7 +1249,7 @@ The pair runs in **both** directions:
 they only stop the *compiler* from reordering. `seq_cst` (the default) would make each store an `xchg` or
 `mov + mfence`: a full fence on every push. On ARM, release and acquire become `stlr`/`ldar`.
 
-#### 8.7 Cached indices
+#### 8.9 Cached indices
 
 Reading the *other* side's index means pulling a cache line the other core keeps writing: slow. So each side keeps a
 private copy (`tail_cache_`, `head_cache_`) and reloads the real one only when its copy says "full" or "empty".
@@ -1059,7 +1257,7 @@ private copy (`tail_cache_`, `head_cache_`) and reloads the real one only when i
 The catch: when the consumer keeps up, the queue looks empty on almost every `pop`, so the consumer reloads `head_`
 almost every time. The trick mostly helps the side that is rarely blocked.
 
-#### 8.8 False sharing
+#### 8.10 False sharing
 
 ![[d13m-falseshare.svg]]
 
@@ -1073,9 +1271,18 @@ pop would steal it back, even though they write different variables. That is **f
 separate lines, so each line has one writer. Not covered: the slots. A `Command` is 40 bytes, so neighbouring slots
 share lines, and a nearly empty queue has both cores touching the same slot lines.
 
+**The four declarations, line by line** (`ring_buffer.hpp:59–65`):
+
+| line | what it does | why it is written this way | what breaks without it |
+|---|---|---|---|
+| `alignas(kCacheLine) std::atomic<size_t> head_{0};` | starts `head_` on a fresh 64-byte line | the producer writes it on every push | without `alignas`, `head_` and `tail_` (8 bytes each) would sit side by side on one line: the ping-pong in the figure. Still correct, just slow. |
+| `size_t tail_cache_ = 0;` | the producer's private copy; placed right after `head_`, so on the **same** line | only the producer touches both, so sharing a line costs nothing | it is a plain `size_t` on purpose: one thread only, so no atomic is needed |
+| `alignas(kCacheLine) std::atomic<size_t> tail_{0};` | starts `tail_` on the **next** line | the consumer writes it on every pop | as above |
+| `size_t head_cache_ = 0;` | the consumer's private copy, on `tail_`'s line | only the consumer touches both | |
+
 **Where the output goes.** `pop` fills `out`, a `Command`. The matching thread's `run` loop hands it to `MatchingEngine::apply` (Part 10, `matching_engine.hpp:24`), which logs it and then calls the book (Part 9).
 
-#### 8.9 What the handoff costs (the server numbers)
+#### 8.11 What the handoff costs (the server numbers)
 
 | path | commands/s | ns per command |
 |---|---|---|
@@ -1087,7 +1294,7 @@ command (the consumer reloads `head_`, then reads the freshly written slot). On 
 costs ~100 ns or more. This is a **hypothesis**: never profiled. Throughput stayed flat at 3.2–3.4 M while the book
 grew 20×, which says the book isn't the limit.
 
-#### 8.10 Questions people usually ask next
+#### 8.12 Questions people usually ask next
 
 ##### "Why not just use `seq_cst` everywhere?"
 
@@ -1109,7 +1316,7 @@ gateways need a ring each, or an MPSC queue with compare-and-swap.
 Honestly: by reasoning. The fuzzer is single-threaded, and there's no TSan run in the repo. A test that "passes on x86"
 proves little, because x86 hides most reorderings that ARM would expose.
 
-#### 8.11 Check your understanding
+#### 8.13 Check your understanding
 
 1. Capacity 8, head = 21, tail = 14. How many items? Which slot does the next push use? Is it full?
 2. Why must Capacity be a power of two?
@@ -1130,7 +1337,7 @@ proves little, because x86 hides most reorderings that ARM would expose.
 > [!success]- Answer to 7
 > 6 − 2 = 4 items (C, D, E, F); the next pop reads slot 2 & 3 = 2, which holds C.
 
-#### 8.12 The five things to remember
+#### 8.14 The five things to remember
 
 1. **SPSC:** one writer per index → no lock; indices only grow; slot = i & (Capacity − 1); size = head − tail.
 2. **Order of operations:** write slot → release head; acquire head → read slot (and the mirror pair on tail).
@@ -1286,6 +1493,27 @@ if (side == Side::Buy) {
 
 Both trades execute at **101**, the maker's price, although the buyer offered 102. `filled_qty_` rose by 2 × 60 = 120 (both sides counted).
 
+![[d13x-match.svg]]
+
+*Animated, 16 steps, loops. The same trace as the table, but with the code beside it: the highlighted line is the one running. The text of each step is in the bar at the bottom.*
+
+**Every line: what it does, why it is there, what breaks without it.**
+
+| line | code | what it does | why it is written this way | what breaks without it |
+|---|---|---|---|---|
+| 127 | `while (qty > 0 && best_ask_ <= price)` | keep going while I still want something **and** the cheapest seller is cheap enough | two separate reasons to stop: I am filled, or the prices no longer cross | drop the price test: a limit buy pays any price. Drop `qty > 0`: with nothing left to fill, the loop never ends. |
+| 128 | `Level& lvl = asks_[best_ask_];` | `lvl` is a second **name** for the level at the best ask price | the `&` makes it a reference, not a copy: `asks_` is an array indexed by price, so this is one array step | without `&`, `lvl` is a copy. Line 134 would change the copy, and line 142 would test a stale `head` that points at an order already erased. |
+| 129 | `while (qty > 0 && lvl.head)` | keep going while someone is still waiting at this price | a pointer counts as "true" when it is not null | |
+| 130 | `Order* maker = lvl.head;` | take the **oldest** order at this price | the head is the oldest because `rest` always appends at the tail. This one line is time priority. | take `lvl.tail` instead and the newest order trades first |
+| 131 | `const uint64_t x = std::min(qty, maker->qty);` | the size of this trade: the smaller of what I want and what the maker has | neither side may trade more than it has | without `min`: `qty -= 40` when `qty` is 30 wraps round (unsigned) to about 1.8 × 10¹⁹. The order would then try to buy the whole book. |
+| 132 | `qty -= x;` | what I still want | | |
+| 133 | `maker->qty -= x;` | what the maker still has. `->` means "the field of the thing this pointer points at" | | |
+| 134 | `lvl.qty -= x;` | the level's running total | kept so "how much rests at 101?" is one read, not a walk of the list | the total drifts away from the real orders; the fuzzer's comparison with the naive engine catches it |
+| 135–137 | `resting_qty_ -= x; filled_qty_ += 2 * x; filled += x;` | the book-wide counters, and this order's own fill | `2 * x`: the buyer filled x and the seller filled x | the conservation sum of Part 7.4 stops balancing |
+| 138–139 | `if (record_trades_) trades_.push_back(...)` | write the trade down, only if asked | a growing vector can allocate memory, so benchmarks switch recording off | |
+| 140 | `if (maker->qty == 0) erase_order(maker);` | a fully filled order leaves the book | a partly filled maker stays at the head and keeps its place in the queue | the empty maker stays at the head. Next round `x = min(qty, 0) = 0`, nothing changes, and the loop never ends. |
+| 142 | `if (lvl.head == nullptr) raise_best_ask();` | the level is used up: find the next price with sellers | `best_ask_` is a cached answer; it is recomputed only when its level empties | `best_ask_` keeps pointing at an empty level. The inner loop is skipped, the outer test stays true, and the loop never ends. |
+
 **Where the output goes.** Two things leave the loop. `qty = 10` is still unfilled: line 164 passes it to `rest` (9.6). `filled = 60` is returned to `Exchange::apply`.
 
 #### 9.5 The code: unlinking a filled order
@@ -1315,6 +1543,16 @@ void OrderBook::erase_order(Order* o) {
 | 87 | | `pool_.release(S1)`: the node returns to the pool (9.9) | |
 
 Then `erase_order(S2)`: `prev` null → `lvl.head = null`; `next` null → `lvl.tail = null`. The level is empty.
+
+**Every line: what it does, why it is there, what breaks without it.**
+
+| line | code | what it does | why it is written this way | what breaks without it |
+|---|---|---|---|---|
+| 83 | `Level& lvl = (o->side == Side::Buy ? bids_ : asks_)[o->price];` | finds the level this order sits in, from the order's own `side` and `price` | `a ? b : c` picks `b` if `a` is true, else `c`. The order knows where it lives, so no search. | |
+| 84 | `if (o->prev) o->prev->next = o->next; else lvl.head = o->next;` | fixes the link that points **at** `o` from the older side | two cases: there is an older order (skip over `o`), or `o` was the head (the level's `head` moves on) | without the `else`: `lvl.head` keeps pointing at `o`. Line 87 gives that node back to the pool, the next `rest` reuses it for a different order, and level 101's head now points into some other level. |
+| 85 | `if (o->next) o->next->prev = o->prev; else lvl.tail = o->prev;` | the same from the newer side | symmetric: a newer order exists, or `o` was the tail | without the `else`: `lvl.tail` is stale. The next `rest` links the new order behind a dead node, so it can never be reached from the head and never trades. |
+| 86 | `index_.erase(o->id);` | forgets the id | so `cancel(id)` later returns `false` instead of finding a stale pointer | a later `cancel` of this id would follow the old pointer and cancel whatever order now lives in that reused node |
+| 87 | `pool_.release(o);` | gives the node back | last, because lines 83–86 still read `o`'s fields | the pool loses one node per filled order. When it runs dry, `rest` refuses every new order. |
 
 Each `Order` carries its own `prev`/`next` (an *intrusive* list), so removing it is two pointer fixes. No search, no allocation.
 
@@ -1351,6 +1589,18 @@ bool OrderBook::rest(uint64_t id, Side side, int64_t price, uint64_t qty) {
     return true;
 }
 ```
+
+**Every line of `rest`: what it does, why it is there, what breaks without it.**
+
+| line | code | what it does | why it is written this way | what breaks without it |
+|---|---|---|---|---|
+| 91–92 | `Order* o = pool_.acquire(); if (!o) return false;` | takes a pre-made node; gives up if none is left | no `new` on the matching path (9.9) | without the check, line 93 writes through a null pointer: a crash |
+| 93 | `*o = Order{id, price, qty, side, nullptr, nullptr};` | fills in every field. `*o` means "the node `o` points at". | the node is **reused**: it still holds the fields and links of its previous order | stale `prev`/`next` from the node's last life would splice this order into the wrong list |
+| 95 | `Level& lvl = ...[price];` | the level for this price, by reference | | |
+| 96–98 | `o->prev = lvl.tail; if (lvl.tail) lvl.tail->next = o; else lvl.head = o; lvl.tail = o;` | appends at the **tail** | newest at the tail keeps the head the oldest: time priority | insert at the head instead and the newest order would trade first |
+| 100–101 | `lvl.qty += qty; resting_qty_ += qty;` | the level total and the book total | | the conservation sum breaks |
+| 102 | `index_.insert(id, o);` | remembers id → node | `cancel` needs it | the order could never be cancelled: `cancel` returns `false` |
+| 106–110 | `if (price > best_bid_) best_bid_ = price;` (or the ask mirror) | updates the cached best price, only if this order is better | most orders don't improve the best, so this is usually one failed comparison | `best_bid_` stays 99 while an order rests at 102. A sell at 101 tests `99 >= 101`, sees no match, and rests: the book is now crossed (a buyer at 102 and a seller at 101 that never traded). |
 
 Line 164 reads: if something is left, a **Limit** order tries to rest it; a Market or IOC order never rests. Whatever cannot rest is counted as expired.
 
@@ -1405,6 +1655,16 @@ bool OrderBook::cancel(uint64_t id) {
 | 176–178 | the counters | bids_[102].qty = 0; `cancelled_qty_` += 10 |
 | 179 | `erase_order(N)` | head = null, tail = null; id 9 leaves the table; N returns to the pool |
 | 181–182 | level empty, Buy, 102 == `best_bid_` | `lower_best_bid`: 102 → 101 → 100 → **99** (B1 rests there) |
+
+**Every line of `cancel`: what it does, why it is there, what breaks without it.**
+
+| line | code | what it does | why it is written this way | what breaks without it |
+|---|---|---|---|---|
+| 170–171 | `Order* o = index_.find(id); if (!o) return false;` | id → node, or "no such resting order" | the order may already be filled, cancelled, or never have existed. All three look the same: not in the table. | without the check: a null pointer is used on line 173 |
+| 173–174 | `const Side side = o->side; const int64_t price = o->price;` | copies two fields into locals | line 179 gives the node back; after that `o->side` and `o->price` belong to nobody | reading `o->price` on line 182 would read a node that may already describe another order |
+| 176–178 | `lvl.qty -= o->qty; resting_qty_ -= o->qty; cancelled_qty_ += o->qty;` | moves the quantity from "resting" to "cancelled" | | the conservation sum breaks |
+| 179 | `erase_order(o);` | the same unlink as a fill | one function for both ways an order leaves | |
+| 181–184 | `if (lvl.head == nullptr) { ... lower_best_bid(); ... }` | if that was the last order at the **best** price, find the new best | only then can the best price have changed | `best_bid_` would name an empty price until the next sell arrives (the match loop's own rescan would then repair it) |
 
 `side` and `price` are copied **before** `erase_order`, because the node goes back to the pool and may be reused.
 
@@ -1496,6 +1756,17 @@ keys_[i] = kEmpty;
 - In the figure: hole i = 2. B at j = 3 with home 2: 1 ≥ 1, so it moves; the hole becomes 3. C at j = 4 with home 3: 1 ≥ 1, it moves; hole = 4. D at j = 5 is at home: 0 ≥ 1 fails, so it stays. Slot 6 is empty: stop, and empty slot 4.
 - `& mask_` makes the distances wrap correctly around the end of the array.
 
+**The key lines of `erase`: what each does and what breaks.**
+
+| code | what it does | why it is written this way | what breaks if changed |
+|---|---|---|---|
+| `while (keys_[i] != id) { if (keys_[i] == kEmpty) return; i = (i + 1) & mask_; }` | walks from the home slot to the id; stops if it meets an empty slot (the id is not there) | the same walk as `find` | |
+| `for (j = (i + 1) & mask_; keys_[j] != kEmpty; j = (j + 1) & mask_)` | visits every later key in the same run | the run ends at the first empty slot, so the loop always stops | |
+| `const size_t home = slot(keys_[j]);` | where that key **wants** to live | needed to know whether moving it back is allowed | |
+| `if (((j - home) & mask_) >= ((j - i) & mask_))` | "is this key at least as far from its home as the hole is behind it?" | if yes, the hole lies between the key's home and the key, so the key may drop back into it | always move: a key lands **before** its home, and `find` (which starts at the home) never sees it. Never move: the hole cuts the run (step 3 of the figure). |
+| `keys_[i] = keys_[j]; vals_[i] = vals_[j]; i = j;` | moves the key and its pointer into the hole; the hole is now where the key was | both arrays move together, or an id would point at the wrong order | |
+| `keys_[i] = kEmpty; vals_[i] = nullptr;` | marks the final hole empty | a real empty slot, not a tombstone | with tombstones the table slowly fills with "deleted" marks and a failed lookup never finds an empty slot to stop at (story S4) |
+
 #### 9.9 The object pool
 
 ![[d13m-pool.svg]]
@@ -1509,6 +1780,13 @@ void release(T* p) { free_[top_++] = p; }
 - All `capacity` orders are allocated once in the constructor. `free_` is a stack of pointers to unused ones; `top_` counts them.
 - Capacity 4: `top_ = 4`. `acquire()` returns `free_[3]`, `top_ = 3`. Releasing it puts it back at `free_[3]`, `top_ = 4`. The next `acquire()` returns **the same node**, still hot in the cache (LIFO reuse).
 - An empty pool returns `nullptr`, and `rest` **refuses** the order (counted as expired) instead of allocating.
+
+**The two lines, piece by piece.**
+
+| code | what it does | why it is written this way | what breaks if changed |
+|---|---|---|---|
+| `top_ > 0 ? free_[--top_] : nullptr` | if any node is free: lower `top_` by one, then return the pointer at that position. Else return null. | `--top_` (minus **before** the name) lowers first, then uses the new value | without the `top_ > 0` test, `--top_` on 0 wraps to a huge number and reads far outside the array |
+| `free_[top_++] = p;` | store the pointer at position `top_`, then raise `top_` | `top_++` (plus **after**) uses the old value, then raises it | there is **no** check for releasing the same node twice. A double release would hand one node to two orders. The book never does this, because `erase_order` is the only caller. |
 
 Measured: **983,976 heap allocations** for the naive engine vs **3** for this one (the thread, the ring storage and the
 histogram), counted by replacing `operator new`.
@@ -1652,6 +1930,15 @@ void apply(const Command& c) {
 | `cycles` | uint64 | cycles from submit to "applied": the command's latency |
 | `hist_` | histogram, may be null | collects the latency of every command, in ns |
 
+**Every line of `apply`: what it does, why it is there, what breaks without it.**
+
+| line | code | what it does | why it is written this way | what breaks if changed |
+|---|---|---|---|---|
+| 25 | `if (journal_) journal_->log(c, ex_);` | writes the command to the log, if logging is on | **before** line 26: the log must never be behind the book | swap with line 26: a crash between the two loses a command that already changed the book |
+| 26 | `ex_.apply(c);` | changes the book: `submit` or `cancel` (Part 9) | the book is the only state, and only this thread touches it, so it needs no lock | |
+| 27 | `++processed_;` | counts commands | a plain counter: one thread only | |
+| 28–31 | `if (hist_) { cycles = rdtsc() - c.tsc; hist_->record(...); }` | latency = cycle counter now minus the counter stamped at submit | `rdtsc` reads a CPU counter in about 20 cycles, far cheaper than a clock call | a slower clock would add its own cost to every latency it measures |
+
 The process can die at any instruction. Check each point:
 
 ![[d13-8-wal.svg]]
@@ -1711,6 +1998,16 @@ Between lines 79 and 80 a crash leaves count = 2: the half-finished record is si
 - Then `count = 12,346` with a **release** store. Readers (the follower thread, or `recover` after a kill) load `count` with acquire, so they see records 0 … 12,345 complete. A record is never "half there" from a reader's view.
 - `atomic_ref` treats the plain `uint64_t` in the shared header as atomic for this one store.
 - When full it returns `false`; the journal then rotates to the other segment. On `main`, `append` silently dropped the record here, and the count was a plain `++` (story S9).
+
+**Every line of `append`: what it does, why it is there, what breaks without it.**
+
+| line | code | what it does | why it is written this way | what breaks if changed |
+|---|---|---|---|---|
+| 77 | `const uint64_t n = header_->count;` | a private copy of the record count | a plain read: the matching thread is the only writer of `count` | |
+| 78 | `if (n >= max_records_) return false;` | the segment is full: say so | the caller (`Journal::log`) rotates to the other segment and appends there | deleted: line 79 writes past the end of the mapped file and the process is killed. Returning nothing (as `main` did): the record is silently lost. |
+| 79 | `records_[n] = c;` | copies the 40 bytes into the file's memory | `records_` points into the `mmap`, so this ordinary copy **is** the file write; no system call | |
+| 80 | `std::atomic_ref<uint64_t>(header_->count).store(n + 1, std::memory_order_release);` | publishes the record | the same letterbox rule as the ring: bytes first (79), flag second (80), with **release**. `atomic_ref` is needed because `count` lives in a file header and can't be declared `std::atomic`. | before line 79, or a plain `++count` (as on `main`): a reader can see count = 3 while record 2 is still half-written, and replay garbage |
+| 81 | `return true;` | the record is in the log | | |
 
 **Where the output goes.** `true` → `Journal::log` returns and `apply` goes on to `ex_.apply(c)`. `false` → the journal rotates to the other segment and appends there. The new `count` is read by two others: the follower thread (10.5) and `recover` after a crash (10.6).
 
@@ -1797,6 +2094,19 @@ for (const WalContents& s : segs) {
 | B | 67,000 | no | 65,000 > 65,000? no | 0 … 1,999 (2,000 commands) | 67,000 |
 
 If B's base were 70,000 instead: 70,000 > 65,000, so commands 65,000–69,999 are missing and `r.ok = false`.
+
+**Every line of the replay loop: what it does, why it is there, what breaks without it.**
+
+| code | what it does | why it is written this way | what breaks if changed |
+|---|---|---|---|
+| `r.seq = r.snapshot_seq;` | "the book already contains this many commands" | the snapshot is the starting point; the log only has to supply what came after | |
+| `if (s.records.empty()) continue;` | skips an unused segment | | |
+| `const uint64_t end = s.base_seq + s.records.size();` | one past the last sequence number in this segment | | |
+| `if (end <= r.seq) continue;` | the whole segment is older than the book: skip it | its commands are already inside the snapshot | replaying it would apply those commands a **second** time |
+| `if (s.base_seq > r.seq) { r.ok = false; break; }` | the segment starts later than the book ends: commands are missing | a book rebuilt with a hole would look fine and be wrong | without it, recovery would skip the missing commands silently and report success |
+| `for (i = r.seq - s.base_seq; ...)` | starts **inside** the segment, at the first command the book doesn't have | `r.seq − base` converts a sequence number into a position in this segment | start at 0: the commands the snapshot already contains are applied twice |
+| `ex.apply(s.records[i]); ++r.replayed;` | the **same** `apply` the live engine uses | one code path for live and replay is what makes the rebuilt book identical | |
+| `r.seq = end;` | the book now reaches the end of this segment | the next segment is compared against this | |
 
 - The segments are sorted by `base_seq` first. Segment 0 has base 40,000 and 12,345 records: `end = 52,345 > 40,000`, `base ≤ seq`, so replay from index `40000 − 40000 = 0`: 12,345 commands. `r.seq = 52,345`.
 - A segment wholly before the snapshot is skipped. A segment starting **after** `r.seq` means a gap, and recovery refuses (`ok = false`) rather than build a wrong book.

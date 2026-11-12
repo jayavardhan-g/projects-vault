@@ -1,6 +1,6 @@
 """Animated step figures for the Micro Exchange part of Day 13 (SMIL, same look as the d05s-* figures)."""
 import sys, os
-OUT = sys.argv[1]
+OUT = sys.argv[1] if len(sys.argv) > 1 else '.'
 INK, MUTE, RED = '#1f2328', '#57606a', '#cf222e'
 BLUE, GREEN, YEL, PINK, GREY, WHITE = '#c8e1ff', '#c7f0d2', '#fff1a8', '#f5c6e9', '#eaeef2', '#ffffff'
 BT, GT = '#0969da', '#1a7f37'
@@ -365,4 +365,5 @@ def segments():
     ]
     save('d13m-segments.svg', W, H, 'Two log segments, one follower: who changes which state', 'Active → Sealed (matching)   Sealed → Free (follower)   Free → Active (matching)', '', fr, 4.6)
 
-for fn in (pipeline, ring, ordering, falseshare, match, unlink, idtable, pool, wal, recover, segments): fn()
+if __name__ == '__main__':
+    for fn in (pipeline, ring, ordering, falseshare, match, unlink, idtable, pool, wal, recover, segments): fn()
