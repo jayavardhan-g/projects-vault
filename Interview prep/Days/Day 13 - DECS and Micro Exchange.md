@@ -838,6 +838,27 @@ So a buyer and a seller fit when the buyer's limit is at or above the seller's l
 
 The resting order is called the **maker** (it "made" the price available). The incoming order is the **taker**. The rule is **maker-price execution**. In code the trade is recorded with `maker->price`.
 
+**It is the resting order's price, not "the seller's price".** In the example above the resting order happened to be the seller. Swap the roles and the rule stays the same:
+
+| who was already resting (the maker) | who just arrived (the taker) | trade price |
+|---|---|---|
+| a **sell** at 101 | a buy at 102 | **101**: the resting seller's price |
+| a **buy** at 20 | a sell at 18 | **20**: the resting buyer's price |
+
+In the second row the seller would have accepted 18, but the buyer's standing offer was 20, so the seller receives 20.
+
+The code has one branch per incoming side. In both, `maker` is the resting order, and the trade is recorded with `maker->price` (`order_book.cpp:139` and `:157`):
+
+```cpp
+// incoming BUY: maker is a resting seller
+trades_.push_back(Trade{id, maker->id, maker->price, x});
+
+// incoming SELL: maker is a resting buyer
+trades_.push_back(Trade{maker->id, id, maker->price, x});
+```
+
+The incoming order's own `price` is **never** written into a trade. It is used in exactly one place: the loop test (`best_ask_ <= price` or `best_bid_ >= price`), which decides whether matching may continue. So read an incoming order's price as a **permission** ("I accept anything down to here"), not as the price it will get.
+
 Why this way? The resting order was a public promise: "I sell at 101." The newcomer accepted that promise. It is the only rule under which nobody gets a worse price than they agreed to.
 
 #### 7.4 Price-time priority
@@ -891,6 +912,16 @@ if (type == OrdType::Market) price = side == Side::Buy ? kMaxPrice - 1 : 1;
 
 `a ? b : c` means "if `a` then `b`, else `c`". A market **buy** gets the highest legal price (`kMaxPrice − 1` = 65,535), so every seller is "cheap enough". A market **sell** gets price 1.
 
+**"A market sell has price 1. Does a buyer at 20 then buy at 1?"** No. The seller receives 20.
+
+- The 1 is only the seller's **limit** (7.3): the test `best_bid_ >= 1` is always true, so no buyer is refused. That is all it does.
+- The loop starts at `best_bid_`, the **highest** buyer, and the trade prints at `maker->price`, that buyer's price: 20.
+- The price 1 can never be bought against later, because a market order **never rests**. Only a `Limit` order reaches `rest`; a market order's leftover expires. So the 1 never enters the book and never becomes a maker price.
+
+You can see it in the session below: command 9 is a market sell, and it fills at **99**, the resting bid's price.
+
+What a market order does risk is **slippage**. Suppose the buyers are 10 shares at 20 and 100 shares at 5, and you market-sell 50. You get 10 at 20 and 40 at 5. Each buyer paid exactly what they offered, but your average is poor because the book was thin. A market order promises to trade **now**, not to trade at a good price. Real exchanges limit this with price bands; this engine has none. A seller who wants protection sends an IOC with a real limit (sell IOC @ 18) instead.
+
 #### 7.6 A whole session: ten commands, and the book after each
 
 This is one small session. It uses every order type and every way an order can end. Follow the book step by step.
@@ -940,6 +971,7 @@ The same session as tables, for reference:
 3. Sells resting: X = 10 @ 101 (older), Y = 10 @ 101 (newer), Z = 10 @ 100. A buy 15 @ 101 arrives. Who trades, how much?
 4. Buy IOC 80 @ 103 arrives; only 50 are offered at or below 103. Where do the 80 shares end up?
 5. In the session, why does command 5 fail?
+6. A buy 10 @ 20 is resting. A market sell 10 arrives (its price is set to 1 in code). At what price is the trade, and why?
 
 > [!success]- Answers
 > 1. No. It needs a buyer at 100 or more; the best is 99. It rests, and the best ask becomes 100.
@@ -947,6 +979,7 @@ The same session as tables, for reference:
 > 3. Z first (best price): 10. Then X (older than Y at 101): 5. Y gets nothing. X keeps 5.
 > 4. 50 filled, 30 expired, 0 resting.
 > 5. Its id (1) belongs to an order that is still resting. A limit order with a duplicate id is rejected, and its 5 shares count as expired.
+> 6. At 20. The buyer is the resting order (the maker), and a trade prints at `maker->price`. The 1 is only the seller's limit for the loop test, and it never enters the book because a market order never rests.
 
 #### 7.8 The five things to remember
 
