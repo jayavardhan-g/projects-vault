@@ -10,6 +10,8 @@ Part of [[Interview plan (Nov 2026)]]. About 7 h. Morning: `decs` (branch `main`
 [[DECS KV server - prep]]). Afternoon: `microexchange`, **branch `upgrade-2026-10`** (HEAD `1fc2869`; `main` is the original;
 prep pack [[Micro Exchange - prep]]). Read the branch with `git show upgrade-2026-10:<path>`.
 
+**Micro Exchange starts from zero at [[#Part 7. What an exchange does (start here)]]**: what an exchange is → the two-thread design → the ring → the book → the log → numbers and tests → interview cards.
+
 **How this note is built:** one study guide, [[#Study guide]]. Each part goes *idea → tiny example → the code → every variable and what it holds → the code traced on small values → where the output goes next → questions → check*. Theory and code sit together.
 
 **Resume bullets (resume 5):**
@@ -46,12 +48,13 @@ prep pack [[Micro Exchange - prep]]). Read the branch with `git show upgrade-202
 | 4 | 45 min | guide | [[#Part 6. The operational laws (reading the DECS numbers)]] |
 | 5 | 30 min | practice | DECS trace and questions (D1, E1); skim the load scripts `script.sh`, `get_popular.js`, `put_only.js`, `dbpin.sh` |
 | — | lunch | | |
-| 6 | 20 min | guide | [[#Part 7. One command through the exchange]] |
-| 7 | 60 min | guide | [[#Part 8. The SPSC ring buffer and memory ordering]] |
-| 8 | 75 min | guide | [[#Part 9. The order book and matching]] |
-| 9 | 45 min | guide | [[#Part 10. The write-ahead log and crash recovery]] |
-| 10 | 45 min | rebuild | An SPSC ring buffer, or a tiny order book (C) |
-| 11 | 30 min | practice | Micro Exchange trace and questions (D2, E2) |
+| 6 | 30 min | guide | [[#Part 7. What an exchange does (start here)]], [[#Part 8. The design: two threads, a queue, one writer]] |
+| 7 | 60 min | guide | [[#Part 9. The SPSC ring buffer and memory ordering]] |
+| 8 | 75 min | guide | [[#Part 10. The order book and matching]] |
+| 9 | 45 min | guide | [[#Part 11. The write-ahead log and crash recovery]] |
+| 10 | 20 min | guide | [[#Part 12. Everything together: one command, the numbers, the tests]] |
+| 11 | 45 min | rebuild | A tiny order book in Python: `exercises/day13_tiny_book.py` (C) |
+| 12 | 30 min | practice | [[#Part 13. Interview cards, and how to say it]], then the trace and questions (D2, E2) |
 
 Optional outside reading is in [[#Sources, and what they say]]. A file-by-file line map is in [[#Line map for reading the files]].
 
@@ -752,99 +755,147 @@ distributions; the operational laws don't.
 
 ---
 
-### Part 7. One command through the exchange
+### Part 7. What an exchange does (start here)
 
 > [!important] The one sentence to hold on to
-> A 40-byte `Command` is copied into the ring by the producer, copied out by the matching thread, copied into the log,
-> and only then applied to the book.
+> An exchange keeps a **book** of waiting buy and sell orders, and a **matching engine** decides who trades with whom:
+> best price first, and at the same price, whoever came first.
 
-#### 7.1 The picture
+Micro Exchange is a matching engine written in C++. Before any C++, you need the problem it solves. Parts 7 to 13 build it in this order:
 
-**What this program is, in plain words.** An exchange receives **orders**: "buy 70 shares at 102 or less", "sell 40 at 101 or more", "cancel order 9". A **matching engine** is the part that decides who trades with whom. It keeps a **book** of orders that are waiting, and for each new order it checks whether a waiting order on the other side has a good enough price. If so, they trade. If not, the new order waits in the book.
+| Part | Question it answers |
+|---|---|
+| 7 | What is an exchange, an order, a book, a match? |
+| 8 | How is the program laid out? Why two threads and one queue? |
+| 9 | How does the queue (the ring buffer) work without a lock? |
+| 10 | How is the book stored so that every operation is one step? |
+| 11 | How does the book come back after a crash? |
+| 12 | One command from start to end; the numbers; how it was tested |
+| 13 | Interview cards, and how to describe the project out loud |
 
-This engine has two threads on two cores. One thread (the **producer**) only receives commands. The other (the **matching thread**) is the only one that touches the book. They are joined by a queue (the ring). Before the matching thread changes the book it writes the command to a log on disk, so a crash can be undone.
+#### 7.1 The problem
 
-```mermaid
-flowchart TB
-  PR["producer thread, core A"] -->|"push: write slot, release-store head"| RB[("SPSC ring, 65,536 slots")]
-  RB -->|"pop: acquire-load head, read slot"| ME["MatchingEngine.apply, core B"]
-  ME -->|"1. log first"| WAL[("mmap WAL<br/>append + release-store count")]
-  ME -->|"2. then apply"| OB["OrderBook.submit / cancel"]
-  OB --> LV[("flat price levels<br/>an intrusive FIFO per price")]
-  OB --> IX[("IdTable: id → Order*")]
-  OB --> POOL[("ObjectPool of Orders")]
-```
+You want to buy 70 shares of a company. You tell the exchange:
 
-![[d13m-pipeline.svg]] [[d13m-pipeline.html|▶ Step through it]]
+> Buy 70 shares, and I will pay at most 102 per share.
 
-*Animated, 6 steps, loops. It follows one command from the producer to the book. The text of each step is in the bar at the bottom of the figure.*
+At the same moment one person wants to sell 40 shares for at least 101. Another wants to sell 20 for at least 101. A third wants 103.
 
-#### 7.2 The data: the 40-byte Command
+Who trades with whom? At what price? What happens to the part nobody wants to sell you?
 
-`include/engine/order.hpp:18–29` (`upgrade-2026-10`)
-```cpp
-struct Command {
-    OpType   type;
-    Side     side;
-    OrdType  ord_type;
-    uint8_t  pad_ = 0;
-    uint16_t symbol;
-    uint64_t id;
-    int64_t  price;  // integer ticks; ignored for Market
-    uint64_t qty;
-    uint64_t tsc;    // cycle counter when the command was submitted
-};
-static_assert(sizeof(Command) == 40, "Command is the WAL record; keep it 40 bytes");
-```
+The software that answers these questions is the **matching engine**. It has to:
 
-**Variables and what they hold** (the example: "buy 70 @ 102", order id 9)
+- receive buy and sell orders;
+- store the orders that can't trade yet;
+- find a buyer and a seller whose prices fit;
+- make the trade;
+- let people cancel;
+- treat everyone in a fixed, fair order.
 
-| field | type | bytes (offset) | what it holds | example |
-|---|---|---|---|---|
-| `type` | `OpType` (uint8) | 1 (0) | New = 1 or Cancel = 2 | New |
-| `side` | `Side` (uint8) | 1 (1) | Buy = 0 or Sell = 1 | Buy |
-| `ord_type` | `OrdType` (uint8) | 1 (2) | Limit, Market or Ioc | Limit |
-| `pad_` | uint8 | 1 (3) | explicit padding | 0 |
-| `symbol` | uint16 | 2 (4) | which book | 0 |
-| (padding) | | 2 (6) | added by the compiler so `id` starts at a multiple of 8 | |
-| `id` | uint64 | 8 (8) | the order id | 9 |
-| `price` | int64 | 8 (16) | price in integer ticks | 102 |
-| `qty` | uint64 | 8 (24) | quantity | 70 |
-| `tsc` | uint64 | 8 (32) | CPU cycle counter at submit time | |
+#### 7.2 Orders, bids and asks
 
-6 + 2 + 4 × 8 = **40 bytes**. The struct is plain data ("trivially copyable"), so the same 40 bytes can be copied as they are into a ring slot and into the log. That is why the comment calls it "the WAL record".
+An **order** is one instruction: buy or sell, how many, at what price.
 
-#### 7.3 The flow in six steps
-
-A **buy 70 @ 102** arrives; resting sells at 101 are S1 (40, the older) and S2 (20).
-
-1. **Producer** (`ring_buffer.hpp:27–35`): copy the 40-byte command into `slots_[head & mask]`, then `head_.store(head + 1, release)`.
-2. **Matching thread** (`:38–46`): `head_.load(acquire)` sees the new head, so the slot copy sees the whole command. Copy it out, then `tail_.store(tail + 1, release)` frees the slot.
-3. **Log first** (`matching_engine.hpp:25` → `wal_logger.hpp:76–82`): copy the command into the mmap'd log, then release-store the new record count.
-4. **Match** (`order_book.cpp:114`): the order is valid. `best_ask_ = 101 ≤ 102`, so trade against the level head, the oldest order: S1 fills 40 and is unlinked by `erase_order` (two pointer fixes, the id-table erase, back to the pool). S2 fills 20 and is erased too. Level 101 is now empty, so `raise_best_ask` scans upward.
-5. **Rest the remainder** (`rest`, `:90–112`): 70 − 60 = **10** remain. Take an `Order` from the pool, append it at the tail of bid level 102, insert its id into the id table, and set `best_bid_ = 102`.
-6. **Latency:** `rdtsc() − c.tsc` goes into the histogram (`matching_engine.hpp:29–30`). Meanwhile the follower thread reads the new log count with acquire, replays the command on its replica, and takes snapshots off the hot path.
-
-**Where each copy of the command goes.**
-
-| step | from → to | who does it | Part |
+| Order | Side | Quantity | Price |
 |---|---|---|---|
-| 1 | producer's `Command` → `slots_[head & mask]` | producer thread, `push` | 8 |
-| 2 | `slots_[tail & mask]` → `out` | matching thread, `pop` | 8 |
-| 3 | `out` → `records_[n]` in the mmap'd log | matching thread, `append` | 10 |
-| 4 | fields `id, side, price, qty` → `OrderBook::submit` | matching thread, `apply` | 9 |
-| 5 | `rdtsc() − c.tsc` → latency histogram | matching thread | 10 |
+| A | Buy | 70 | 102 |
+| B | Sell | 40 | 101 |
+| C | Sell | 20 | 101 |
+| D | Sell | 50 | 103 |
 
-#### 7.4 A whole session: ten commands, and the book after each
+Two words you must use correctly:
 
-This is one small session on one symbol. It uses every order type and every way an order can end. Follow the book column by column.
+- **Bid:** an order to **buy**. "I bid 102."
+- **Ask:** an order to **sell**. "I ask 101."
 
-The three order types (`OrdType`, `order.hpp:14`):
-- **Limit:** trade what you can at your price or better; whatever is left **rests** in the book.
-- **IOC** (immediate or cancel): trade what you can up to your price; whatever is left **expires**. It never rests.
-- **Market:** trade at any price; whatever is left expires. In code its price is set to the extreme (`kMaxPrice − 1` for a buy, `1` for a sell, `order_book.cpp:117`), so the price test always passes.
+Orders that are waiting are said to **rest**. All resting orders together are the **order book**. It has a bid side and an ask side.
 
-An order's quantity can end in exactly four places: **filled**, **resting**, **cancelled** or **expired**.
+Prices in this engine are whole numbers called **ticks**. A tick is the smallest price step. Using integers avoids all rounding problems of decimals. In code a price is an `int64_t` (a 64-bit whole number).
+
+Three more words:
+
+- **Best bid:** the highest price any buyer is offering.
+- **Best ask:** the lowest price any seller is asking.
+- **Spread:** best ask − best bid.
+
+Example: buyers wait at 99, sellers wait at 101 and 103. Best bid = 99, best ask = 101, spread = 101 − 99 = 2.
+
+#### 7.3 When can two orders trade?
+
+A **limit order** names the worst price you accept.
+
+- Buy limit at 102: "I pay 102 **or less**."
+- Sell limit at 101: "I receive 101 **or more**."
+
+So a buyer and a seller fit when the buyer's limit is at or above the seller's limit:
+
+| new order | can trade when | in code |
+|---|---|---|
+| a buy at `price` | the cheapest seller is cheap enough | `best_ask_ <= price` |
+| a sell at `price` | the highest buyer pays enough | `best_bid_ >= price` |
+
+**At what price does the trade happen?** A buy at 102 meets a resting sell at 101. The buyer would pay 102. The seller would accept 101. The trade happens at **101**: the price of the order that was **already resting**.
+
+The resting order is called the **maker** (it "made" the price available). The incoming order is the **taker**. The rule is **maker-price execution**. In code the trade is recorded with `maker->price`.
+
+Why this way? The resting order was a public promise: "I sell at 101." The newcomer accepted that promise. It is the only rule under which nobody gets a worse price than they agreed to.
+
+#### 7.4 Price-time priority
+
+Often several resting orders could serve the newcomer. Two rules decide who goes first:
+
+1. **Better price first.** A buyer is matched with the cheapest seller first.
+2. **Same price: older first.** Among sellers at the same price, the one who arrived first trades first.
+
+Together this is **price-time priority**. It is the fairness rule of most exchanges.
+
+Run the example. Resting sells: S1 = 40 @ 101 (older), S2 = 20 @ 101 (newer), S3 = 50 @ 103. Resting buy: B1 = 30 @ 99. A **buy 70 @ 102** arrives.
+
+![[d13-6-book.svg]]
+
+| step | best ask | maker | fill | qty left |
+|---|---|---|---|---|
+| 1 | 101 ≤ 102 | S1 (head of 101) | min(70, 40) = 40 | 30 |
+| 2 | 101 | S2 | min(30, 20) = 20 | 10 |
+| 3 | 101 empty → scan up → 103 > 102 | stop | | 10 |
+| 4 | | rest 10 at the tail of bid 102 | best bid = 102 | 0 |
+
+Read it once more in words:
+
+- S1 goes first: it has the best price, and it is older than S2. Trade min(70, 40) = 40. The buyer still wants 30.
+- S2 is next. Trade min(30, 20) = 20. The buyer still wants 10.
+- The next seller asks 103. The buyer's limit is 102. No trade.
+- The last 10 shares **rest** in the book as a bid at 102.
+
+One incoming order produced **two trades** (a "partial fill" each time) and one resting order. This small example is the one every later Part traces through the code.
+
+#### 7.5 Three order types
+
+The types differ in one thing only: what happens to the part that **can't trade right now**.
+
+| type | meaning | the unfilled part |
+|---|---|---|
+| **Limit** | trade at my price or better | **rests** in the book and waits |
+| **IOC** (immediate or cancel) | trade what you can right now, up to my price | **expires** at once |
+| **Market** | trade right now at whatever price there is | **expires** at once |
+
+![[d13y-types.svg]] [[d13y-types.html|▶ Step through it]]
+
+*Animated, 4 steps, loops. The same buyer of 80 shares, sent as each of the three types.*
+
+In code a Market order has no special loop. Its price is simply set to the most extreme value, so the price test always passes (`order_book.cpp:117`):
+
+```cpp
+if (type == OrdType::Market) price = side == Side::Buy ? kMaxPrice - 1 : 1;
+```
+
+`a ? b : c` means "if `a` then `b`, else `c`". A market **buy** gets the highest legal price (`kMaxPrice − 1` = 65,535), so every seller is "cheap enough". A market **sell** gets price 1.
+
+#### 7.6 A whole session: ten commands, and the book after each
+
+This is one small session. It uses every order type and every way an order can end. Follow the book step by step.
+
+A quantity can end in exactly four places: **filled**, **resting**, **cancelled** or **expired**.
 
 ![[d13x-session.svg]] [[d13x-session.html|▶ Step through it]]
 
@@ -880,26 +931,217 @@ The same session as tables, for reference:
 | 8 | 295 | 220 | 30 | 10 | 35 | 295 ✓ |
 | 9 | 345 | 280 | 0 | 10 | 55 | 345 ✓ |
 
-`filled + resting + cancelled + expired == submitted` after **every** command. This is the conservation rule the fuzzer checks (the comment at `exchange.hpp:44–45` states it). If any line of the book loses or invents quantity, this sum breaks at once. Step 6 is the example Parts 8–10 trace in detail.
+`filled + resting + cancelled + expired == submitted` after **every** command. This is the **conservation rule**: shares are never created and never lost. The fuzzer checks it after each command (the comment at `exchange.hpp:44–45` states it). If any line of the book loses or invents quantity, the sum breaks at once. Command 6 is the example Parts 9–11 trace in detail.
+
+#### 7.7 Check your understanding
+
+1. Best bid is 99, best ask is 101. A sell 10 @ 100 arrives. Does it trade?
+2. A buy 50 @ 105 meets a resting sell 50 @ 101. At what price is the trade?
+3. Sells resting: X = 10 @ 101 (older), Y = 10 @ 101 (newer), Z = 10 @ 100. A buy 15 @ 101 arrives. Who trades, how much?
+4. Buy IOC 80 @ 103 arrives; only 50 are offered at or below 103. Where do the 80 shares end up?
+5. In the session, why does command 5 fail?
+
+> [!success]- Answers
+> 1. No. It needs a buyer at 100 or more; the best is 99. It rests, and the best ask becomes 100.
+> 2. 101, the resting (maker) order's price.
+> 3. Z first (best price): 10. Then X (older than Y at 101): 5. Y gets nothing. X keeps 5.
+> 4. 50 filled, 30 expired, 0 resting.
+> 5. Its id (1) belongs to an order that is still resting. A limit order with a duplicate id is rejected, and its 5 shares count as expired.
+
+#### 7.8 The five things to remember
+
+1. **Book** = resting bids (buys) and asks (sells); best bid = highest buy, best ask = lowest sell.
+2. **Match test:** buy trades while `best_ask <= price`; sell trades while `best_bid >= price`.
+3. **Price-time priority:** best price first; at one price, oldest first. The trade prints at the **maker's** price.
+4. **Limit** rests its leftover; **IOC** and **Market** never rest.
+5. **Conservation:** filled + resting + cancelled + expired = submitted, always.
 
 ---
 
-### Part 8. The SPSC ring buffer and memory ordering
+### Part 8. The design: two threads, a queue, one writer
 
+> [!important] The one sentence to hold on to
+> One thread only receives commands, one thread only matches, and a queue joins them; the matching thread is the
+> **only** thing that ever touches the book.
+
+#### 8.1 What a thread is
+
+A program normally does one thing after another. A **thread** is one such sequence of steps. A program may start several threads. Each runs its own function, and on a machine with several CPU **cores** they really run at the same time.
+
+```cpp
+void intake()   { /* receive commands */ }
+void matching() { /* match them */ }
+
+std::thread producer(intake);     // starts running intake() on its own
+std::thread matcher(matching);    // starts running matching() at the same time
+producer.join();                  // wait until intake() returns
+matcher.join();
+```
+
+All threads of one program share the same memory. That is useful (they can hand data to each other) and dangerous (they can step on each other's data).
+
+This engine has three threads:
+
+| thread | its only job |
+|---|---|
+| **producer** (intake) | receive commands and put them in the queue |
+| **matching** | take commands out, log them, change the book |
+| **follower** | in the background: read the log, keep a copy of the book, write snapshots (Part 11) |
+
+Why split intake from matching? Matching is the part that must be fast. Every nanosecond the matching thread spends on something else (reading a socket, parsing bytes) delays every order behind it.
+
+#### 8.2 Why only one thread touches the book
+
+Suppose two threads both matched orders, to go faster. Both can reach the same resting order at the same moment.
+
+![[d13y-race.svg]] [[d13y-race.html|▶ Step through it]]
+
+*Animated, 6 steps, loops. Two threads read, change and write the same quantity. One update is lost.*
+
+What you just saw is a **lost update**. `qty -= 30` looks like one step, but it is three: read the number, subtract, write it back. Two threads can interleave those steps. The same happens with the linked-list pointers of Part 10: two threads unlinking neighbours at once leave pointers aimed at dead orders.
+
+There are two ways out:
+
+| way | how | cost |
+|---|---|---|
+| **lock the book** (a mutex) | a thread must take the lock before touching the book; others wait | every match pays for locking, and threads queue up behind the lock |
+| **single writer** | only one thread is ever allowed to touch the book | no lock at all; but matching uses one core only |
+
+This engine picks **single writer**. It buys two things:
+
+- **Speed:** the book's code has no locks and no atomics. It is plain single-threaded code.
+- **Determinism:** commands are applied in exactly one order. The same commands always give the same book. Part 11 depends on this: crash recovery replays the commands and must get the same book back.
+
+**"Why not several matching threads?"** For one book, they would fight over the same data and need locks, and the order of trades would depend on thread timing. To scale, you give each **symbol** (each stock) its own book and its own matching thread. Books of different symbols share nothing.
+
+#### 8.3 Why a queue sits between the threads
+
+The producer may receive 100 commands in a burst while the matching thread has time for 80. The other 20 must wait somewhere, in arrival order. That is a **queue**: first in, first out.
+
+The queue is the **only** thing both threads touch. So all the difficulty of two threads sharing memory is squeezed into this one small piece. Part 9 is about making it correct and fast.
+
+This engine's queue is an **SPSC ring buffer**: Single Producer, Single Consumer. One thread puts in, one takes out. That restriction is what lets it work with no lock.
+
+#### 8.4 The whole pipeline
+
+```mermaid
+flowchart TB
+  PR["producer thread, core A"] -->|"push: write slot, release-store head"| RB[("SPSC ring, 65,536 slots")]
+  RB -->|"pop: acquire-load head, read slot"| ME["MatchingEngine.apply, core B"]
+  ME -->|"1. log first"| WAL[("mmap WAL<br/>append + release-store count")]
+  ME -->|"2. then apply"| OB["OrderBook.submit / cancel"]
+  OB --> LV[("flat price levels<br/>an intrusive FIFO per price")]
+  OB --> IX[("IdTable: id → Order*")]
+  OB --> POOL[("ObjectPool of Orders")]
+```
+
+![[d13m-pipeline.svg]] [[d13m-pipeline.html|▶ Step through it]]
+
+*Animated, 6 steps, loops. It follows one command from the producer to the book. The text of each step is in the bar at the bottom of the figure.*
+
+Follow the arrows once:
+
+1. The **producer** writes a command into a ring slot and publishes it.
+2. The **matching thread** takes it out.
+3. It first writes the command to the **log** (the WAL, a file).
+4. Only then does it change the **book**: match, rest or cancel.
+5. The **follower** reads the log in the background and keeps a second copy of the book for snapshots.
+
+#### 8.5 What travels through the pipeline: the 40-byte Command
+
+A `struct` in C++ is a group of named values stored side by side in memory. The thing that moves through the ring and into the log is this one:
+
+`include/engine/order.hpp:18–29` (`upgrade-2026-10`)
+```cpp
+struct Command {
+    OpType   type;
+    Side     side;
+    OrdType  ord_type;
+    uint8_t  pad_ = 0;
+    uint16_t symbol;
+    uint64_t id;
+    int64_t  price;  // integer ticks; ignored for Market
+    uint64_t qty;
+    uint64_t tsc;    // cycle counter when the command was submitted
+};
+static_assert(sizeof(Command) == 40, "Command is the WAL record; keep it 40 bytes");
+```
+
+**Variables and what they hold** (the example: "buy 70 @ 102", order id 9)
+
+| field | type | bytes (offset) | what it holds | example |
+|---|---|---|---|---|
+| `type` | `OpType` (uint8) | 1 (0) | New = 1 or Cancel = 2 | New |
+| `side` | `Side` (uint8) | 1 (1) | Buy = 0 or Sell = 1 | Buy |
+| `ord_type` | `OrdType` (uint8) | 1 (2) | Limit, Market or Ioc | Limit |
+| `pad_` | uint8 | 1 (3) | explicit padding | 0 |
+| `symbol` | uint16 | 2 (4) | which book | 0 |
+| (padding) | | 2 (6) | added by the compiler so `id` starts at a multiple of 8 | |
+| `id` | uint64 | 8 (8) | the order id | 9 |
+| `price` | int64 | 8 (16) | price in integer ticks | 102 |
+| `qty` | uint64 | 8 (24) | quantity | 70 |
+| `tsc` | uint64 | 8 (32) | CPU cycle counter at submit time | |
+
+6 + 2 + 4 × 8 = **40 bytes**. The struct is plain data ("trivially copyable"), so the same 40 bytes can be copied as they are into a ring slot and into the log. That is why the comment calls it "the WAL record".
+
+Three things about it that interviewers ask:
+
+- **Why fixed-size integers (`uint64_t`, `uint16_t`)?** The same bytes are written to a file and read back later. Their sizes must never depend on the compiler.
+- **What is padding?** The CPU wants an 8-byte number to start at an address that is a multiple of 8. `id` would start at byte 6, so the compiler inserts 2 empty bytes to push it to byte 8.
+- **What does `static_assert` do?** It is checked when the program is **compiled**. If someone adds a field and the size is no longer 40, the build fails. Old log files would otherwise be read with the wrong layout.
+
+#### 8.6 The hot path
+
+The **hot path** is the code that runs for **every** command, so its speed decides the speed of the whole system:
+
+```text
+producer: push into the ring
+matching: pop  →  append to the log  →  match / rest / cancel  →  record the latency
+```
+
+Everything in this project follows one rule: **keep slow things off the hot path**. On the hot path there is:
+
+| no… | because | replaced by | Part |
+|---|---|---|---|
+| lock | waiting and waking cost microseconds | a lock-free ring, a spinning consumer | 9 |
+| `new` / `delete` | the allocator is slow and unpredictable | a pre-allocated pool | 10 |
+| tree walk or list walk | pointer hops miss the cache | array index, intrusive list, hash table | 10 |
+| system call | switching into the kernel costs hundreds of ns | a memory-mapped log | 11 |
+| copying the book | 1.6 ms stall | the follower thread snapshots its own copy | 11 |
+
+When an interviewer asks "why did you do X?", the answer is nearly always one row of this table.
+
+#### 8.7 Check your understanding
+
+1. Which threads may modify the live book?
+2. `qty -= 30` on a shared order from two threads: what can go wrong?
+3. Name the two things the single-writer design buys.
+4. How would you scale this engine to 1,000 symbols?
+5. Why is `Command` exactly 40 bytes and checked with `static_assert`?
+
+> [!success]- Answers
+> 1. Only the matching thread.
+> 2. A lost update: both read the old value, both write; one subtraction disappears.
+> 3. No locks on the book (speed), and one fixed order of commands (determinism, which recovery needs).
+> 4. One book per symbol, books spread over several matching threads; a symbol's commands always go to the same thread.
+> 5. It is the ring slot and the log record. The byte layout on disk must not change silently.
+
+---
+
+### Part 9. The SPSC ring buffer and memory ordering
+
+> [!important] The one sentence to hold on to
 > One producer writes only `head`, one consumer writes only `tail`, so no lock is needed. The producer writes the slot
 > **then** publishes `head` with **release**; the consumer reads `head` with **acquire**, **then** the slot, so it always
 > sees a complete command.
 
-#### 8.1 Why a queue between two threads?
+This is the hardest part of the project. It goes in small steps: a queue → a ring → why not a lock → the C++ words → the code line by line → the hardware underneath.
 
-The engine splits the work: an intake thread (the producer) hands commands to the matching thread (the consumer).
-Intake then never waits for matching. They need a queue between them.
+#### 9.1 From a queue to a ring
 
-The naive engine uses a mutex + condition variable queue. A sleeping consumer must be woken by the OS, which is slow:
-the docs credit most of the naive 2.2 ms p99 to sleeping and waking. With exactly **one** writer per index, you can
-drop the lock entirely: **SPSC** (single producer, single consumer).
+A queue is first in, first out. Push A, B, C, D; pop gives A first.
 
-#### 8.2 The ring on a 4-slot example
+The simple way to store it is an array. But after popping A, slot 0 is free and the data sits in slots 1–3. Shifting everything down on each pop would be wasteful. A **ring buffer** never moves data. It keeps two counters and reuses the slots in a circle:
 
 - An array of `Capacity` slots, where Capacity is a power of two (here 4; in the engine 65,536).
 - Two counters that **only grow**: `head` (how many pushed) and `tail` (how many popped).
@@ -912,7 +1154,47 @@ Because the counters never wrap back to 0, "full" and "empty" never look the sam
 ring, index 70,000 lands in slot 70,000 & 65,535 = **4,464**. A 64-bit counter at 10 M pushes per second overflows after
 about **58,000 years**.
 
-#### 8.3 Before the code: the C++ these lines are made of
+#### 9.2 Why not just protect a queue with a lock?
+
+The textbook queue for two threads looks like this:
+
+```cpp
+std::mutex m;
+std::queue<Command> q;
+
+void push(Command c) {
+    std::lock_guard<std::mutex> lock(m);   // take the lock; released at the closing brace
+    q.push(c);
+}
+```
+
+A **mutex** ("mutual exclusion") is a lock. Only one thread can hold it. A second thread that wants it must wait. This is correct. It is how the naive engine does it. It is slow for two reasons:
+
+- **Taking and releasing** the lock costs time on every push and every pop, even when nobody else wants it.
+- **Sleeping.** When the queue is empty, the consumer goes to sleep on a *condition variable* ("wake me when something arrives"). Waking it is a job for the operating system.
+
+![[d13y-wake.svg]] [[d13y-wake.html|▶ Step through it]]
+
+*Animated, 4 steps, loops. The same one-command handoff with a sleeping consumer (top) and a spinning consumer (bottom).*
+
+The ring's consumer never sleeps. It **spins**: it keeps asking "anything new?" in a tight loop. That is called **busy waiting**.
+
+| | spinning | sleeping |
+|---|---|---|
+| when idle | keeps checking | waits to be woken |
+| reaction time | nanoseconds | microseconds (OS wake-up) |
+| CPU use | one core at 100%, always | almost nothing when idle |
+| right for | very low latency, a core to spare | long or rare waits |
+
+And why can the lock go away completely? Because of **SPSC**:
+
+- exactly one thread (the producer) ever writes `head`;
+- exactly one thread (the consumer) ever writes `tail`;
+- so no two threads ever compete to **change** the same variable.
+
+Each side only needs to **read** the other side's counter safely. The rest of this Part is about that word "safely".
+
+#### 9.3 Before the code: the C++ these lines are made of
 
 The ring's code looks strange because almost every word in it is about **two threads touching the same memory**. This section explains each word once. The line-by-line walk comes right after.
 
@@ -1006,7 +1288,7 @@ That is the same as `index % 4`, but one cheap instruction instead of a division
 - `const T& item` is a **reference**: `push` looks at the caller's command where it already is, with no copy, and promises not to change it.
 - `T& out` (in `pop`) is a reference the function **writes through**: the popped command lands in the caller's variable.
 
-#### 8.4 The code
+#### 9.4 The code
 
 `include/core/ring_buffer.hpp:27–47` (`upgrade-2026-10`)
 ```cpp
@@ -1091,7 +1373,7 @@ Read three things off the table:
 - The second pop did not read `head_` at all: its cached copy (4) already showed items waiting.
 - Push G fails with 4 items in 4 slots: no slot is wasted, because the counters never wrap.
 
-#### 8.5 Every line of push: what it does, why, what uses it, what breaks
+#### 9.5 Every line of push: what it does, why, what uses it, what breaks
 
 ![[d13x-push.svg]] [[d13x-push.html|▶ Step through it]]
 
@@ -1187,7 +1469,7 @@ The starting state is the "push E" moment of the trace above: `head_ = 4`, `tail
 - **What it does.** Tells the caller the command is in the ring.
 - **What uses it next.** The caller moves on to its next command. With `false` (line 31) it would call `push` again with the same command.
 
-#### 8.6 Every line of pop: the mirror image
+#### 9.6 Every line of pop: the mirror image
 
 ![[d13x-pop.svg]] [[d13x-pop.html|▶ Step through it]]
 
@@ -1219,7 +1501,7 @@ for (;;) {
 }
 ```
 
-- `pop` returned `true` → `apply(c)` logs the command and changes the book (Parts 10 and 9).
+- `pop` returned `true` → `apply(c)` logs the command and changes the book (Parts 11 and 10).
 - `pop` returned `false` → if the producer has said it is finished and the ring is empty, stop. Otherwise `cpu_pause()` (a hint to the CPU that this is a short wait) and go round again. The matching thread never sleeps: it **spins**, so it reacts within nanoseconds, at the price of one core running at 100%.
 
 **The two pairs, side by side.** Each shared counter has one writer, and each is written with release and read by the other side with acquire:
@@ -1229,7 +1511,7 @@ for (;;) {
 | `head_` | line 34 (producer) | release, after writing the slot | line 41 (consumer) | acquire, before reading the slot | "the command is completely in the slot" |
 | `tail_` | line 45 (consumer) | release, after copying the slot out | line 30 (producer) | acquire, before reusing the slot | "I have finished reading that slot" |
 
-#### 8.7 Why ordering is needed at all
+#### 9.7 Why is ordering needed at all? The hardware underneath
 
 ![[d13m-ordering.svg]] [[d13m-ordering.html|▶ Step through it]]
 
@@ -1242,7 +1524,7 @@ that order:
 
 Without a rule, the consumer could see head = 5 **before** E's 40 bytes arrive, and copy a half-written command.
 
-#### 8.8 Release and acquire
+##### Release and acquire, stated precisely
 
 ![[d13-5-ordering.svg]]
 
@@ -1261,7 +1543,7 @@ The pair runs in **both** directions:
 they only stop the *compiler* from reordering. `seq_cst` (the default) would make each store an `xchg` or
 `mov + mfence`: a full fence on every push. On ARM, release and acquire become `stlr`/`ldar`.
 
-#### 8.9 Cached indices
+#### 9.8 Cached indices
 
 Reading the *other* side's index means pulling a cache line the other core keeps writing: slow. So each side keeps a
 private copy (`tail_cache_`, `head_cache_`) and reloads the real one only when its copy says "full" or "empty".
@@ -1269,7 +1551,17 @@ private copy (`tail_cache_`, `head_cache_`) and reloads the real one only when i
 The catch: when the consumer keeps up, the queue looks empty on almost every `pop`, so the consumer reloads `head_`
 almost every time. The trick mostly helps the side that is rarely blocked.
 
-#### 8.10 False sharing
+#### 9.9 Cache lines and false sharing
+
+First, what a **cache** is. Main memory is far from the CPU: a read from it takes around 100 ns. So each core keeps its own small, fast copy of the memory it used recently. That copy is the cache.
+
+Three facts are enough:
+
+- The cache does not hold single variables. It holds **lines of 64 bytes**. Touch one byte, and the whole 64-byte line around it is loaded.
+- Several cores may hold a copy of the same line, as long as they only **read** it.
+- To **write** a line, a core must own it alone. Every other core's copy is thrown away. The next time another core needs that line, it must fetch it again from the writer. That transfer is slow (it is the "cross-core handoff" of 9.10).
+
+Now put `head_` and `tail_` (8 bytes each) next to each other. They land in the same 64-byte line. The producer writes `head_`; the consumer writes `tail_`. They never touch the same variable, yet they keep stealing the same line from each other.
 
 ![[d13m-falseshare.svg]] [[d13m-falseshare.html|▶ Step through it]]
 
@@ -1292,9 +1584,11 @@ share lines, and a nearly empty queue has both cores touching the same slot line
 | `alignas(kCacheLine) std::atomic<size_t> tail_{0};` | starts `tail_` on the **next** line | the consumer writes it on every pop | as above |
 | `size_t head_cache_ = 0;` | the consumer's private copy, on `tail_`'s line | only the consumer touches both | |
 
-**Where the output goes.** `pop` fills `out`, a `Command`. The matching thread's `run` loop hands it to `MatchingEngine::apply` (Part 10, `matching_engine.hpp:24`), which logs it and then calls the book (Part 9).
+**"Does `alignas(64)` make the ring thread-safe?"** No. The atomics and the release/acquire pairs make it **correct**. `alignas(64)` only makes it **fast**. Remove it and the program still gives the same answers, just slower.
 
-#### 8.11 What the handoff costs (the server numbers)
+**Where the output goes.** `pop` fills `out`, a `Command`. The matching thread's `run` loop hands it to `MatchingEngine::apply` (Part 11, `matching_engine.hpp:24`), which logs it and then calls the book (Part 10).
+
+#### 9.10 What the handoff costs (the server numbers)
 
 | path | commands/s | ns per command |
 |---|---|---|
@@ -1306,7 +1600,7 @@ command (the consumer reloads `head_`, then reads the freshly written slot). On 
 costs ~100 ns or more. This is a **hypothesis**: never profiled. Throughput stayed flat at 3.2–3.4 M while the book
 grew 20×, which says the book isn't the limit.
 
-#### 8.12 Questions people usually ask next
+#### 9.11 Questions people usually ask next
 
 ##### "Why not just use `seq_cst` everywhere?"
 
@@ -1318,6 +1612,15 @@ needs, and nothing more.
 Each `push` and `pop` finishes in a bounded number of steps whatever the other thread does: **wait-free**. The program
 as a whole still waits, because a caller spins when the ring is full or empty.
 
+Three words to keep apart:
+
+| word | meaning | here |
+|---|---|---|
+| **blocking** | a thread may have to wait for another thread (a lock) | the naive mutex queue |
+| **lock-free** | the system as a whole always makes progress, though one thread may retry | — |
+| **wait-free** | **every** call finishes in a bounded number of its own steps | `push` and `pop`: no loop inside, they return `true` or `false` |
+
+
 ##### "Would it work with two producers?"
 
 No. Two producers could read the same `head`, both write slot `head & mask`, and one command would be lost. Several
@@ -1328,7 +1631,7 @@ gateways need a ring each, or an MPSC queue with compare-and-swap.
 Honestly: by reasoning. The fuzzer is single-threaded, and there's no TSan run in the repo. A test that "passes on x86"
 proves little, because x86 hides most reorderings that ARM would expose.
 
-#### 8.13 Check your understanding
+#### 9.12 Check your understanding
 
 1. Capacity 8, head = 21, tail = 14. How many items? Which slot does the next push use? Is it full?
 2. Why must Capacity be a power of two?
@@ -1349,7 +1652,7 @@ proves little, because x86 hides most reorderings that ARM would expose.
 > [!success]- Answer to 7
 > 6 − 2 = 4 items (C, D, E, F); the next pop reads slot 2 & 3 = 2, which holds C.
 
-#### 8.14 The five things to remember
+#### 9.13 The five things to remember
 
 1. **SPSC:** one writer per index → no lock; indices only grow; slot = i & (Capacity − 1); size = head − tail.
 2. **Order of operations:** write slot → release head; acquire head → read slot (and the mirror pair on tail).
@@ -1359,34 +1662,73 @@ proves little, because x86 hides most reorderings that ARM would expose.
 
 ---
 
-### Part 9. The order book and matching
+### Part 10. The order book and matching
 
-> Best price first, and at one price the oldest order first. A flat array indexed by price finds the level in O(1); an
-> intrusive linked list per level keeps arrival order and unlinks in O(1); a hash table finds an order by id; a
-> pre-allocated pool means no `new` while matching.
+> [!important] The one sentence to hold on to
+> A flat array indexed by price finds the level in one step; a linked list inside the orders keeps arrival order and
+> unlinks in one step; a hash table finds an order by id; a pre-allocated pool means no `new` while matching.
 
-#### 9.1 What a limit order book is
+#### 10.1 What the book has to do, and the four structures that do it
 
-- A **limit order** says "buy (or sell) up to qty at price p or better".
-- Orders that can't trade at once **rest** in the book: **bids** (buys) and **asks** (sells), grouped by price into **levels**.
-- **Best bid** = highest buy price; **best ask** = lowest sell price. They never cross while resting: best bid < best ask.
-- **Price-time priority:** an incoming order trades with the best opposite price first. At one price, the **oldest** order trades first.
-- A trade happens at the **resting** (maker) order's price.
+Part 7 showed **what** matching is. This Part is **how** the book is stored so that each operation takes a fixed, small number of steps. The book is asked four things, millions of times a second:
 
-#### 9.2 Matching, on the worked example
+| need | structure | cost |
+|---|---|---|
+| find the level for a price | `std::vector<Level>` of 65,536 ticks per side, indexed by price | one array index; 2 × 65,536 × 24 B ≈ **3 MB** per symbol |
+| oldest first within a level | an **intrusive** doubly linked list (`prev`/`next` inside `Order`), append at tail | O(1) append, O(1) unlink |
+| find an order by id (cancel) | `IdTable`: open addressing, linear probing | expected O(1), no allocation |
+| get memory for a new order | `ObjectPool`: a pre-allocated free stack | O(1), never calls `new` |
 
-Asks: 101 = [S1 40, S2 20] (S1 older), 103 = [S3 50]. Bids: 99 = [B1 30]. A **buy 70 @ 102** arrives:
+"O(1)" means the cost does not grow with the size of the book: a book of ten orders and a book of a million answer in the same number of steps.
 
-![[d13-6-book.svg]]
+The next sections build these one at a time. First, the two C++ ideas all four are made of.
 
-| step | best ask | maker | fill | qty left |
-|---|---|---|---|---|
-| 1 | 101 ≤ 102 | S1 (head of 101) | min(70, 40) = 40 | 30 |
-| 2 | 101 | S2 | min(30, 20) = 20 | 10 |
-| 3 | 101 empty → scan up → 103 > 102 | stop | | 10 |
-| 4 | | rest 10 at the tail of bid 102 | best bid = 102 | 0 |
+#### 10.2 Pointers and references (read this before any book code)
 
-#### 9.3 The data: Order, Level and the four structures
+The book's code is full of `Order*`, `->`, `nullptr` and `Level&`. They are simple once you see memory as numbered boxes.
+
+![[d13y-pointer.svg]] [[d13y-pointer.html|▶ Step through it]]
+
+*Animated, 7 steps, loops. Two orders at made-up addresses 1000 and 1048, and a pointer that holds the number 1000.*
+
+| you see | read it as | example |
+|---|---|---|
+| `Order* maker` | `maker` is a **pointer**: it holds the address of an `Order` | `maker = lvl.head;` |
+| `maker->qty` | go to that address, take the field `qty` | `maker->qty -= x;` changes the order itself |
+| `nullptr` | the pointer points at nothing | `if (lvl.head)` = "is there an order?" |
+| `*o` | the whole object `o` points at | `*o = Order{...};` overwrites it |
+| `Level& lvl` | `lvl` is a **reference**: a second name for an existing `Level` | `lvl.qty -= x;` changes the real level |
+
+Why does this matter for speed? Passing a pointer or a reference moves 8 bytes. Nothing is copied, nothing is searched. "Given a pointer to the order" means "we already know exactly where it is".
+
+#### 10.3 Structure 1: price levels in a flat array
+
+All orders at one price form a **level**. The first question for every command is: where is the level for this price?
+
+![[d13y-levels.svg]] [[d13y-levels.html|▶ Step through it]]
+
+*Animated, 6 steps, loops. Finding price 101 in a tree (3 hops) and in an array (1 step).*
+
+```cpp
+std::vector<Level> bids_;   // 65,536 levels, index = price
+std::vector<Level> asks_;   // 65,536 levels, index = price
+```
+
+`asks_[101]` **is** the level for sellers at 101. There is nothing to search: this is called a **direct-address table**.
+
+| | `std::map<price, Level>` (naive) | flat array (this engine) |
+|---|---|---|
+| find a level | walk a tree: O(log n) pointer hops | one index: O(1) |
+| memory layout | nodes scattered on the heap | one contiguous block, cache friendly |
+| a new price | allocates a node | nothing: the slot already exists |
+| memory used | only for prices in use | 2 × 65,536 × 24 B ≈ **3 MB** per symbol, always |
+| price range | any | must be bounded: 1 … 65,535 ticks |
+
+The array does not tell you which level is the **best** one. So the book also caches two numbers, `best_ask_` and `best_bid_`, and updates them as orders come and go (10.9).
+
+#### 10.4 Structure 2: a linked list inside the orders (time priority)
+
+Inside one level the orders must stay in arrival order, oldest first. The book also has to remove any order from the middle (a cancel) without shifting the others. A **doubly linked list** does both: each order knows the one before it (`prev`) and the one after it (`next`).
 
 `include/engine/order.hpp:33–40` and `include/engine/order_book.hpp:38–42` (`upgrade-2026-10`)
 ```cpp
@@ -1420,17 +1762,48 @@ struct Level {
 
 (The ids 1–4 and 9 are made up for the example.)
 
-| need | structure | cost |
+**Intrusive** is the word for where the links live. In a normal list (`std::list`), the list creates its own small node objects, and each node points at your data. Here the `prev` and `next` pointers are fields **of the `Order` itself**. Two consequences:
+
+- no extra node to allocate per order;
+- if you hold a pointer to an order, you already hold its place in the list. Removing it needs no search (10.6).
+
+#### 10.5 The code: `submit` and the match loop
+
+`submit` is called for every new order. Before the loop it checks the order (`order_book.cpp:114–124`):
+
+```cpp
+uint64_t OrderBook::submit(uint64_t id, Side side, int64_t price, uint64_t qty,
+                           OrdType type) {
+    if (qty == 0) return 0;
+    if (type == OrdType::Market) price = side == Side::Buy ? kMaxPrice - 1 : 1;
+    if (id == 0 || price <= 0 || price >= kMaxPrice ||
+        (type == OrdType::Limit && index_.find(id))) {
+        expired_qty_ += qty;  // rejected before it touched the book
+        return 0;
+    }
+
+    uint64_t filled = 0;
+```
+
+| line | what it does | what breaks without it |
 |---|---|---|
-| find the level for a price | `std::vector<Level>` of 65,536 ticks per side, indexed by price | one array index; 2 × 65,536 × 24 B ≈ **3 MB** per symbol |
-| oldest first within a level | an **intrusive** doubly linked list (`prev`/`next` inside `Order`), append at tail | O(1) append, O(1) unlink |
-| find an order by id (cancel) | `IdTable`: open addressing, linear probing | expected O(1), no allocation |
-| get memory for a new order | `ObjectPool`: a pre-allocated free stack | O(1), never calls `new` |
+| `if (qty == 0) return 0;` | an order for nothing does nothing | harmless, but it would rest an empty order |
+| `if (type == Market) price = ...` | gives a market order the extreme price (7.5) | a market order would need its own copy of the loop |
+| `id == 0` | id 0 means "empty slot" in the id table (10.10) | storing id 0 would look like an empty slot and be lost |
+| `price <= 0 \|\| price >= kMaxPrice` | the price is used as an array index | `asks_[price]` would read outside the array: a crash or silent corruption |
+| `type == Limit && index_.find(id)` | a resting order already has this id | two orders with one id: `cancel(id)` could only ever find one |
+| `expired_qty_ += qty;` | the rejected quantity is counted | the conservation sum of Part 7 would not balance |
 
-**Intrusive** means the links live *inside* the object, not in a separate list node. Given a pointer to the order,
-unlinking needs no search:
+Then the loop. The example again:
 
-#### 9.4 The code: the match loop
+Asks: 101 = [S1 40, S2 20] (S1 older), 103 = [S3 50]. Bids: 99 = [B1 30]. A **buy 70 @ 102** arrives:
+
+| step | best ask | maker | fill | qty left |
+|---|---|---|---|---|
+| 1 | 101 ≤ 102 | S1 (head of 101) | min(70, 40) = 40 | 30 |
+| 2 | 101 | S2 | min(30, 20) = 20 | 10 |
+| 3 | 101 empty → scan up → 103 > 102 | stop | | 10 |
+| 4 | | rest 10 at the tail of bid 102 | best bid = 102 | 0 |
 
 ```mermaid
 flowchart TB
@@ -1521,14 +1894,17 @@ Both trades execute at **101**, the maker's price, although the buyer offered 10
 | 132 | `qty -= x;` | what I still want | | |
 | 133 | `maker->qty -= x;` | what the maker still has. `->` means "the field of the thing this pointer points at" | | |
 | 134 | `lvl.qty -= x;` | the level's running total | kept so "how much rests at 101?" is one read, not a walk of the list | the total drifts away from the real orders; the fuzzer's comparison with the naive engine catches it |
-| 135–137 | `resting_qty_ -= x; filled_qty_ += 2 * x; filled += x;` | the book-wide counters, and this order's own fill | `2 * x`: the buyer filled x and the seller filled x | the conservation sum of Part 7.4 stops balancing |
+| 135–137 | `resting_qty_ -= x; filled_qty_ += 2 * x; filled += x;` | the book-wide counters, and this order's own fill | `2 * x`: the buyer filled x and the seller filled x | the conservation sum of Part 7 stops balancing |
 | 138–139 | `if (record_trades_) trades_.push_back(...)` | write the trade down, only if asked | a growing vector can allocate memory, so benchmarks switch recording off | |
 | 140 | `if (maker->qty == 0) erase_order(maker);` | a fully filled order leaves the book | a partly filled maker stays at the head and keeps its place in the queue | the empty maker stays at the head. Next round `x = min(qty, 0) = 0`, nothing changes, and the loop never ends. |
 | 142 | `if (lvl.head == nullptr) raise_best_ask();` | the level is used up: find the next price with sellers | `best_ask_` is a cached answer; it is recomputed only when its level empties | `best_ask_` keeps pointing at an empty level. The inner loop is skipped, the outer test stays true, and the loop never ends. |
 
-**Where the output goes.** Two things leave the loop. `qty = 10` is still unfilled: line 164 passes it to `rest` (9.6). `filled = 60` is returned to `Exchange::apply`.
 
-#### 9.5 The code: unlinking a filled order
+**The sell side** is the same loop with everything mirrored: `best_bid_ >= price`, `bids_[best_bid_]`, and `lower_best_bid()` scanning downward.
+
+**Where the output goes.** Two things leave the loop. `qty = 10` is still unfilled: line 164 passes it to `rest` (10.7). `filled = 60` is returned to `Exchange::apply`.
+
+#### 10.6 The code: unlinking a filled order
 
 `src/order_book.cpp:82–88` (`upgrade-2026-10`)
 ```cpp
@@ -1551,8 +1927,8 @@ void OrderBook::erase_order(Order* o) {
 |---|---|---|---|
 | 84 | `S1->prev` is null → `else` | `lvl.head = S1->next` = S2 | head S2, tail S2 |
 | 85 | `S1->next` is S2 → `if` | `S2->prev = S1->prev` = null | S2 = {prev null, next null} |
-| 86 | | `index_.erase(1)`: id 1 leaves the table (9.8) | |
-| 87 | | `pool_.release(S1)`: the node returns to the pool (9.9) | |
+| 86 | | `index_.erase(1)`: id 1 leaves the table (10.10) | |
+| 87 | | `pool_.release(S1)`: the node returns to the pool (10.11) | |
 
 Then `erase_order(S2)`: `prev` null → `lvl.head = null`; `next` null → `lvl.tail = null`. The level is empty.
 
@@ -1568,7 +1944,11 @@ Then `erase_order(S2)`: `prev` null → `lvl.head = null`; `next` null → `lvl.
 
 Each `Order` carries its own `prev`/`next` (an *intrusive* list), so removing it is two pointer fixes. No search, no allocation.
 
-#### 9.6 The code: resting the remainder
+#### 10.7 The code: resting the remainder
+
+![[d13y-rest.svg]] [[d13y-rest.html|▶ Step through it]]
+
+*Animated, 13 steps, loops. `rest(9, Buy, 102, 10)` one line at a time; the last step shows a second order joining the same level.*
 
 `src/order_book.cpp:164–166` and `:90–112` (`upgrade-2026-10`)
 ```cpp
@@ -1606,7 +1986,7 @@ bool OrderBook::rest(uint64_t id, Side side, int64_t price, uint64_t qty) {
 
 | line | code | what it does | why it is written this way | what breaks without it |
 |---|---|---|---|---|
-| 91–92 | `Order* o = pool_.acquire(); if (!o) return false;` | takes a pre-made node; gives up if none is left | no `new` on the matching path (9.9) | without the check, line 93 writes through a null pointer: a crash |
+| 91–92 | `Order* o = pool_.acquire(); if (!o) return false;` | takes a pre-made node; gives up if none is left | no `new` on the matching path (10.11) | without the check, line 93 writes through a null pointer: a crash |
 | 93 | `*o = Order{id, price, qty, side, nullptr, nullptr};` | fills in every field. `*o` means "the node `o` points at". | the node is **reused**: it still holds the fields and links of its previous order | stale `prev`/`next` from the node's last life would splice this order into the wrong list |
 | 95 | `Level& lvl = ...[price];` | the level for this price, by reference | | |
 | 96–98 | `o->prev = lvl.tail; if (lvl.tail) lvl.tail->next = o; else lvl.head = o; lvl.tail = o;` | appends at the **tail** | newest at the tail keeps the head the oldest: time priority | insert at the head instead and the newest order would trade first |
@@ -1634,7 +2014,11 @@ Had the level already held orders, line 97 would link the old tail to N instead.
 
 **Where the output goes.** `rest` returns `true`, so nothing expires. The book now has the new best bid 102 with 10 resting, and the next sell at 102 or lower will match against N first.
 
-#### 9.7 The code: cancel
+#### 10.8 The code: cancel
+
+![[d13y-cancel.svg]] [[d13y-cancel.html|▶ Step through it]]
+
+*Animated, 10 steps, loops. `cancel(9)` one line at a time.*
 
 `src/order_book.cpp:169–186` (`upgrade-2026-10`)
 ```cpp
@@ -1680,7 +2064,69 @@ bool OrderBook::cancel(uint64_t id) {
 
 `side` and `price` are copied **before** `erase_order`, because the node goes back to the pool and may be reused.
 
-#### 9.8 The id table (open addressing with backward-shift delete)
+#### 10.9 Keeping the best price up to date
+
+`best_ask_` and `best_bid_` are cached answers to "what is the best price right now?". Two events change them:
+
+- **A better order rests.** `rest` compares once and updates (lines 106–110).
+- **The best level empties** (its last order was filled or cancelled). Then the book has to look for the next non-empty level (`order_book.cpp:68–74`):
+
+```cpp
+void OrderBook::raise_best_ask() {
+    while (best_ask_ < kMaxPrice && asks_[best_ask_].head == nullptr) ++best_ask_;
+}
+
+void OrderBook::lower_best_bid() {
+    while (best_bid_ > 0 && bids_[best_bid_].head == nullptr) --best_bid_;
+}
+```
+
+Read `raise_best_ask` as: "while I am still inside the array **and** this level is empty, step one price up".
+
+Traced on the example: level 101 empties. 101 empty → 102. 102 empty → 103. 103 has S3 → stop. `best_ask_ = 103`.
+
+| piece | what it does | what breaks without it |
+|---|---|---|
+| `asks_[best_ask_].head == nullptr` | "nobody is waiting at this price" | |
+| `++best_ask_` | try the next price up (asks get worse upward) | |
+| `best_ask_ < kMaxPrice` | stop at the end of the array | with no sellers left, the scan would run off the array |
+
+When the ask side is empty the scan ends at `best_ask_ = kMaxPrice`. That value means "no sellers": no buy price can be ≥ 65,536, so the match loop's test fails by itself.
+
+**The weak spot, and you should say it first.** The scan goes one tick at a time. Normally the next level is a tick or two away. But if the next seller is far away, or the side is empty, it walks up to 65,536 levels: a latency spike. The fix is a **bitmap**: one bit per level ("empty or not"), and a single CPU instruction (find-first-set) jumps to the next set bit.
+
+#### 10.10 Structure 3: the id table, a hash table from zero
+
+A cancel arrives with only an id: "cancel order 9". Where is order 9? Searching every level would be far too slow.
+
+A **hash table** answers "where is the thing with this key?" in about one step. The idea:
+
+1. Take a big array of slots.
+2. Turn the key into a slot number with a **hash function**. That slot is the key's **home**.
+3. Store the key there, with its value (here: the `Order*`).
+4. To look up, compute the same home and look there.
+
+Two different keys can get the same home. That is a **collision**. There are two classic answers:
+
+| answer | how | drawback |
+|---|---|---|
+| chaining | each slot holds a small linked list of the keys that landed there | a pointer hop and an allocation per entry |
+| **open addressing** (this engine) | keep everything in the one array; if the home is taken, use another slot | deleting is tricky |
+
+With open addressing you need a rule for "another slot". The simplest is **linear probing**: try the next slot, then the next, wrapping around at the end. It is cache friendly, because neighbouring slots sit in the same cache line.
+
+**The hash function here** (`order_book.cpp:11–16`):
+
+```cpp
+uint64_t mix(uint64_t x) {
+    x += 0x9e3779b97f4a7c15ull;
+    x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ull;
+    x = (x ^ (x >> 27)) * 0x94d049bb133111ebull;
+    return x ^ (x >> 31);
+}
+```
+
+You don't need to memorise the constants (this is the well-known *splitmix64* mixer). You need to know **why** it is there. The home slot is `mix(id) & mask_`, which keeps only the **low bits**. Without mixing, ids that share their low bits (for example ids that step by 4,096, or that carry a client number in the high bits) would all get the same home and pile into one long run. `mix` stirs the number so that **every** bit of the id changes the low bits. `>>` shifts bits right, `^` is XOR, and the multiplications spread each bit across the word.
 
 **What it is for.** `cancel(9)` arrives with only an id. The table answers "where is the `Order` with id 9?" in one or two steps, without walking any list.
 
@@ -1779,7 +2225,19 @@ keys_[i] = kEmpty;
 | `keys_[i] = keys_[j]; vals_[i] = vals_[j]; i = j;` | moves the key and its pointer into the hole; the hole is now where the key was | both arrays move together, or an id would point at the wrong order | |
 | `keys_[i] = kEmpty; vals_[i] = nullptr;` | marks the final hole empty | a real empty slot, not a tombstone | with tombstones the table slowly fills with "deleted" marks and a failed lookup never finds an empty slot to stop at (story S4) |
 
-#### 9.9 The object pool
+#### 10.11 Structure 4: the object pool
+
+Every resting order needs a 48-byte `Order` to live in. The usual way to get memory is `new`:
+
+```cpp
+Order* o = new Order();   // ask the allocator for memory
+...
+delete o;                 // give it back
+```
+
+`new` is a call into the **allocator**, a general-purpose piece of code that must find a free block of the right size. That takes a variable amount of time, sometimes takes a lock, and sometimes asks the operating system for more memory. On the hot path that means unpredictable pauses. And the blocks it returns are scattered across memory, which costs cache misses.
+
+A **pool** does all the allocating once, before trading starts. Think of a car park: all spaces are built up front; an arriving order takes a free space; when it leaves, the space is free for the next one.
 
 ![[d13m-pool.svg]] [[d13m-pool.html|▶ Step through it]]
 
@@ -1803,7 +2261,15 @@ void release(T* p) { free_[top_++] = p; }
 Measured: **983,976 heap allocations** for the naive engine vs **3** for this one (the thread, the ring storage and the
 histogram), counted by replacing `operator new`.
 
-#### 9.10 Why the naive engine was slow
+**Is the pool thread-safe?** No, and it does not need to be. Only the matching thread uses it (the single-writer rule of Part 8).
+
+#### 10.12 Why the naive engine was slow
+
+The repo keeps the simple first version (`baseline/naive_engine.hpp`) as a reference. It is correct, and it is what the speedup is measured against.
+
+![[d13y-naive.svg]] [[d13y-naive.html|▶ Step through it]]
+
+*Animated, 5 steps, loops. Cancelling order 4 out of five at one price: the naive walk, then this engine's direct unlink.*
 
 `baseline/naive_engine.hpp:107–119` (`upgrade-2026-10`)
 ```cpp
@@ -1821,8 +2287,6 @@ void erase_from(Levels& levels, const OrderPtr& o) {
     if (orders.empty()) levels.erase(lvl);
 }
 ```
-> [!info] New functions in this code
-> - `template<int TILE> __global__ void k(...)`: makes the kernel generic over a **compile-time** number. `mm_tiled_1to1<32>` and `<64>` are compiled separately, so `TILE` can size static arrays and loops can be fully unrolled. [[Function glossary#template|→ examples]]
 
 - **What "O(n) cancellation" really meant:** the naive engine finds the order by id in O(1) too, but then **walks the price level's `std::list`** to find the node, which is O(orders at that price). Plus `std::map` levels and `shared_ptr` orders: an allocation per order (983,976 allocations vs 3).
 
@@ -1838,7 +2302,19 @@ The naive engine already finds an order by id in O(1) (a hash map). Its O(n) is 
 unlinking", not "O(1) id lookup". The ~10× at small books comes mostly from constant factors (queue, log, timing);
 the growth to larger speedups with book size is what the O(1) cancel and the flat layout bought.
 
-#### 9.11 Questions people usually ask next
+#### 10.13 The costs on one page
+
+| operation | this engine | how |
+|---|---|---|
+| find a price level | O(1) | array index (10.3) |
+| append an order at a price | O(1) | link at the tail (10.7) |
+| unlink a known order | O(1) | two pointer fixes (10.6) |
+| find an order by id | expected O(1) | hash table at ≤ 50% load (10.10) |
+| get / return an order node | O(1) | pool stack (10.11) |
+| match an incoming order | O(number of orders it fills) | plus a level scan when a level empties (10.9) |
+| find the next best price | usually 1–2 steps; worst case 65,536 | the known weak spot (10.9) |
+
+#### 10.14 Questions people usually ask next
 
 ##### "Why not `std::map` for the levels?"
 
@@ -1861,7 +2337,7 @@ to `expired_qty_`. One gap: the duplicate-id check runs only for Limit orders, s
 id, price, qty (8 B each), side (1 B), prev and next (8 B each): 41 B of fields, padded to 48 for 8-byte alignment,
 with 7 bytes of padding after `side`.
 
-#### 9.12 Check your understanding
+#### 10.15 Check your understanding
 
 1. State price-time priority. At what price does a trade execute?
 2. Asks 101 = [S1 40, S2 30]. A buy 50 @ 102 arrives. Fills? What rests? What is `lvl.head` after?
@@ -1878,7 +2354,7 @@ with 7 bytes of padding after `side`.
 > 5. Hole 6. Y at 7: (7 − 6) = 1 ≥ (7 − 6) = 1 → moves to 6; hole 7. Z at 0: (0 − 7) & 7 = 1 ≥ (0 − 7) & 7 = 1 → moves to 7; hole 0. Slot 1 empty → stop; slot 0 emptied.
 > 6. `acquire` returns `nullptr`; `rest` refuses the order, and its qty counts as expired.
 
-#### 9.13 The five things to remember
+#### 10.16 The five things to remember
 
 1. **Rule:** best price first, oldest first; trade at the maker's price.
 2. **Levels:** a flat tick-indexed array (3 MB per symbol); cached best bid/ask, rescanned only when a level empties.
@@ -1888,13 +2364,17 @@ with 7 bytes of padding after `side`.
 
 ---
 
-### Part 10. The write-ahead log and crash recovery
+### Part 11. The write-ahead log and crash recovery
 
-> Write each command to the log **before** applying it; publish the record count with **release**, so a reader sees
-> only complete records. After a crash, load the last snapshot and replay every logged command after it: the book is
-> deterministic, so the replay rebuilds it exactly.
+> [!important] The one sentence to hold on to
+> Write each command to the log **before** applying it; after a crash, load the last snapshot and replay every logged
+> command after it. The book is deterministic, so the replay rebuilds it exactly.
 
-#### 10.1 What a crash loses
+#### 11.1 The problem: the book lives in RAM
+
+Everything in Part 10 (levels, orders, the id table) is in the process's memory. If the program crashes, all of it is gone. 10,000 resting orders vanish. An exchange can't tell its users "sorry, we forgot your orders".
+
+So something must be written to a **file** as the engine runs, and there must be a way to rebuild the book from that file.
 
 Two kinds of crash behave differently:
 - **Process crash** (`kill -9`, a segfault): the process's memory is gone, but data already handed to the kernel (the **page cache**) survives and reaches disk later.
@@ -1902,7 +2382,24 @@ Two kinds of crash behave differently:
 
 The engine's book lives in process memory, so any crash wipes it. The log is how it comes back.
 
-#### 10.2 Log, then apply
+#### 11.2 The idea: log the commands, not the book
+
+Saving the whole book after every command would be absurd: megabytes per command. Instead, save the **commands**:
+
+```text
+1. New  Sell 40 @ 101   id 1
+2. New  Sell 20 @ 101   id 2
+3. New  Buy  70 @ 102   id 9
+4. Cancel               id 9
+```
+
+Each is 40 bytes. To get the book back, start from an empty book and **replay** them in order. This file is the **write-ahead log (WAL)**. "Write-ahead" means: written **before** the change is made.
+
+Replaying only works because the book is a **deterministic state machine**: the same commands, in the same order, always produce exactly the same book. Nothing inside `apply` reads a clock or a random number, and there is one matching thread, so there is one order. (That is the second payoff of the single-writer design of Part 8.)
+
+Logging the commands is called **logical logging**. The alternative, **physical logging**, writes the resulting changes ("level 101 qty is now 20, order 1 removed, …"). It needs more bytes, but it does not need determinism.
+
+#### 11.3 Log first, then apply
 
 ```mermaid
 flowchart TB
@@ -1934,9 +2431,9 @@ void apply(const Command& c) {
 
 | name | type | what it holds |
 |---|---|---|
-| `c` | `const Command&`, 40 B | the command just popped from the ring (Part 8) |
+| `c` | `const Command&`, 40 B | the command just popped from the ring (Part 9) |
 | `journal_` | pointer, may be null | the log; null when persistence is off |
-| `ex_` | `Exchange` | the books; `ex_.apply(c)` calls `OrderBook::submit` or `cancel` (Part 9) |
+| `ex_` | `Exchange` | the books; `ex_.apply(c)` calls `OrderBook::submit` or `cancel` (Part 10) |
 | `processed_` | counter | commands applied so far |
 | `c.tsc` | uint64 | the cycle counter stamped when the command was submitted |
 | `cycles` | uint64 | cycles from submit to "applied": the command's latency |
@@ -1947,7 +2444,7 @@ void apply(const Command& c) {
 | line | code | what it does | why it is written this way | what breaks if changed |
 |---|---|---|---|---|
 | 25 | `if (journal_) journal_->log(c, ex_);` | writes the command to the log, if logging is on | **before** line 26: the log must never be behind the book | swap with line 26: a crash between the two loses a command that already changed the book |
-| 26 | `ex_.apply(c);` | changes the book: `submit` or `cancel` (Part 9) | the book is the only state, and only this thread touches it, so it needs no lock | |
+| 26 | `ex_.apply(c);` | changes the book: `submit` or `cancel` (Part 10) | the book is the only state, and only this thread touches it, so it needs no lock | |
 | 27 | `++processed_;` | counts commands | a plain counter: one thread only | |
 | 28–31 | `if (hist_) { cycles = rdtsc() - c.tsc; hist_->record(...); }` | latency = cycle counter now minus the counter stamped at submit | `rdtsc` reads a CPU counter in about 20 cycles, far cheaper than a clock call | a slower clock would add its own cost to every latency it measures |
 
@@ -1967,7 +2464,43 @@ have been acknowledged).
 Replay works because the book is a **deterministic state machine**: the same commands in the same order always give
 the same book. No clocks, no randomness inside `apply`.
 
-#### 10.3 The code: append
+#### 11.4 mmap: writing a file without system calls
+
+The normal way to write a file is to ask the operating system each time:
+
+```cpp
+std::ofstream file("log.bin", std::ios::app);
+file.write(bytes, 40);
+file.flush();
+```
+
+Each write that reaches the OS is a **system call**: the CPU switches from your program into the kernel and back. That costs hundreds of nanoseconds, more than everything else on the hot path together. The naive engine does this for every record.
+
+**`mmap`** (memory map) is a different deal with the kernel: "make this file appear as a range of my memory". After that, the program writes to the file with ordinary memory writes. In this engine `records_` is a pointer into that range, so one line **is** the file write:
+
+```cpp
+records_[n] = c;    // 40 bytes copied; no system call
+```
+
+Where do the bytes really go, and what survives which crash?
+
+![[d13y-pagecache.svg]] [[d13y-pagecache.html|▶ Step through it]]
+
+*Animated, 6 steps, loops. The process, the kernel's page cache and the disk; then a `kill -9`, then a power cut.*
+
+The **page cache** is the kernel's own in-memory copy of file contents. A mapped file's pages **are** page-cache pages. A page that was written but not yet saved to disk is **dirty**. The kernel saves dirty pages on its own schedule. `msync` (for mapped files) and `fsync` (for ordinary writes) mean "save now and don't return until the disk has it".
+
+| | naive: `ofstream` + `flush` per record | here: `mmap(MAP_SHARED)` |
+|---|---|---|
+| per record | a `write()` syscall | a plain memory store (~40 bytes) |
+| survives `kill -9` | yes (page cache) | yes (page cache) |
+| survives power loss | only with fsync | only after `msync`, which runs at the end of a run |
+| disk full | an error code | **SIGBUS** on a page write |
+
+So the honest claim is **crash recovery from process crashes**, not power-loss durability. `ftruncate` makes a sparse
+file, so the first touch of each page faults; `posix_fallocate` would reserve the blocks up front.
+
+#### 11.5 The code: append
 
 `include/persistence/wal_logger.hpp:76–82` (`upgrade-2026-10`)
 ```cpp
@@ -2021,21 +2554,26 @@ Between lines 79 and 80 a crash leaves count = 2: the half-finished record is si
 | 80 | `std::atomic_ref<uint64_t>(header_->count).store(n + 1, std::memory_order_release);` | publishes the record | the same letterbox rule as the ring: bytes first (79), flag second (80), with **release**. `atomic_ref` is needed because `count` lives in a file header and can't be declared `std::atomic`. | before line 79, or a plain `++count` (as on `main`): a reader can see count = 3 while record 2 is still half-written, and replay garbage |
 | 81 | `return true;` | the record is in the log | | |
 
-**Where the output goes.** `true` → `Journal::log` returns and `apply` goes on to `ex_.apply(c)`. `false` → the journal rotates to the other segment and appends there. The new `count` is read by two others: the follower thread (10.5) and `recover` after a crash (10.6).
+**Where the output goes.** `true` → `Journal::log` returns and `apply` goes on to `ex_.apply(c)`. `false` → the journal rotates to the other segment and appends there. The new `count` is read by two others: the follower thread (11.6) and `recover` after a crash (11.7).
 
-#### 10.4 mmap vs write
+#### 11.6 Snapshots and the follower thread
 
-| | naive: `ofstream` + `flush` per record | here: `mmap(MAP_SHARED)` |
-|---|---|---|
-| per record | a `write()` syscall | a plain memory store (~40 bytes) |
-| survives `kill -9` | yes (page cache) | yes (page cache) |
-| survives power loss | only with fsync | only after `msync`, which runs at the end of a run |
-| disk full | an error code | **SIGBUS** on a page write |
+Two problems with a log that only grows:
 
-So the honest claim is **crash recovery from process crashes**, not power-loss durability. `ftruncate` makes a sparse
-file, so the first touch of each page faults; `posix_fallocate` would reserve the blocks up front.
+- the file gets bigger for ever;
+- recovery gets slower for ever. Replaying a billion commands to restart is not acceptable.
 
-#### 10.5 Segments, snapshots and the follower
+A **snapshot** fixes both. It is a saved copy of the whole book at one moment, say "as of command 40,000". Recovery then loads the snapshot and replays only the commands **after** 40,000. Log records the snapshot covers can be thrown away.
+
+But who takes the snapshot? Copying a big book takes time, and the matching thread has none to spare.
+
+![[d13y-follower.svg]] [[d13y-follower.html|▶ Step through it]]
+
+*Animated, 5 steps, loops. The first design (the matching thread copies its book) and the final one (a follower thread keeps its own copy).*
+
+The **follower** is a third thread. It reads the log, replays every record into its own book (the **replica**), and snapshots that. This works for the same reason recovery works: same commands, same order, same book. The pattern has a name worth saying: **moving work off the hot path**.
+
+How does the follower know a record is complete before it reads it? The same release/acquire pair as the ring: `append` copies the record, **then** release-stores `count`; the follower acquire-loads `count`, **then** reads records below it.
 
 ![[d13m-segments.svg]] [[d13m-segments.html|▶ Step through it]]
 
@@ -2055,7 +2593,7 @@ throughput.
 The follower reads in **200 µs batches** (~800 records at 4 M commands/s): polling nonstop kept pulling the header's
 cache line, which holds `count`, away from the matching core on every append (story S6).
 
-#### 10.6 The code: recover
+#### 11.7 The code: recover
 
 ```cpp
 if (use_snapshot) r.snapshot_seq = Snapshot::load(ex, paths.snapshot());
@@ -2128,7 +2666,9 @@ each failed a test.
 
 **Where the output goes.** `recover` leaves `ex` holding the rebuilt books and returns `r` (ok, seq, replayed). The engine then continues appending from sequence `r.seq`.
 
-#### 10.7 Replacing a file atomically (the snapshot)
+#### 11.8 Replacing a file atomically (the snapshot)
+
+A crash can also happen **while the snapshot is being written**. A half-written snapshot that has replaced the good one would be a disaster. So the old snapshot must stay valid until the new one is completely on disk.
 
 `snapshot.hpp:84–100` writes `snapshot.tmp` → `fsync` it → `rename` over `snapshot` → `fsync` the directory.
 - `rename` is atomic on POSIX: a crash leaves the old file or the new one, never a mix.
@@ -2136,7 +2676,7 @@ each failed a test.
 - The directory fsync makes the **rename** itself durable.
 - If a snapshot write fails, the process aborts (`write_or_die`): truncating the log behind a snapshot that never reached disk would lose commands.
 
-#### 10.8 Questions people usually ask next
+#### 11.9 Questions people usually ask next
 
 ##### "Why not fsync every record?"
 
@@ -2159,7 +2699,7 @@ record (or per batch) is the standard fix.
 The command is 40 bytes and the book is deterministic, so replaying commands is enough (**logical** logging). Logging
 the changes (physical logging) costs more bytes but doesn't need a deterministic apply.
 
-#### 10.9 Check your understanding
+#### 11.10 Check your understanding
 
 1. What survives a `kill -9` but not a power cut?
 2. Why log **before** applying? What goes wrong the other way round?
@@ -2176,13 +2716,185 @@ the changes (physical logging) costs more bytes but doesn't need a deterministic
 > 5. After A, seq = 65,000, but B starts at 70,000 > 65,000: records 65,000–69,999 are missing, so `ok = false`.
 > 6. The rename changes the directory; without the directory fsync, a power cut could undo the rename even though the file's contents were durable.
 
-#### 10.10 The five things to remember
+#### 11.11 The five things to remember
 
 1. **Log first, then apply;** a deterministic book makes replay exact.
 2. **Publish with release:** copy the record, then release-store the count; readers acquire-load it and see only whole records.
 3. **mmap** = no syscall per record; survives process crashes, not power loss (no per-record msync); SIGBUS on a full disk.
 4. **Snapshots off the hot path:** a follower replays into a replica, snapshots it, frees sealed segments; one owner per state change.
 5. **Recovery:** snapshot + replay the segments in order; refuse a gap. 40/40 SIGKILL recoveries exact; atomic replace = tmp → fsync → rename → fsync dir.
+
+---
+
+### Part 12. Everything together: one command, the numbers, the tests
+
+> [!important] The one sentence to hold on to
+> The book alone does 18.1 M commands/s; the full two-thread pipeline does 3.44 M/s, because handing each command to
+> another core costs more than matching it.
+
+#### 12.1 One command through every component
+
+![[d13m-pipeline.svg]] [[d13m-pipeline.html|▶ Step through it]]
+
+A **buy 70 @ 102** arrives; resting sells at 101 are S1 (40, the older) and S2 (20).
+
+1. **Producer** (`ring_buffer.hpp:27–35`): copy the 40-byte command into `slots_[head & mask]`, then `head_.store(head + 1, release)`.
+2. **Matching thread** (`:38–46`): `head_.load(acquire)` sees the new head, so the slot copy sees the whole command. Copy it out, then `tail_.store(tail + 1, release)` frees the slot.
+3. **Log first** (`matching_engine.hpp:25` → `wal_logger.hpp:76–82`): copy the command into the mmap'd log, then release-store the new record count.
+4. **Match** (`order_book.cpp:114`): the order is valid. `best_ask_ = 101 ≤ 102`, so trade against the level head, the oldest order: S1 fills 40 and is unlinked by `erase_order` (two pointer fixes, the id-table erase, back to the pool). S2 fills 20 and is erased too. Level 101 is now empty, so `raise_best_ask` scans upward.
+5. **Rest the remainder** (`rest`, `:90–112`): 70 − 60 = **10** remain. Take an `Order` from the pool, append it at the tail of bid level 102, insert its id into the id table, and set `best_bid_ = 102`.
+6. **Latency:** `rdtsc() − c.tsc` goes into the histogram (`matching_engine.hpp:29–30`). Meanwhile the follower thread reads the new log count with acquire, replays the command on its replica, and takes snapshots off the hot path.
+
+| step | what moves | from → to | who | Part |
+|---|---|---|---|---|
+| 1 | 40 bytes | producer's `Command` → `slots_[head & mask]` | producer, `push` | 9 |
+| 2 | 40 bytes | `slots_[tail & mask]` → `out` | matching, `pop` | 9 |
+| 3 | 40 bytes | `out` → `records_[n]` in the mapped log | matching, `append` | 11 |
+| 4 | the fields | `id, side, price, qty` → `OrderBook::submit` | matching, `apply` | 10 |
+| 5 | one number | `rdtsc() − c.tsc` → the latency histogram | matching | below |
+
+**How the latency is measured.** `rdtsc` is a CPU instruction that returns a counter of clock cycles. It takes about 20 cycles, far less than asking the OS for the time. The producer stamps each command with the counter (`c.tsc`) when it submits it. After applying it, the matching thread reads the counter again. The difference, converted to nanoseconds, is that command's latency: the time from "submitted" to "applied". It goes into a **histogram** (counts per latency bucket), from which you read percentiles such as p99: "99% of commands were faster than this".
+
+#### 12.2 The numbers, and how to read them
+
+Measured on the shared Xeon server:
+
+| what | commands/s | ns per command |
+|---|---|---|
+| the order book alone, one thread | 18.1 M | ≈ 55 |
+| the two-thread pipeline (ring + log + `rdtsc` + histogram) | 3.44 M | ≈ 291 |
+
+The surprise is that adding a second thread makes it **slower** per command. Threads don't add speed here; they add a handoff. Each command crosses from one core to another, and that means cache lines moving between cores: the line holding `head_`, and the line holding the slot. The extra ≈ 235 ns per command is most likely that. It is a **hypothesis**: it was reasoned, never profiled. One piece of evidence: throughput stayed at 3.2–3.4 M/s while the book grew 20×, so the book is not the limit.
+
+Against the naive engine, on the same server at 2 M commands: **18.1×** faster (median of 5 paired runs). The resume's 10.8 M ops/s and 50× are single runs on a laptop with no raw output kept. Quote the server numbers, and say where each was measured.
+
+Where the speedup comes from:
+
+| naive | this engine | what it saved |
+|---|---|---|
+| mutex + condition variable queue | SPSC ring, spinning | a sleep and wake per handoff (most of the naive 2.2 ms p99) |
+| `ofstream` + `flush` per record | mmap log | a system call per record |
+| `std::map` levels | flat array | tree walks and node allocations |
+| `std::list` walk to cancel | intrusive unlink | O(orders at that price) → O(1) |
+| `shared_ptr` per order | pool | 983,976 heap allocations → 3 |
+
+#### 12.3 How it was tested
+
+Fast code that gives wrong answers is worthless, so know these three:
+
+- **Differential fuzzing.** A fuzzer generates random commands. The same stream goes into this engine and into the naive engine. Their results must be identical. The naive engine is slow but simple enough to trust, so it acts as the answer key.
+- **The conservation check.** After every command: filled + resting + cancelled + expired = submitted (Part 7).
+- **Kill tests.** The process is killed with `SIGKILL` at random moments, then recovered. The recovered book must equal the book the commands should produce: **40/40 exact** (8/8 on a re-run).
+
+And a test of the tests: **six bugs were injected on purpose**, and each one made a test fail. That shows the tests can actually catch mistakes.
+
+These live on the `upgrade-2026-10` branch.
+
+#### 12.4 Limits to name before the interviewer does
+
+1. **No ThreadSanitizer run.** The ring's memory ordering is argued, not machine-checked.
+2. **The fuzzer is single-threaded.** It tests the book's logic, not the two-thread handoff. And x86 hides most reorderings that ARM would expose.
+3. **No checksum on log records.** A corrupted record would be replayed silently. Fix: a CRC per record.
+4. **Not power-loss durable.** No `msync` per record. Process crashes only.
+5. **The best-price scan** can walk 65,536 levels. Fix: a bitmap.
+6. **3 MB per symbol** for the level arrays, used or not. Thousands of symbols would need a sparse structure.
+7. **One producer only.** Several gateways need a ring each, or a multi-producer queue.
+8. **The pipeline cost is a hypothesis.** It was not profiled.
+
+Naming a limit and its fix is a strong answer to "what would you improve?".
+
+---
+
+### Part 13. Interview cards, and how to say it
+
+#### 13.1 Twenty cards
+
+Cover the answer, say yours out loud, then open it.
+
+> [!question]- 1. What is a matching engine?
+> The part of an exchange that keeps the book of resting buy and sell orders and decides which incoming order trades with which resting order, at what price, in what order.
+
+> [!question]- 2. What is price-time priority?
+> Best price first; among orders at the same price, the oldest first. Here: the match loop always takes the best level (`best_ask_` / `best_bid_`) and the **head** of its list, and new orders are appended at the **tail**.
+
+> [!question]- 3. Limit vs Market vs IOC?
+> Limit: trade at my price or better, the leftover rests. IOC: trade now up to my price, the leftover expires. Market: trade now at any price, the leftover expires. In code a Market order is given the extreme price, and only a Limit order calls `rest`.
+
+> [!question]- 4. At what price does a trade happen?
+> At the resting (maker) order's price: `maker->price`. A buy at 102 against a resting sell at 101 trades at 101.
+
+> [!question]- 5. Why a single matching thread?
+> Two threads changing one book need locks and can lose updates or corrupt the lists. One writer needs no lock, and it applies commands in one fixed order, which makes the book deterministic. Recovery by replay depends on that. To scale: one book and thread per symbol.
+
+> [!question]- 6. What is SPSC and why does it need no lock?
+> Single producer, single consumer. Only the producer writes `head`, only the consumer writes `tail`. No two threads ever change the same variable, so each side only has to read the other's counter safely.
+
+> [!question]- 7. Why are `head_` and `tail_` atomic?
+> Each is written by one thread and read by the other. On a plain variable that is a data race: undefined behaviour. The compiler could, for example, read `head_` once and spin for ever on the stale value.
+
+> [!question]- 8. Explain acquire and release.
+> The producer writes the slot, then stores `head` with release: "everything I wrote before this is visible to whoever reads this value". The consumer loads `head` with acquire, then reads the slot. Seeing the new head guarantees seeing the whole command. The mirror pair on `tail` stops the producer from overwriting a slot that is still being read.
+
+> [!question]- 9. Why relaxed for a thread's own index?
+> Only that thread writes it, and a thread always sees its own writes. No promise about another thread is needed.
+
+> [!question]- 10. What is false sharing, and what does `alignas(64)` do?
+> Cores share memory in 64-byte cache lines, and writing a line takes it away from every other core. If `head_` and `tail_` share a line, producer and consumer keep stealing it though they write different variables. `alignas(64)` gives each its own line. It is a speed fix, not a correctness fix.
+
+> [!question]- 11. Why a power-of-two capacity?
+> Then `index & (Capacity − 1)` equals `index % Capacity`: one AND instead of a division. The counters only grow, so full (`head − tail >= Capacity`) and empty (`head == tail`) never look alike.
+
+> [!question]- 12. Why spin instead of sleeping?
+> Waking a sleeping thread goes through the OS scheduler: microseconds. A spinning consumer reacts in nanoseconds. The price is one core at 100%.
+
+> [!question]- 13. Why a flat array for price levels?
+> The price is the index: one step, no tree walk, no allocation, contiguous memory. Cost: 3 MB per symbol and a bounded price range. A `std::map` is O(log n) pointer hops.
+
+> [!question]- 14. What is an intrusive linked list?
+> The `prev` and `next` pointers are fields of the `Order` itself. No separate list node, and whoever holds a pointer to the order can unlink it with two pointer writes. No search.
+
+> [!question]- 15. How does a cancel find its order?
+> The id table: a hash table from order id to `Order*`, open addressing with linear probing, at most half full. Then `erase_order` unlinks it in O(1).
+
+> [!question]- 16. Why backward-shift deletion?
+> Emptying a slot can cut a probe run and hide later keys. Tombstones avoid that but are never reclaimed; in time no empty slot is left and a failed lookup never stops. Backward shift moves later keys of the run back into the hole and leaves a truly empty slot.
+
+> [!question]- 17. Why an object pool?
+> `new` and `delete` on the hot path are slow, unpredictable and scatter memory. The pool allocates every `Order` once and hands them out from a stack in O(1). 983,976 heap allocations in the naive engine against 3.
+
+> [!question]- 18. What is a WAL, and why log before applying?
+> A log of commands written before the book changes. A crash between the two steps then leaves a logged command that replay will apply. The other order could lose a command that already changed the book.
+
+> [!question]- 19. Why mmap, and what does it not give you?
+> A log record becomes a 40-byte memory write: no system call. The page cache survives a process crash, so `kill -9` is recoverable. It does **not** survive a power cut, because there is no `msync` per record.
+
+> [!question]- 20. Why snapshots, and why a follower thread?
+> A snapshot bounds the log's size and the recovery time: load it, replay only what came after. Taking it on the matching thread stalled matching for 1.6 ms. The follower replays the log into its own replica and snapshots that, so matching never stops.
+
+#### 13.2 How to describe the project in one minute
+
+Say it in this order: what it is → the layout → the data structures → durability → the numbers with their setup.
+
+> Micro Exchange is a limit-order matching engine in C++20. It keeps an order book per symbol and matches by price-time priority.
+>
+> It runs as a pipeline. An intake thread pushes 40-byte commands into a single-producer, single-consumer ring buffer. One matching thread pops them and is the only writer of the book, so the book needs no locks and is deterministic.
+>
+> The book is built so every operation is constant time: a flat array of price levels indexed by price, an intrusive doubly linked list per level for time priority, an open-addressing hash table from order id to order for cancels, and a pre-allocated object pool so the hot path never allocates.
+>
+> For durability, each command is appended to a memory-mapped write-ahead log before it is applied. A follower thread replays the log into a replica and takes snapshots from it. After a crash, the engine loads the snapshot and replays the tail of the log.
+>
+> On a shared Xeon server the full pipeline does 3.44 million commands a second, 18 times the simple baseline. It recovered exactly in 40 of 40 kill tests. It is durable against process crashes, not power loss.
+
+Then stop. Let them choose where to dig. Each sentence above is one Part of this note. For the authorship and resume-number caveats, see the top of this note.
+
+#### 13.3 If you only have an hour
+
+1. Part 7: the example (buy 70 @ 102) until you can run it in your head.
+2. Part 9: 9.3 to 9.6. Draw the ring and say the two release/acquire pairs.
+3. Part 10: the match loop animation, then `erase_order`.
+4. Part 11: the three crash points, and "process crash yes, power loss no".
+5. Part 12.4: the limits. Then the cards.
+
 
 ## Sources, and what they say
 
@@ -2284,7 +2996,7 @@ Use this when you open the files themselves.
 ## C. Rebuild it yourself (block 10, 45 min; pick one)
 
 1. **SPSC ring in C++, about 50 lines:** `template<class T, size_t N> class Spsc` with `push`/`pop`, acquire/release, cached indices, and `alignas(64)` on head and tail. A test: one thread pushes 0…10⁷, the other pops and checks the order and the sum. Time it with and without `alignas(64)`.
-2. **Order book in Python, about 70 lines:** levels as `dict[price] → deque`, best bid/ask, `submit` with partial fills, `cancel` by id through a dict of nodes. Check price-time priority on a hand-made sequence.
+2. **Order book in Python:** `Days/exercises/day13_tiny_book.py` is written except the match loop inside `submit` (look for `TODO(human)`, about 8 lines). Run `python3 day13_tiny_book.py`: it replays the ten commands of Part 7.6 and checks the book and the conservation sum after each.
 
 ## D. Traces
 
