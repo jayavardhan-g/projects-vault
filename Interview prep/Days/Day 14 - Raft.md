@@ -6,8 +6,7 @@ tags: [interview, day, raft, distributed-systems]
 ---
 # Day 14 (Sat Nov 21): Raft (raftkv)
 
-Part of [[Interview plan (Nov 2026)]]. Repo `raftkv`. About 7 h. Prep pack: [[Raft - prep]] (original vs upgrade §0,
-key files §2, design decisions §3, stories §4, numbers §5, a code-review appendix).
+Part of [[Interview plan (Nov 2026)]]. Repo `raftkv`. About 7 h. Prep pack: [[Raft - prep]] (original vs upgrade §0, key files §2, design decisions §3, stories §4, numbers §5, a code-review appendix).
 
 **Code, explained:** the figures, the code to read and what each snippet does are in [[#Code, explained]], right after section B.
 
@@ -168,8 +167,7 @@ Upgrade-only: `start_pre_vote` (283), `take_snapshot` (186), `handle_install_sna
 Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 Repo `raftkv`: the **upgrade** is branch `upgrade-2026-10` (`bad36f1`), the
-**original** is commit `2a19135` (= `origin/main`). Your local `main` was fast-forwarded to the upgrade, so read the
-original by commit id. Snippets are from the upgrade unless marked.
+**original** is commit `2a19135` (= `origin/main`). Your local `main` was fast-forwarded to the upgrade, so read the original by commit id. Snippets are from the upgrade unless marked.
 
 ```mermaid
 flowchart TB
@@ -478,31 +476,22 @@ if (!transport.start([&node](const Message& request, const std::string& peer) {
 
 ### 5. Deep dive: terms and leader election from scratch
 
-Section 1 above walks `handle_request_vote`. This section builds elections from zero. Order: why a leader → terms →
-timeouts and why they're random → one election, step by step → the voting rules and the election restriction →
-pre-vote and check-quorum → questions → check.
+Section 1 above walks `handle_request_vote`. This section builds elections from zero. Order: why a leader → terms → timeouts and why they're random → one election, step by step → the voting rules and the election restriction → pre-vote and check-quorum → questions → check.
 
 > [!important] The one sentence to hold on to
-> A follower that hears nothing for a **random** 600–1200 ms becomes a candidate in a **new term** and asks for votes;
-> each node grants **one vote per term**, only to a candidate whose log is **at least as up to date**, and a majority of
-> votes makes a leader.
+> A follower that hears nothing for a **random** 600–1200 ms becomes a candidate in a **new term** and asks for votes; each node grants **one vote per term**, only to a candidate whose log is **at least as up to date**, and a majority of votes makes a leader.
 
 #### 5.1 Why a leader?
 
-Raft keeps a **replicated log**: every node applies the same commands in the same order to the same deterministic
-state machine (here, a key-value map), so all nodes end in the same state. Agreeing on the order is the hard part.
+Raft keeps a **replicated log**: every node applies the same commands in the same order to the same deterministic state machine (here, a key-value map), so all nodes end in the same state. Agreeing on the order is the hard part.
 
-Raft makes it simple with a **strong leader**: clients send commands to the leader; it decides the order and copies
-its log to the followers. Entries flow only leader → follower. Elections exist to pick that leader, and to pick a new
-one when it fails.
+Raft makes it simple with a **strong leader**: clients send commands to the leader; it decides the order and copies its log to the followers. Entries flow only leader → follower. Elections exist to pick that leader, and to pick a new one when it fails.
 
 #### 5.2 Terms: a logical clock
 
 Time is split into numbered **terms**: 1, 2, 3, … Each term starts with an election and has **at most one** leader.
 
-The rule that keeps everyone consistent: **any message carrying a higher term makes the receiver adopt that term and
-become a follower.** So a deposed leader that wakes up with term 2 and hears term 3 steps down at once. A message with
-a *lower* term is stale and is refused.
+The rule that keeps everyone consistent: **any message carrying a higher term makes the receiver adopt that term and become a follower.** So a deposed leader that wakes up with term 2 and hears term 3 steps down at once. A message with a *lower* term is stale and is refused.
 
 #### 5.3 Timeouts, and why they're random
 
@@ -512,20 +501,15 @@ a *lower* term is stale and is refused.
 | rpc timeout | 400 ms | how long one RPC may block a replicator |
 | election timeout | uniform in **[600, 1200] ms**, re-drawn on every reset | silence this long → start an election |
 
-The rule is **heartbeat ≪ election timeout ≪ time between failures**. The validator also demands
-`election_min ≥ rpc_timeout + heartbeat` (600 ≥ 400 + 100): one lost RPC must not trigger an election.
+The rule is **heartbeat ≪ election timeout ≪ time between failures**. The validator also demands `election_min ≥ rpc_timeout + heartbeat` (600 ≥ 400 + 100): one lost RPC must not trigger an election.
 
-**Why random?** If two followers time out at the same moment, both become candidates, each votes for itself, and
-neither gets a majority: a **split vote**. With independent uniform timeouts on a 600 ms range, the chance that two
-fire within δ of each other is
+**Why random?** If two followers time out at the same moment, both become candidates, each votes for itself, and neither gets a majority: a **split vote**. With independent uniform timeouts on a 600 ms range, the chance that two fire within δ of each other is
 
 $$P = 1 - \left(1 - \frac{\delta}{600}\right)^2$$
 
-With δ = 10 ms (the ticker checks every 10 ms): $P = 1 - (590/600)^2 \approx 3.3\%$. A split vote just means a retry
-with fresh random timeouts, so two in a row is ~0.1%.
+With δ = 10 ms (the ticker checks every 10 ms): $P = 1 - (590/600)^2 \approx 3.3\%$. A split vote just means a retry with fresh random timeouts, so two in a row is ~0.1%.
 
-**Expected failover.** After the leader dies, the first survivor to time out starts the election. The minimum of k
-uniforms on [600, 1200] has mean $600 + 600/(k+1)$:
+**Expected failover.** After the leader dies, the first survivor to time out starts the election. The minimum of k uniforms on [600, 1200] has mean $600 + 600/(k+1)$:
 - 3 nodes (2 survivors): 600 + 200 = **800 ms**;
 - 5 nodes (3 survivors): 600 + 150 = **750 ms**.
 
@@ -574,13 +558,9 @@ Note it compares the **last term first**, not the length. A short log ending in 
 
 ![[d14-2-restriction.svg]]
 
-An entry is committed once it's on a **majority**. A winner needs votes from a **majority**. Two majorities of 5 (3
-and 3) must share at least one node, because 3 + 3 > 5. That node holds the entry and refuses any candidate whose log
-lacks it. So every new leader already has every committed entry (**Leader Completeness**), and leaders never need to
-fetch entries from followers.
+An entry is committed once it's on a **majority**. A winner needs votes from a **majority**. Two majorities of 5 (3 and 3) must share at least one node, because 3 + 3 > 5. That node holds the entry and refuses any candidate whose log lacks it. So every new leader already has every committed entry (**Leader Completeness**), and leaders never need to fetch entries from followers.
 
-On a grant, the voter also **resets its own timer**: a node that just voted shouldn't immediately start a competing
-election.
+On a grant, the voter also **resets its own timer**: a node that just voted shouldn't immediately start a competing election.
 
 #### 5.6 Pre-vote and check-quorum (the upgrade)
 
@@ -597,18 +577,15 @@ Two candidates could then both collect a majority: two leaders in one term (§8)
 
 ##### "Can elections fail forever?"
 
-In theory, if timeouts kept colliding. With random re-draws each round, the chance of k split votes in a row falls
-like 0.033^k. In practice a leader appears within one or two rounds.
+In theory, if timeouts kept colliding. With random re-draws each round, the chance of k split votes in a row falls like 0.033^k. In practice a leader appears within one or two rounds.
 
 ##### "Why an odd number of nodes?"
 
-A majority of 4 is 3, the same as for 5, but 4 nodes tolerate only 1 failure (5 tolerate 2). The extra node adds cost
-without adding fault tolerance.
+A majority of 4 is 3, the same as for 5, but 4 nodes tolerate only 1 failure (5 tolerate 2). The extra node adds cost without adding fault tolerance.
 
 ##### "What happened on Wi-Fi?"
 
-RTTs over 100 ms made followers time out under a healthy leader: elections every few seconds, NOOP entries piling up,
-terms in the thousands. The fix is a slower timing profile (`wifi`: heartbeat 250, rpc 1000, election 1500–3000 ms).
+RTTs over 100 ms made followers time out under a healthy leader: elections every few seconds, NOOP entries piling up, terms in the thousands. The fix is a slower timing profile (`wifi`: heartbeat 250, rpc 1000, election 1500–3000 ms).
 There's no before/after measurement in the repo.
 
 #### 5.8 Check your understanding
@@ -640,13 +617,10 @@ There's no before/after measurement in the repo.
 
 ### 6. Deep dive: log replication and log matching from scratch
 
-Section 3 above walks `handle_append_entries`. This section explains why one consistency check is enough to keep every
-log correct, and how a follower that went wrong gets repaired. Order: what AppendEntries carries → the log-matching
-property → the check → repairing a divergent follower → append and truncate → the leader's side → questions → check.
+Section 3 above walks `handle_append_entries`. This section explains why one consistency check is enough to keep every log correct, and how a follower that went wrong gets repaired. Order: what AppendEntries carries → the log-matching property → the check → repairing a divergent follower → append and truncate → the leader's side → questions → check.
 
 > [!important] The one sentence to hold on to
-> Every AppendEntries says "these entries follow index *prev* with term *prev_term*". A follower accepts only if its own
-> entry at *prev* has that term; by induction, an accepted log matches the leader's up to the last entry sent.
+> Every AppendEntries says "these entries follow index *prev* with term *prev_term*". A follower accepts only if its own entry at *prev* has that term; by induction, an accepted log matches the leader's up to the last entry sent.
 
 #### 6.1 What AppendEntries carries
 
@@ -691,8 +665,7 @@ if (check_index >= 1 && term_at(check_index) != check_term) {
 
 #### 6.4 Repairing a divergent follower, on an example
 
-A follower that was cut off may hold entries from terms that never committed. The leader's log (terms by index) is
-`1 1 1 4 4 5 5 6 6 6`; the follower's is `1 1 1 2 2 2 3 3 3 3 3`.
+A follower that was cut off may hold entries from terms that never committed. The leader's log (terms by index) is `1 1 1 4 4 5 5 6 6 6`; the follower's is `1 1 1 2 2 2 3 3 3 3 3`.
 
 ![[d14-3-backup.svg]]
 
@@ -702,11 +675,9 @@ A follower that was cut off may hold entries from terms that never committed. Th
 | 2 | 6 | 5 | 2 | reject, conflict = 4 (first index of term 2) |
 | 3 | 3 | 1 | 1 | **match**: append 4..10 |
 
-The leader sets `next_index = conflict` on each reject (`:576–584`). **Fast backup** skips a whole term per round
-trip: 3 rounds here. Going back one index at a time would take 8 (prev = 10, 9, …, 4 rejected, then 3).
+The leader sets `next_index = conflict` on each reject (`:576–584`). **Fast backup** skips a whole term per round trip: 3 rounds here. Going back one index at a time would take 8 (prev = 10, 9, …, 4 rejected, then 3).
 
-Is skipping safe? Yes: the leader may resend a few entries the follower already has, which the append rule (6.5)
-skips harmlessly.
+Is skipping safe? Yes: the leader may resend a few entries the follower already has, which the append rule (6.5) skips harmlessly.
 
 #### 6.5 Append and truncate
 
@@ -722,9 +693,7 @@ for (const LogEntry& entry : entries) {
 - Round 3 sends entries 4..10. Entry 4 (term 4): the follower has index 4 with term 2, a mismatch, so it **truncates** from 4 on: `resize(4 − 0 − 1 = 3)` keeps indices 1–3. Then it appends 4..10. Its stale entry 11 disappears with the truncation.
 - An entry that already exists **with the same term** is skipped, never truncated.
 
-Why that matters: messages can arrive late or twice. Suppose an old message carrying only entries 4..5 arrives *after*
-4..10 were appended. Entries 4 and 5 match, so they're skipped, and 6..10 survive. Truncating on any message would
-delete entries the follower had already acknowledged.
+Why that matters: messages can arrive late or twice. Suppose an old message carrying only entries 4..5 arrives *after* 4..10 were appended. Entries 4 and 5 match, so they're skipped, and 6..10 survive. Truncating on any message would delete entries the follower had already acknowledged.
 
 #### 6.6 The leader's side
 
@@ -742,14 +711,11 @@ No (**Leader Append-Only**). Only followers truncate, and only entries the leade
 
 ##### "Doesn't truncating risk deleting a committed entry?"
 
-No. A committed entry is on a majority, and the leader has it (Leader Completeness, §5.5). A follower's entry that
-conflicts with the leader therefore can't be committed.
+No. A committed entry is on a majority, and the leader has it (Leader Completeness, §5.5). A follower's entry that conflicts with the leader therefore can't be committed.
 
 ##### "Why not send the whole log on a mismatch?"
 
-It could be huge. One check per message plus fast backup finds the divergence point in about one round trip per
-conflicting term, then sends only what's missing. A follower that is very far behind (past a snapshot) gets
-InstallSnapshot instead.
+It could be huge. One check per message plus fast backup finds the divergence point in about one round trip per conflicting term, then sends only what's missing. A follower that is very far behind (past a snapshot) gets InstallSnapshot instead.
 
 #### 6.8 Check your understanding
 
@@ -778,26 +744,20 @@ InstallSnapshot instead.
 
 ### 7. Deep dive: the commit rule and Figure 8 from scratch
 
-Section 2 above walks `maybe_advance_commit`. This section explains why the rule counts **only current-term
-entries**, and why the follower bounds its commit index the way it does. Order: what "committed" means →
-`maybe_advance_commit` line by line → Figure 8 → the NOOP → the follower's side and story 1 → apply and reply →
-questions → check.
+Section 2 above walks `maybe_advance_commit`. This section explains why the rule counts **only current-term entries**, and why the follower bounds its commit index the way it does. Order: what "committed" means → `maybe_advance_commit` line by line → Figure 8 → the NOOP → the follower's side and story 1 → apply and reply → questions → check.
 
 > [!important] The one sentence to hold on to
-> A leader marks index N committed only when the entry at N is **from its own term** and is on a **majority**; that
-> commits everything before N too. A follower commits up to `min(leader_commit, last entry this message proved)`.
+> A leader marks index N committed only when the entry at N is **from its own term** and is on a **majority**; that commits everything before N too. A follower commits up to `min(leader_commit, last entry this message proved)`.
 
 #### 7.1 What "committed" means
 
-An entry is **committed** when it can never be lost or replaced: it's safe to apply to the state machine and to answer
-the client "OK". The leader decides this; followers learn it from `leader_commit` in later messages.
+An entry is **committed** when it can never be lost or replaced: it's safe to apply to the state machine and to answer the client "OK". The leader decides this; followers learn it from `leader_commit` in later messages.
 
 "On a majority" sounds like enough. It almost is. Figure 8 (7.3) shows the one case where it isn't.
 
 #### 7.2 `maybe_advance_commit`, line by line
 
-Use the check-yourself numbers: 5 nodes (majority 3), the leader is in term 4, its log ends at 50, entries 46–50 are
-term 4, `commit_index = 40`, and `match_index = {n2: 50, n3: 48, n4: 50, n5: 30}`.
+Use the check-yourself numbers: 5 nodes (majority 3), the leader is in term 4, its log ends at 50, entries 46–50 are term 4, `commit_index = 40`, and `match_index = {n2: 50, n3: 48, n4: 50, n5: 30}`.
 
 ```cpp
 for (uint64_t n = last_log_index(); n > commit_index_; --n) {
@@ -868,9 +828,7 @@ const uint64_t last_new_entry = entries.empty() ? check_index : entries.back().i
 
 ##### "Would the tests catch it if you deleted the current-term check?"
 
-Almost certainly not (prep pack exercise 1). Figure 8 needs a precise sequence of crashes and elections that random
-fault injection rarely produces, and the NOOP shrinks the window further. Some safety rules are defended by argument,
-a targeted test or a model checker, not random testing.
+Almost certainly not (prep pack exercise 1). Figure 8 needs a precise sequence of crashes and elections that random fault injection rarely produces, and the NOOP shrinks the window further. Some safety rules are defended by argument, a targeted test or a model checker, not random testing.
 
 ##### "Why doesn't the leader count itself through `match_index`?"
 
@@ -878,8 +836,7 @@ a targeted test or a model checker, not random testing.
 
 ##### "Is a committed entry applied at once on every node?"
 
-No. The leader applies as soon as it commits. Followers apply after the next AppendEntries tells them the new
-`leader_commit` (a heartbeat within 100 ms).
+No. The leader applies as soon as it commits. Followers apply after the next AppendEntries tells them the new `leader_commit` (a heartbeat within 100 ms).
 
 #### 7.8 Check your understanding
 
@@ -910,13 +867,10 @@ No. The leader applies as soon as it commits. Followers apply after the next App
 
 ### 8. Deep dive: Raft durability from scratch (what to persist, when, and how)
 
-Section 4 above walks `write_durably` and the start-up order. This section explains why Raft's safety proofs assume
-three things survive a crash, and what each storage step buys. Order: the three persistent fields → change, persist,
-reply → `write_durably` line by line → story 2 → what it costs → what tests can and can't show → questions → check.
+Section 4 above walks `write_durably` and the start-up order. This section explains why Raft's safety proofs assume three things survive a crash, and what each storage step buys. Order: the three persistent fields → change, persist, reply → `write_durably` line by line → story 2 → what it costs → what tests can and can't show → questions → check.
 
 > [!important] The one sentence to hold on to
-> Before answering any RPC, a node saves `currentTerm`, `votedFor` and its log with temp-file → fsync → rename →
-> fsync-directory, so after any crash it remembers every promise it made.
+> Before answering any RPC, a node saves `currentTerm`, `votedFor` and its log with temp-file → fsync → rename → fsync-directory, so after any crash it remembers every promise it made.
 
 #### 8.1 The three fields that must survive
 
@@ -984,8 +938,7 @@ The original opened the port **first**. A timeline of the bug:
 3. 5 > 0, so the handler adopts term 5 and calls `persist()`: it writes term 5 and an **empty log** over the saved file.
 4. Then `start()` loads that file: the node has forgotten entries it had acknowledged.
 
-The leader refills the log, so the node looks healthy. But if it was part of the majority for an entry and the leader
-then dies, that entry can be lost. The fix (`d798369`): load the saved state, **then** open the port.
+The leader refills the log, so the node looks healthy. But if it was part of the majority for an entry and the leader then dies, that entry can be lost. The fix (`d798369`): load the saved state, **then** open the port.
 
 #### 8.5 What it costs
 
@@ -1005,8 +958,7 @@ Real systems append to a log file instead of rewriting it, and **group-commit**:
 
 ##### "What if the `.bin` file is corrupt?"
 
-Today the node starts **empty, silently** (`raft_node.cpp:120`): it forgets its vote and log. A checksum and a refusal
-to start would be safer.
+Today the node starts **empty, silently** (`raft_node.cpp:120`): it forgets its vote and log. A checksum and a refusal to start would be safer.
 
 ##### "What if the disk write fails?"
 

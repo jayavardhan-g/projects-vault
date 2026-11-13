@@ -6,8 +6,7 @@ tags: [interview, day, seminar, speech]
 ---
 # Day 7 (Sat Nov 14): the seminar, and speech basics
 
-Part of [[Interview plan (Nov 2026)]]. **No code today.** About 6.5 h. Prep pack: [[Seminar - prep]] (concept map §2,
-field numbers §5.2, claims to fix §5.3, 50 questions §7). This day also sets up tomorrow ([[Day 08 - CosyVoice]]).
+Part of [[Interview plan (Nov 2026)]]. **No code today.** About 6.5 h. Prep pack: [[Seminar - prep]] (concept map §2, field numbers §5.2, claims to fix §5.3, 50 questions §7). This day also sets up tomorrow ([[Day 08 - CosyVoice]]).
 
 **Code, explained:** the figures, the code to read and what each snippet does are in [[#Code, explained]], right after section B.
 
@@ -214,8 +213,7 @@ Report §1.1 and ch. 8. Prep pack §5.2 "Latency anchors" and "Error propagation
 Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 The seminar was a reading project, so there is **no code of
-yours** today. Instead: one figure per pipeline, plus a few **illustrative** NumPy snippets (written for this note,
-not from any repo) that make the quantisers concrete. Numbers come from [[Seminar - prep]] §5.2.
+yours** today. Instead: one figure per pipeline, plus a few **illustrative** NumPy snippets (written for this note, not from any repo) that make the quantisers concrete. Numbers come from [[Seminar - prep]] §5.2.
 
 ---
 
@@ -358,14 +356,10 @@ print(round(bitrate(25, 1, 6561)))              # CosyVoice 2 ≈ 317
 
 ### 5. Deep dive: from waveform to log-mel to tokens, from scratch
 
-Section 1 above shows the pipeline as boxes. This section builds each box from zero, on numbers you can check by
-hand. Order: what a sample is → why we cut audio into frames → what an FFT gives → why mel and why log → the
-encoder's rate → token rates and sequence cost → questions → check.
+Section 1 above shows the pipeline as boxes. This section builds each box from zero, on numbers you can check by hand. Order: what a sample is → why we cut audio into frames → what an FFT gives → why mel and why log → the encoder's rate → token rates and sequence cost → questions → check.
 
 > [!important] The one sentence to hold on to
-> Audio is a long list of pressure readings; we cut it into overlapping 25 ms frames every 10 ms, describe each
-> frame by how much energy sits in 80 pitch bands (log-mel), and an encoder turns those 100 frames per second into
-> 50 vectors per second, which a quantiser can turn into tokens.
+> Audio is a long list of pressure readings; we cut it into overlapping 25 ms frames every 10 ms, describe each frame by how much energy sits in 80 pitch bands (log-mel), and an encoder turns those 100 frames per second into 50 vectors per second, which a quantiser can turn into tokens.
 
 #### 5.1 What a sample is
 
@@ -376,8 +370,7 @@ A microphone measures air pressure many times per second. Each measurement is on
 
 So 10 seconds at 24 kHz is **240,000 numbers**. No transformer can attend over that, so we compress.
 
-Why 16 kHz is enough for speech: a sample rate of $f_s$ can represent pitches up to $f_s / 2$ (the **Nyquist**
-limit). 16 kHz covers up to 8 kHz, which holds nearly all of speech's content. Music needs more (44.1 kHz).
+Why 16 kHz is enough for speech: a sample rate of $f_s$ can represent pitches up to $f_s / 2$ (the **Nyquist** limit). 16 kHz covers up to 8 kHz, which holds nearly all of speech's content. Music needs more (44.1 kHz).
 
 #### 5.2 Frames: why cut the audio into short windows?
 
@@ -397,43 +390,35 @@ For 10 s of audio: **1,000 frames**.
 
 #### 5.3 What the FFT gives you
 
-Each 400-sample frame goes through an **FFT** (fast Fourier transform). It answers: *how much of each pitch is in
-this frame?*
+Each 400-sample frame goes through an **FFT** (fast Fourier transform). It answers: *how much of each pitch is in this frame?*
 
 - A 400-point FFT gives 400 / 2 + 1 = **201 frequency bins**.
 - The bins are $f_s / N$ = 16,000 / 400 = **40 Hz** apart: 0 Hz, 40 Hz, 80 Hz, …, 8,000 Hz.
 - We keep the **magnitude** (how loud each pitch is) and drop the phase. Squared magnitude = power.
 
-So one frame becomes 201 non-negative numbers. That's the **spectrum** of the frame. A stack of spectra over time is
-a **spectrogram**.
+So one frame becomes 201 non-negative numbers. That's the **spectrum** of the frame. A stack of spectra over time is a **spectrogram**.
 
 #### 5.4 Why mel, and why log?
 
 Two facts about hearing shape the next two steps.
 
-**1. The ear hears pitch on a stretched scale.** The step from 100 Hz to 200 Hz sounds large. The step from 7,000 Hz to
-7,100 Hz sounds tiny. The **mel scale** models this. One common formula:
+**1. The ear hears pitch on a stretched scale.** The step from 100 Hz to 200 Hz sounds large. The step from 7,000 Hz to 7,100 Hz sounds tiny. The **mel scale** models this. One common formula:
 
 $$\text{mel}(f) = 2595 \cdot \log_{10}\!\left(1 + \frac{f}{700}\right)$$
 
 - mel(1,000 Hz) = 2595 · log₁₀(1 + 1000/700) = **1,000**;
 - mel(8,000 Hz) = **2,840**.
 
-Place 80 triangle filters **evenly in mel** from 0 to 2,840. Converted back to Hz, they are narrow at low pitch and
-wide at high pitch. With this formula, 28 of the 80 filter centres sit below 1 kHz. Each filter adds up the power of
-the FFT bins under its triangle. So **201 bins → 80 numbers**. (Whisper's filterbank uses a slightly different mel
-formula, but the shape is the same.)
+Place 80 triangle filters **evenly in mel** from 0 to 2,840. Converted back to Hz, they are narrow at low pitch and wide at high pitch. With this formula, 28 of the 80 filter centres sit below 1 kHz. Each filter adds up the power of the FFT bins under its triangle. So **201 bins → 80 numbers**. (Whisper's filterbank uses a slightly different mel formula, but the shape is the same.)
 
 **2. The ear hears loudness on a log scale.** Power values span a huge range: 0.001 to 1,000 is a factor of a million.
-Taking $\log_{10}$ turns that into −3 … 3. Small values stay visible next to big ones, and the network gets numbers of
-similar size.
+Taking $\log_{10}$ turns that into −3 … 3. Small values stay visible next to big ones, and the network gets numbers of similar size.
 
 **Result:** one frame = **80 log-mel values**. 10 s = a **[1,000, 80]** matrix. That's Whisper's input.
 
 #### 5.5 The encoder: 100 frames/s → 50 vectors/s
 
-Whisper's encoder starts with two 1-D convolutions. The second has **stride 2**: it outputs one vector for every two
-input frames. So the rate halves: 100 → **50 vectors per second**.
+Whisper's encoder starts with two 1-D convolutions. The second has **stride 2**: it outputs one vector for every two input frames. So the rate halves: 100 → **50 vectors per second**.
 
 | stage | rate | 10 s of audio | 30 s (Whisper's window) |
 |---|---|---|---|
@@ -441,9 +426,7 @@ input frames. So the rate halves: 100 → **50 vectors per second**.
 | log-mel frames | 100 /s | 1,000 × 80 | 3,000 × 80 |
 | encoder states | 50 /s | **500** vectors | **1,500** vectors |
 
-These states are **continuous** vectors. For **understanding** (speech in, text out), an adapter can feed them to an
-LLM directly. For **generation**, an LM needs a finite vocabulary to predict from, so a **quantiser** turns each
-vector into one or more **token ids** (section 6 below).
+These states are **continuous** vectors. For **understanding** (speech in, text out), an adapter can feed them to an LLM directly. For **generation**, an LM needs a finite vocabulary to predict from, so a **quantiser** turns each vector into one or more **token ids** (section 6 below).
 
 #### 5.6 Token rate sets the sequence length
 
@@ -458,27 +441,21 @@ Attention compares every token with every other one, so its work grows with the 
 
 $$\frac{\text{attention}(6{,}000)}{\text{attention}(250)} = \left(\frac{6{,}000}{250}\right)^2 = 24^2 = 576$$
 
-The MLP work and the KV cache grow linearly: 24×. And a streaming model must **produce** at least the token rate per
-second to keep up with real time: 25 tokens/s is easy, 600 tokens/s from one flat stream is not.
+The MLP work and the KV cache grow linearly: 24×. And a streaming model must **produce** at least the token rate per second to keep up with real time: 25 tokens/s is easy, 600 tokens/s from one flat stream is not.
 
 #### 5.7 Questions people usually ask next
 
 ##### "Why 25 ms and 10 ms? Are they magic?"
 
-No. They're a long-standing ASR convention. The window must be long enough to contain a few pitch periods (a 100 Hz
-voice repeats every 10 ms), but short enough that the sound is roughly steady inside it. The hop is smaller than the
-window so that no event is missed between frames.
+No. They're a long-standing ASR convention. The window must be long enough to contain a few pitch periods (a 100 Hz voice repeats every 10 ms), but short enough that the sound is roughly steady inside it. The hop is smaller than the window so that no event is missed between frames.
 
 ##### "Why throw away the phase?"
 
-The ear is much less sensitive to phase than to magnitude, and magnitude is easier for models to learn from. The cost
-appears at the **output**: to rebuild a waveform from a mel spectrogram you must invent a phase. That's the
-**vocoder's** job (HiFi-GAN in CosyVoice).
+The ear is much less sensitive to phase than to magnitude, and magnitude is easier for models to learn from. The cost appears at the **output**: to rebuild a waveform from a mel spectrogram you must invent a phase. That's the **vocoder's** job (HiFi-GAN in CosyVoice).
 
 ##### "Why 80 mel bins? Whisper v3 uses 128."
 
-More bins keep more detail of the spectrum, at a slightly bigger input. 80 is the classic choice; Whisper large-v3
-moved to 128. The pipeline is the same.
+More bins keep more detail of the spectrum, at a slightly bigger input. 80 is the classic choice; Whisper large-v3 moved to 128. The pipeline is the same.
 
 ##### "Isn't a log-mel spectrogram already a compressed audio file?"
 
@@ -516,31 +493,22 @@ A **codec** like EnCodec is trained to rebuild the waveform itself from discrete
 
 ### 6. Deep dive: VQ, RVQ and FSQ, from scratch
 
-Section 2 above gives the three quantisers as boxes and a NumPy sketch. This section works each one on a single 2-d
-vector, so every number can be checked by hand. Order: why quantise → VQ → codebook collapse → RVQ → FSQ →
-bitrate → the sketch's code line by line → questions → check.
+Section 2 above gives the three quantisers as boxes and a NumPy sketch. This section works each one on a single 2-d vector, so every number can be checked by hand. Order: why quantise → VQ → codebook collapse → RVQ → FSQ → bitrate → the sketch's code line by line → questions → check.
 
 > [!important] The one sentence to hold on to
-> A quantiser replaces a continuous vector by an **id** from a finite set: VQ picks the nearest learned code, RVQ
-> repeats that on the leftover error, and FSQ simply squashes and rounds each dimension, so it has no codebook that
-> can collapse.
+> A quantiser replaces a continuous vector by an **id** from a finite set: VQ picks the nearest learned code, RVQ repeats that on the leftover error, and FSQ simply squashes and rounds each dimension, so it has no codebook that can collapse.
 
 #### 6.1 Why quantise at all?
 
-An LM generates text by choosing **one of V tokens** at each step (a softmax over a vocabulary). To generate speech
-the same way, speech must also become **ids from a finite vocabulary**. The encoder gives continuous vectors, so we
-need a rule that maps each vector to an id, and a table that maps each id back to a vector. That rule is a
-**quantiser**.
+An LM generates text by choosing **one of V tokens** at each step (a softmax over a vocabulary). To generate speech the same way, speech must also become **ids from a finite vocabulary**. The encoder gives continuous vectors, so we need a rule that maps each vector to an id, and a table that maps each id back to a vector. That rule is a **quantiser**.
 
 #### 6.2 VQ: the nearest of K codes
 
-**Idea:** keep a **codebook** of K vectors $c_0, …, c_{K-1}$. Replace the input $z$ by the closest one, and output its
-index:
+**Idea:** keep a **codebook** of K vectors $c_0, …, c_{K-1}$. Replace the input $z$ by the closest one, and output its index:
 
 $$k^* = \arg\min_k \lVert z - c_k \rVert^2$$
 
-**Tiny example.** $z = (0.9, 0.2)$; a codebook of K = 4 codes: $c_0 = (1, 0)$, $c_1 = (0, 1)$, $c_2 = (-1, 0)$,
-$c_3 = (0, -1)$.
+**Tiny example.** $z = (0.9, 0.2)$; a codebook of K = 4 codes: $c_0 = (1, 0)$, $c_1 = (0, 1)$, $c_2 = (-1, 0)$, $c_3 = (0, -1)$.
 
 | code | $z - c_k$ | squared distance |
 |---|---|---|
@@ -553,9 +521,7 @@ So the token is **0**, and the decoder will see $c_0 = (1, 0)$. The leftover err
 
 ![[d07-2-quantisers.svg]] [[d07-2-quantisers.html|▶ Step through it]]
 
-**How the codebook is learned:** codes are moved towards the inputs that chose them (like k-means), either by a loss
-term or by an exponential moving average. The encoder can't get a gradient through `argmin`, so training copies the
-decoder's gradient straight past the quantiser (the **straight-through estimator**).
+**How the codebook is learned:** codes are moved towards the inputs that chose them (like k-means), either by a loss term or by an exponential moving average. The encoder can't get a gradient through `argmin`, so training copies the decoder's gradient straight past the quantiser (the **straight-through estimator**).
 
 #### 6.3 Codebook collapse
 
@@ -566,16 +532,13 @@ Codes only move if some input **chooses** them. A code that's never nearest neve
 - Code 0 moves to their mean, 0.45. Codes 1 and 2 never move.
 - Result: **1 of 3 codes used**. The "vocabulary" is effectively one token, and nothing separates the four points.
 
-In a real codec with K = 1,024, collapse means a few hundred codes do all the work and bits are wasted. The usual
-fixes: initialise the codes from data (k-means), EMA updates, and **restarting dead codes** at random inputs.
+In a real codec with K = 1,024, collapse means a few hundred codes do all the work and bits are wasted. The usual fixes: initialise the codes from data (k-means), EMA updates, and **restarting dead codes** at random inputs.
 
 #### 6.4 RVQ: quantise what's left, again
 
-One codebook of 1,024 codes gives only 10 bits per frame, which can't capture a waveform's detail. **Residual VQ**
-stacks codebooks: each one quantises the error the previous ones left.
+One codebook of 1,024 codes gives only 10 bits per frame, which can't capture a waveform's detail. **Residual VQ** stacks codebooks: each one quantises the error the previous ones left.
 
-Continue the example. Stage 1 gave $c_0 = (1, 0)$ and the residual $r = z - c_0 = (−0.1, 0.2)$. Stage 2 has its own,
-**smaller-scale** codebook: (0.25, 0), (0, 0.25), (−0.25, 0), (0, −0.25).
+Continue the example. Stage 1 gave $c_0 = (1, 0)$ and the residual $r = z - c_0 = (−0.1, 0.2)$. Stage 2 has its own, **smaller-scale** codebook: (0.25, 0), (0, 0.25), (−0.25, 0), (0, −0.25).
 
 | stage-2 code | $r - c$ | squared distance |
 |---|---|---|
@@ -584,8 +547,7 @@ Continue the example. Stage 1 gave $c_0 = (1, 0)$ and the residual $r = z - c_0 
 | (−0.25, 0) | (0.15, 0.2) | 0.0625 |
 | (0, −0.25) | (−0.1, 0.45) | 0.2125 |
 
-Stage 2 picks id **1**. The reconstruction is $c_0 + (0, 0.25) = (1, 0.25)$, and the squared error drops from
-**0.05 to 0.0125**.
+Stage 2 picks id **1**. The reconstruction is $c_0 + (0, 0.25) = (1, 0.25)$, and the squared error drops from **0.05 to 0.0125**.
 
 - **Tokens per frame:** one per stage. EnCodec at 6 kbps uses 8 stages: **8 tokens per frame**.
 - **Combinations:** $K^N$. With K = 1,024 and N = 8 that's $2^{80}$ possible frames, but the **sequence** is only 8× longer. Length grows **linearly** in N, not exponentially. (Your slide 5 says "exponentially larger sequences": wrong; the report has it right.)
@@ -604,8 +566,7 @@ Stage 2 picks id **1**. The reconstruction is $c_0 + (0, 0.25) = (1, 0.25)$, and
 | 1 | 0.9 | 0.716 | 0.716 | **1** |
 | 2 | 0.2 | 0.197 | 0.197 | **0** |
 
-The code is (1, 0). As one id: shift each digit to 0…2 and read it in base 3: $(1+1)·3 + (0+1) = $ **7** (of
-$3^2 = 9$ codes).
+The code is (1, 0). As one id: shift each digit to 0…2 and read it in base 3: $(1+1)·3 + (0+1) = $ **7** (of $3^2 = 9$ codes).
 
 - **Codebook size** = $L^d$. CosyVoice 2 uses L = 3 on d = 8 dimensions: $3^8$ = **6,561** codes.
 - **No collapse:** every grid point is a valid code by construction, and nothing has to "move" to become usable.
@@ -621,8 +582,7 @@ $$\text{bitrate} = \text{frames/s} \times \text{codebooks per frame} \times \log
 | WavTokenizer | 75 | 1 | log₂ 4,096 = 12 | 75 × 12 = **900 bps** |
 | CosyVoice 2 S3 | 25 | 1 | log₂ 6,561 = 12.68 | 25 × 12.68 ≈ **317 bps** |
 
-Against raw 24 kHz PCM (384 kbps), WavTokenizer is 384 / 0.9 ≈ **427×** smaller. WavTokenizer's hop is 24,000 / 75 =
-**320 samples** per token.
+Against raw 24 kHz PCM (384 kbps), WavTokenizer is 384 / 0.9 ≈ **427×** smaller. WavTokenizer's hop is 24,000 / 75 = **320 samples** per token.
 
 #### 6.7 The sketch in section 2, line by line
 
@@ -647,25 +607,20 @@ np.round(np.tanh(z) * (3 // 2))   # [1., 0.]: FSQ with L = 3
 
 ##### "If FSQ can't collapse, why does anyone still use VQ?"
 
-A learned codebook can place codes where the data actually is, which can be more efficient at the same size. FSQ's
-grid is fixed, so it relies on the encoder to spread its outputs over the grid. In practice FSQ matches VQ quality
-with far less tuning, which is why CosyVoice 2 switched to it.
+A learned codebook can place codes where the data actually is, which can be more efficient at the same size. FSQ's grid is fixed, so it relies on the encoder to spread its outputs over the grid. In practice FSQ matches VQ quality with far less tuning, which is why CosyVoice 2 switched to it.
 
 ##### "Why does RVQ need smaller codes at later stages?"
 
-The residual is smaller than the original vector (0.22 long vs 0.92 here). Codes the size of the original would
-overshoot. Training learns this scale automatically; I set it by hand in the example.
+The residual is smaller than the original vector (0.22 long vs 0.92 here). Codes the size of the original would overshoot. Training learns this scale automatically; I set it by hand in the example.
 
 ##### "What does 'semantic' vs 'acoustic' token mean in these terms?"
 
-It's about what the quantiser was trained to keep. **Acoustic** tokens (EnCodec, WavTokenizer) are trained to rebuild
-the waveform, so they keep the voice. **Semantic** tokens (HuBERT k-means, CosyVoice's S3) are trained for content:
+It's about what the quantiser was trained to keep. **Acoustic** tokens (EnCodec, WavTokenizer) are trained to rebuild the waveform, so they keep the voice. **Semantic** tokens (HuBERT k-means, CosyVoice's S3) are trained for content:
 S3 puts a quantiser inside an ASR encoder, so its tokens keep what was said, and the voice must come from elsewhere.
 
 ##### "Is 317 bps really enough for speech?"
 
-For **content**, yes: text is under 100 bps. CosyVoice 2 adds the voice and detail later (speaker embedding, prompt
-mel, flow matching), so the tokens don't have to carry them.
+For **content**, yes: text is under 100 bps. CosyVoice 2 adds the voice and detail later (speaker embedding, prompt mel, flow matching), so the tokens don't have to carry them.
 
 #### 6.9 Check your understanding
 
@@ -696,27 +651,21 @@ mel, flow matching), so the tokens don't have to carry them.
 
 ### 7. Deep dive: cascade vs end-to-end, and CosyVoice 2's streaming, from scratch
 
-Section 4 above lists the trade-offs. This section puts numbers on them. Order: the two designs → latency adds up →
-errors compound → what a cascade throws away → how CosyVoice 2's 5 : 15 interleave starts speaking early → the
-bitrate helper line by line → questions → check.
+Section 4 above lists the trade-offs. This section puts numbers on them. Order: the two designs → latency adds up → errors compound → what a cascade throws away → how CosyVoice 2's 5 : 15 interleave starts speaking early → the bitrate helper line by line → questions → check.
 
 > [!important] The one sentence to hold on to
-> A cascade (ASR → text LLM → TTS) is easy to build and debug, but its waits **add up**, its errors **compound**, and
-> the tone of voice is lost at the ASR step; an end-to-end model keeps speech as tokens throughout, at the cost of
-> needing paired speech data and being harder to inspect.
+> A cascade (ASR → text LLM → TTS) is easy to build and debug, but its waits **add up**, its errors **compound**, and the tone of voice is lost at the ASR step; an end-to-end model keeps speech as tokens throughout, at the cost of needing paired speech data and being harder to inspect.
 
 #### 7.1 The two designs
 
 - **Cascade:** speech → ASR → **text** → text LLM → **text** → TTS → speech. Three separate models joined by plain text.
 - **End-to-end:** one model whose vocabulary includes speech units (SpeechGPT; Moshi). Speech in, speech out, with no text bottleneck required.
 
-CosyVoice 2 is neither: it's a **TTS system** (text in, speech out) with an LLM inside. In a cascade it would be the
-last box.
+CosyVoice 2 is neither: it's a **TTS system** (text in, speech out) with an LLM inside. In a cascade it would be the last box.
 
 #### 7.2 Latency adds up
 
-In a cascade, each stage waits for the one before it. Take these **illustrative** stage costs (prep pack exercise 5;
-not measurements):
+In a cascade, each stage waits for the one before it. Take these **illustrative** stage costs (prep pack exercise 5; not measurements):
 
 | stage | ms | why it waits |
 |---|---|---|
@@ -729,17 +678,13 @@ not measurements):
 
 ![[d07-4-cascade.svg]] [[d07-4-cascade.html|▶ Step through it]]
 
-Humans leave about **200 ms** between turns. 1,400 ms is 7× that. For scale, OpenAI reported the old cascaded Voice
-Mode at 2.8 s (GPT-3.5) and 5.4 s (GPT-4), and GPT-4o at about 320 ms on average (vendor numbers, quote them as such).
+Humans leave about **200 ms** between turns. 1,400 ms is 7× that. For scale, OpenAI reported the old cascaded Voice Mode at 2.8 s (GPT-3.5) and 5.4 s (GPT-4), and GPT-4o at about 320 ms on average (vendor numbers, quote them as such).
 
-The two biggest cuts: a smarter end-of-turn detector (or starting the LLM on a partial transcript), and **streaming
-TTS** that starts after a few text tokens (section 7.5).
+The two biggest cuts: a smarter end-of-turn detector (or starting the LLM on a partial transcript), and **streaming TTS** that starts after a few text tokens (section 7.5).
 
 #### 7.3 Errors compound
 
-ASR makes **hard decisions**: a misheard name stays misheard, and the LLM can't recover it. A rough independence
-sketch: if each word is right with probability 1 − WER, a whole question of n words is right with probability
-$(1 - \text{WER})^n$.
+ASR makes **hard decisions**: a misheard name stays misheard, and the LLM can't recover it. A rough independence sketch: if each word is right with probability 1 − WER, a whole question of n words is right with probability $(1 - \text{WER})^n$.
 
 | ASR WER | 15 words | 20 words |
 |---|---|---|
@@ -747,29 +692,22 @@ $(1 - \text{WER})^n$.
 | 8% | 0.92¹⁵ = **29%** | 0.92²⁰ = 19% |
 | 10% | 0.90¹⁵ = 21% | 0.90²⁰ = **12%** |
 
-Errors aren't really independent, and many hit harmless words, so treat this as a sketch of the argument, not a
-measurement.
+Errors aren't really independent, and many hit harmless words, so treat this as a sketch of the argument, not a measurement.
 
 #### 7.4 What a cascade throws away
 
-Text keeps **what** was said. It drops **how**: tone, sarcasm, hesitation, laughter, emphasis. "Great, just great"
-said angrily and said happily give the same transcript, so the LLM answers both the same way, and the TTS reads the
-reply without knowing the mood. No speed-up fixes this; only a representation that keeps paralinguistic information
-can.
+Text keeps **what** was said. It drops **how**: tone, sarcasm, hesitation, laughter, emphasis. "Great, just great" said angrily and said happily give the same transcript, so the LLM answers both the same way, and the TTS reads the reply without knowing the mood. No speed-up fixes this; only a representation that keeps paralinguistic information can.
 
 #### 7.5 CosyVoice 2: starting to speak before the text is finished
 
-The CosyVoice 2 LM reads text and writes speech tokens **interleaved**: 5 text tokens, then 15 speech tokens, then
-the next 5 text, and so on.
+The CosyVoice 2 LM reads text and writes speech tokens **interleaved**: 5 text tokens, then 15 speech tokens, then the next 5 text, and so on.
 
 - 15 speech tokens at 25 Hz = 15 / 25 = **0.6 s of audio** per block.
 - So after only **5 text tokens** arrive, the first 0.6 s of speech can be generated, turned into mel by the flow model and played, while the next block is made.
 - The full 10 s reply is 250 speech tokens, about 17 blocks.
 
 Why 15 and not 40? Speech needs roughly 7 speech tokens per text token at 25 Hz (a rough figure from the prep pack).
-15 speech tokens cover about 15 / 7 ≈ 2.1 text tokens, fewer than the 5 just read, so the text stays **ahead** of the
-speech. At 5 : 40, the speech would cover about 5.7 text tokens per block, more than it has seen: the model would have
-to say words it hasn't read yet. Day 8 §7 shows how the training sequence is built with this ratio.
+15 speech tokens cover about 15 / 7 ≈ 2.1 text tokens, fewer than the 5 just read, so the text stays **ahead** of the speech. At 5 : 40, the speech would cover about 5.7 text tokens per block, more than it has seen: the model would have to say words it hasn't read yet. Day 8 §7 shows how the training sequence is built with this ratio.
 
 #### 7.6 The bitrate helper, line by line
 
@@ -798,18 +736,15 @@ print(round(bitrate(25, 1, 6561)))              # CosyVoice 2 ≈ 317
 
 ##### "Isn't SpeechGPT end-to-end? Why is its latency close to a cascade's?"
 
-It's one model, but its "chain of modality" writes the question's **text**, then the answer's text, and only then the
-answer's speech units. Writing text first costs nearly as much time as a cascade.
+It's one model, but its "chain of modality" writes the question's **text**, then the answer's text, and only then the answer's speech units. Writing text first costs nearly as much time as a cascade.
 
 ##### "Does end-to-end always win?"
 
-On latency and paralinguistics, usually. But it needs large amounts of paired speech data, is harder to debug (no
-readable transcript in the middle), and can't directly reuse the best text LLMs. Many products still run cascades.
+On latency and paralinguistics, usually. But it needs large amounts of paired speech data, is harder to debug (no readable transcript in the middle), and can't directly reuse the best text LLMs. Many products still run cascades.
 
 ##### "Where does the voice come from in CosyVoice?"
 
-Not from the S3 tokens, which carry content. The **speaker embedding** and the **prompt mel** condition the flow
-model. That's why your Day 8 LoRA adapts only the LM.
+Not from the S3 tokens, which carry content. The **speaker embedding** and the **prompt mel** condition the flow model. That's why your Day 8 LoRA adapts only the LM.
 
 #### 7.8 Check your understanding
 

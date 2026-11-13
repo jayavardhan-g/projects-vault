@@ -11,8 +11,7 @@ Part of [[Interview plan (Nov 2026)]]. Repo `sysml` (branch `main`). About 7 h. 
 
 **Code, explained:** the figures, the code to read and what each snippet does are in [[#Code, explained]], right after section B.
 
-**Resume bullet (part 2 of 2):** "Accelerated MLP inference **1.73×** using column-wise CUDA stream parallelism at large dimensions, while
-reducing peak activation memory **13.3%** through gradient checkpointing."
+**Resume bullet (part 2 of 2):** "Accelerated MLP inference **1.73×** using column-wise CUDA stream parallelism at large dimensions, while reducing peak activation memory **13.3%** through gradient checkpointing."
 
 **Fix the wording before you defend it** (prep pack §5, "Honest resume wording"):
 - **13.3% is the whole training footprint** (962 → 834 MiB). **Activation memory fell 32%** (400 → 272 MiB).
@@ -47,8 +46,7 @@ reducing peak activation memory **13.3%** through gradient checkpointing."
 
 ### A1. Streams (block 1, 30 min)
 
-**Read:** NVIDIA blog *"How to Overlap Data Transfers in CUDA C/C++"* (Mark Harris), and the "Streams" part of the
-CUDA Programming Guide (§6.2.8 "Asynchronous Concurrent Execution").
+**Read:** NVIDIA blog *"How to Overlap Data Transfers in CUDA C/C++"* (Mark Harris), and the "Streams" part of the CUDA Programming Guide (§6.2.8 "Asynchronous Concurrent Execution").
 
 > [!abstract] What it says: Mark Harris, *How to Overlap Data Transfers in CUDA C/C++* (NVIDIA blog)
 > **Key idea:** copies and kernels can run at the same time only if they sit in **different non-default streams** and the host memory is **pinned** (page-locked).
@@ -133,8 +131,7 @@ For a new tile of scores `s`:
 
 This equals the exact softmax, because every term was rescaled to the same final max.
 
-**Why it matters:** standard attention writes the N×N score matrix to HBM. At N = 8192, B = 8, 16 heads, that is
-8·16·8192²·4 B = **34.4 GB**. That's why your PyTorch baseline is batch-chunked. FlashAttention keeps scores in shared memory and never writes them out.
+**Why it matters:** standard attention writes the N×N score matrix to HBM. At N = 8192, B = 8, 16 heads, that is 8·16·8192²·4 B = **34.4 GB**. That's why your PyTorch baseline is batch-chunked. FlashAttention keeps scores in shared memory and never writes them out.
 Its value is **memory, not raw speed**: your kernel is 1.5× slower than PyTorch's explicit path at 8K (prep pack §8).
 
 **Concepts:**
@@ -560,18 +557,14 @@ for (int x = lane; x < D; x += WARP, ++jj) {
 
 ### 5. Deep dive: CUDA streams from scratch
 
-Section 2 above walks the three Part 1 variants. This section explains what a stream can and can't do, so you can
-defend the 1.73× honestly. Order: what a stream is → a toy timeline → when overlap is possible → the code with real
-values → why the batch split lost and the column split won → questions → check.
+Section 2 above walks the three Part 1 variants. This section explains what a stream can and can't do, so you can defend the 1.73× honestly. Order: what a stream is → a toy timeline → when overlap is possible → the code with real values → why the batch split lost and the column split won → questions → check.
 
 > [!important] The one sentence to hold on to
-> A stream is an **ordered queue** of GPU work; kernels in different streams **may** run at the same time, but only if
-> the GPU has **idle SMs** to give them, and a kernel that already fills all 132 SMs leaves nothing to share.
+> A stream is an **ordered queue** of GPU work; kernels in different streams **may** run at the same time, but only if the GPU has **idle SMs** to give them, and a kernel that already fills all 132 SMs leaves nothing to share.
 
 #### 5.1 What a stream is
 
-The host (CPU) doesn't run kernels. It **enqueues** them, and the GPU drains the queue. A **stream** is one such
-queue:
+The host (CPU) doesn't run kernels. It **enqueues** them, and the GPU drains the queue. A **stream** is one such queue:
 - work in **one** stream runs in order: kernel 2 starts after kernel 1 ends;
 - work in **different** streams has no ordering, so the GPU may overlap it;
 - without a stream argument, a launch goes to the **default stream**.
@@ -582,17 +575,13 @@ Launch syntax: `kernel<<<grid, block, shared_bytes, stream>>>(args)`. The 4th ar
 
 ![[d6-5-streams.svg]] [[d6-5-streams.html|▶ Step through it]]
 
-**Case A:** four kernels, each with only enough blocks to fill **30** of the 132 SMs. In one stream they run back
-to back: 4 time units. In four streams the GPU runs them side by side on different SMs: about **1** unit.
+**Case A:** four kernels, each with only enough blocks to fill **30** of the 132 SMs. In one stream they run back to back: 4 time units. In four streams the GPU runs them side by side on different SMs: about **1** unit.
 
-**Case B:** four kernels, each with enough blocks for **4 full waves** over all 132 SMs. There are no idle SMs, so
-the second kernel's blocks just wait behind the first's. Four streams finish no sooner than one, and the extra
-launches and syncs make it a little later.
+**Case B:** four kernels, each with enough blocks for **4 full waves** over all 132 SMs. There are no idle SMs, so the second kernel's blocks just wait behind the first's. Four streams finish no sooner than one, and the extra launches and syncs make it a little later.
 
 #### 5.3 When overlap is possible: count the waves
 
-A **wave** = the number of blocks the whole GPU holds at once. For `mm_thin` (256 threads per block, up to 2,048
-threads per SM): up to **8 blocks per SM**, so 132 × 8 = **1,056 blocks** per wave.
+A **wave** = the number of blocks the whole GPU holds at once. For `mm_thin` (256 threads per block, up to 2,048 threads per SM): up to **8 blocks per SM**, so 132 × 8 = **1,056 blocks** per wave.
 
 | width N | baseline grid | blocks | waves | idle SMs to share? |
 |---|---|---|---|---|
@@ -604,8 +593,7 @@ At large N the GPU is already full. Either way, **concurrency** has little to gi
 
 #### 5.4 The code, with real values
 
-**Baseline:** two launches on the default stream, grid `((N + 255) / 256, 32)`. At N = 32768: 128 column chunks × 32
-batch rows = 4,096 blocks.
+**Baseline:** two launches on the default stream, grid `((N + 255) / 256, 32)`. At N = 32768: 128 column chunks × 32 batch rows = 4,096 blocks.
 
 **Batch split** (`chunk = (32 + 3) / 4 = 8`). For stream s = 2:
 - `r0 = 2 · 8 = 16`, `rows = 8`;
@@ -621,9 +609,7 @@ batch rows = 4,096 blocks.
 
 #### 5.5 Why the batch split lost and the column split won
 
-**Bytes:** one weight matrix at N = 32768 is N² × 4 B = **4.29 GB**. The activations are tiny by comparison (32 × N
-× 4 B = 4.2 MB). So time is about **how many times W is read from HBM**. Reading both W1 and W2 once takes at least
-2 × 4.29 GB / 4.8 TB/s = **1.8 ms**; the baseline takes 44.4 ms, so W is being re-read many times.
+**Bytes:** one weight matrix at N = 32768 is N² × 4 B = **4.29 GB**. The activations are tiny by comparison (32 × N × 4 B = 4.2 MB). So time is about **how many times W is read from HBM**. Reading both W1 and W2 once takes at least 2 × 4.29 GB / 4.8 TB/s = **1.8 ms**; the baseline takes 44.4 ms, so W is being re-read many times.
 
 **Batch split:** each stream re-reads all of W for only 8 rows. More passes over W, 4× the launches, plus host syncs.
 Slower everywhere: 52.3 vs 44.4 ms at N = 32768.
@@ -632,8 +618,7 @@ Slower everywhere: 52.3 vs 44.4 ms at N = 32768.
 - The baseline grid is 128 column chunks wide. One wave of 1,056 blocks covers all 128 chunks for only ~8 batch rows, so every wave sweeps the **whole** of W (4.3 GB, far bigger than the ~50 MB L2). W is streamed from HBM about 4 times per layer.
 - Each column-split kernel is 32 chunks wide and 1,024 blocks big: **one wave**. All 32 batch rows of a column chunk run together, so they can share that chunk's W reads through L2.
 
-That's **locality**, not concurrency. It fits the data: the gain appears only where the baseline needs several
-waves (N = 32768: 1.73×; N = 16384: 1.02×; below, slower).
+That's **locality**, not concurrency. It fits the data: the gain appears only where the baseline needs several waves (N = 32768: 1.73×; N = 16384: 1.02×; below, slower).
 
 | N | baseline | batch split | column split |
 |---|---|---|---|
@@ -646,24 +631,19 @@ waves (N = 32768: 1.73×; N = 16384: 1.02×; below, slower).
 
 ##### "Can you prove the 1.73× is not concurrency?"
 
-Not from this data. One experiment would settle it: run the **same four column-split kernels on one stream**, one
-after another. If it's still about 1.7× faster than the baseline, the gain is locality. If it drops to 1×, the
-streams' overlap mattered.
+Not from this data. One experiment would settle it: run the **same four column-split kernels on one stream**, one after another. If it's still about 1.7× faster than the baseline, the gain is locality. If it drops to 1×, the streams' overlap mattered.
 
 ##### "Why are the stream variants slower at small N?"
 
-Each split kernel is tiny, so fixed costs dominate: 4× (or 8×) the launches, and `cudaStreamSynchronize` calls inside
-the timed loop. The baseline has no host sync inside its loop at all.
+Each split kernel is tiny, so fixed costs dominate: 4× (or 8×) the launches, and `cudaStreamSynchronize` calls inside the timed loop. The baseline has no host sync inside its loop at all.
 
 ##### "When would streams clearly help?"
 
-Overlapping a **copy** with compute (`cudaMemcpyAsync` on one stream while a kernel runs on another), or running
-several small independent kernels that each leave SMs idle.
+Overlapping a **copy** with compute (`cudaMemcpyAsync` on one stream while a kernel runs on another), or running several small independent kernels that each leave SMs idle.
 
 ##### "Is the column split correct?"
 
-At N = 32768, yes: each stream computes its own columns from the full A1 after the barrier. Part 1 has no
-correctness check, though, and the prep pack notes the split is wrong for N ≤ 512. Say so if asked.
+At N = 32768, yes: each stream computes its own columns from the full A1 after the barrier. Part 1 has no correctness check, though, and the prep pack notes the split is wrong for N ≤ 512. Say so if asked.
 
 #### 5.7 Check your understanding
 
@@ -696,13 +676,10 @@ correctness check, though, and the prep pack notes the split is wrong for N ≤ 
 
 ### 6. Deep dive: gradient checkpointing from scratch
 
-Section 3 above walks the arena code. This section builds checkpointing from the reason backward needs memory at
-all. Order: what backward needs → the trade → this project's plan → the arena, with real sizes → the cost → the
-code ordering rule → questions → check.
+Section 3 above walks the arena code. This section builds checkpointing from the reason backward needs memory at all. Order: what backward needs → the trade → this project's plan → the arena, with real sizes → the cost → the code ordering rule → questions → check.
 
 > [!important] The one sentence to hold on to
-> Keep only a few activations (**checkpoints**) during the forward pass and **recompute** the rest from the nearest
-> checkpoint during backward: less memory, one extra forward pass of compute.
+> Keep only a few activations (**checkpoints**) during the forward pass and **recompute** the rest from the nearest checkpoint during backward: less memory, one extra forward pass of compute.
 
 #### 6.1 What backward needs
 
@@ -710,8 +687,7 @@ Take one layer: `Z = A_prev · W + b`, then `A = ReLU(Z)`. Its gradients need tw
 - **`Z`**, for the ReLU derivative: the gradient passes where Z > 0 and is zeroed elsewhere (`k_relu_deriv(z3, dZ3)`);
 - **`A_prev`**, for the weight gradient: `dW = A_prevᵀ · dZ` (`mm_tiled_AT(a3, dZ4, dW4)`).
 
-Backward runs **last layer first**. So the forward pass must keep every layer's Z and A until backward reaches that
-layer. For deep or wide networks, these activations dominate memory.
+Backward runs **last layer first**. So the forward pass must keep every layer's Z and A until backward reaches that layer. For deep or wide networks, these activations dominate memory.
 
 #### 6.2 The trade, on a toy
 
@@ -739,27 +715,22 @@ Two **segments** get rebuilt in backward:
 
 #### 6.4 The arena, with real sizes
 
-Config N4096: batch 4096, widths 1024 → 4096 → 4096 → 4096 → 1024. One 4096 × 4096 float tensor = 4096² × 4 B
-= **64 MiB**; `Z4` (4096 × 1024) = **16 MiB**.
+Config N4096: batch 4096, widths 1024 → 4096 → 4096 → 4096 → 1024. One 4096 × 4096 float tensor = 4096² × 4 B = **64 MiB**; `Z4` (4096 × 1024) = **16 MiB**.
 
 ![[d6-6-ckpt.svg]] [[d6-6-ckpt.html|▶ Step through it]]
 
 - **Baseline:** Z1, A1, Z2, A2, Z3, A3 at 64 each + Z4 at 16 = **400 MiB**.
 - **Checkpointed:** A2 (64) + Z4 (16) + one **arena** for the recomputed segments.
 
-The key fact: backward finishes with segment B **before** it needs segment A. So the two are never alive together,
-and one buffer can hold either:
+The key fact: backward finishes with segment B **before** it needs segment A. So the two are never alive together, and one buffer can hold either:
 
 $$\text{arena} = \max(\underbrace{2 n_3}_{Z_3,A_3} = 128,\ \underbrace{2 n_1 + n_2}_{Z_1,A_1,Z_2} = 192) = 192\ \text{MiB}$$
 
 Checkpointed total: 64 + 16 + 192 = **272 MiB**. Activations fall **400 → 272 MiB (−32%)**.
 
-The whole training step (weights, gradients, everything) measured **962 → 834 MiB**: the same 128 MiB saved, which
-is **13.3%** of the total. That's the resume number; say which denominator it uses.
+The whole training step (weights, gradients, everything) measured **962 → 834 MiB**: the same 128 MiB saved, which is **13.3%** of the total. That's the resume number; say which denominator it uses.
 
-**The 0 MB bug** (story S3): the first version gave each recomputed tensor its **own** permanent buffer. Five
-buffers of 64 MiB = 320, + A2 + Z4 = 400 MiB again: exactly the baseline. Recomputing saves nothing unless the
-recomputed tensors **share** memory.
+**The 0 MB bug** (story S3): the first version gave each recomputed tensor its **own** permanent buffer. Five buffers of 64 MiB = 320, + A2 + Z4 = 400 MiB again: exactly the baseline. Recomputing saves nothing unless the recomputed tensors **share** memory.
 
 #### 6.5 The cost: one extra forward, almost exactly
 
@@ -767,8 +738,7 @@ Backward recomputes layers 1, 2 and 3. Their FLOPs, as a share of the forward pa
 
 $$\frac{1024 \cdot 4096 + 4096 \cdot 4096 + 4096 \cdot 4096}{1024 \cdot 4096 + 2 \cdot 4096^2 + 4096 \cdot 1024} = \frac{9}{10}$$
 
-Forward takes 39.5 ms, so the prediction is 0.9 × 39.5 = **35.5 ms**. Measured: backward **136.1 → 171.7 ms, +35.5
-ms (+26%)**. The extra time is exactly the recomputed forward work.
+Forward takes 39.5 ms, so the prediction is 0.9 × 39.5 = **35.5 ms**. Measured: backward **136.1 → 171.7 ms, +35.5 ms (+26%)**. The extra time is exactly the recomputed forward work.
 
 #### 6.6 The code ordering rule, line by line
 
@@ -785,36 +755,29 @@ Backward, in order:
 3. **Line 513:** from here, z3 and a3 are dead. **Rebuild segment A** from `X` over the same arena: `rZ1`, `rA1`, `rZ2`.
 4. Layer 2 and 1 gradients, then SGD.
 
-Any read of `z3` after step 3 would get segment A's numbers: silently wrong gradients, no crash. The code comment
-states the rule because nothing else enforces it.
+Any read of `z3` after step 3 would get segment A's numbers: silently wrong gradients, no crash. The code comment states the rule because nothing else enforces it.
 
-**How memory is measured:** `cudaMemGetInfo` before allocating and after **everything** is allocated (arena
-included). Every buffer is a `cudaMalloc` made up front, so this difference is the true peak.
+**How memory is measured:** `cudaMemGetInfo` before allocating and after **everything** is allocated (arena included). Every buffer is a `cudaMalloc` made up front, so this difference is the true peak.
 
-**How correctness is checked:** both modes run 100 SGD steps from the same seed; the sums of W4 match to 10 digits
-(−379.7093289 at N4096).
+**How correctness is checked:** both modes run 100 SGD steps from the same seed; the sums of W4 match to 10 digits (−379.7093289 at N4096).
 
 #### 6.7 Questions people usually ask next
 
 ##### "Why checkpoint A2 and Z4, not other tensors?"
 
-Z4 is the output the loss needs first in backward. A2 splits the network into two segments, and it is also the
-input that layer 3's weight gradient needs. Both are fixed by the assignment.
+Z4 is the output the loss needs first in backward. A2 splits the network into two segments, and it is also the input that layer 3's weight gradient needs. Both are fixed by the assignment.
 
 ##### "Is 13.3% 'peak activation memory'?"
 
-No. 13.3% is of the **whole** training footprint (962 MiB). Activations alone fell 32% (400 → 272). Say the 32%
-first, then the 13.3%.
+No. 13.3% is of the **whole** training footprint (962 MiB). Activations alone fell 32% (400 → 272). Say the 32% first, then the 13.3%.
 
 ##### "Why is backward 3.4× the forward instead of about 2×?"
 
-Backward does two matmuls per layer, roughly 2× the FLOPs. The extra comes from the transposed-operand kernels
-(`mm_tiled_AT`, `mm_tiled_BT`), whose global loads are uncoalesced.
+Backward does two matmuls per layer, roughly 2× the FLOPs. The extra comes from the transposed-operand kernels (`mm_tiled_AT`, `mm_tiled_BT`), whose global loads are uncoalesced.
 
 ##### "How does PyTorch do this?"
 
-`torch.utils.checkpoint` wraps a segment: forward runs it under `no_grad`, keeps the inputs, and backward reruns it to
-rebuild the activations. The caching allocator reuses the freed memory, which plays the role of the arena.
+`torch.utils.checkpoint` wraps a segment: forward runs it under `no_grad`, keeps the inputs, and backward reruns it to rebuild the activations. The caching allocator reuses the freed memory, which plays the role of the arena.
 
 #### 6.8 Check your understanding
 
@@ -848,13 +811,10 @@ rebuild the activations. The caching allocator reuses the freed memory, which pl
 ### 7. Deep dive: online softmax and FlashAttention from scratch
 
 Section 4 above walks `flash_lib.cu` phase by phase. This section builds the algorithm from the problem it solves.
-Order: why the score matrix is the problem → safe softmax → online softmax on a toy → why it's exact → how the
-kernel splits the work → warp shuffles → the code with real indices → the measured story → questions → check.
+Order: why the score matrix is the problem → safe softmax → online softmax on a toy → why it's exact → how the kernel splits the work → warp shuffles → the code with real indices → the measured story → questions → check.
 
 > [!important] The one sentence to hold on to
-> Walk over the keys **one tile at a time**, keeping per query row a running max `m`, a running sum `l` and a running
-> output `o`, and **rescale** the old state whenever a larger max appears; at the end `o / l` is exactly softmax(QKᵀ)V,
-> and the N × N score matrix never exists.
+> Walk over the keys **one tile at a time**, keeping per query row a running max `m`, a running sum `l` and a running output `o`, and **rescale** the old state whenever a larger max appears; at the end `o / l` is exactly softmax(QKᵀ)V, and the N × N score matrix never exists.
 
 #### 7.1 The problem: the score matrix
 
@@ -863,19 +823,15 @@ At the benchmark size (B = 8, 16 heads, N = 8192, float32):
 
 $$8 \times 16 \times 8192^2 \times 4\ \text{B} = 34.4\ \text{GB}$$
 
-That's why the PyTorch baseline has to process the batch in chunks at 8K. Writing and reading 34 GB of scores also
-costs HBM bandwidth. FlashAttention computes the same O while keeping scores in **on-chip shared memory**, one small
-tile at a time.
+That's why the PyTorch baseline has to process the batch in chunks at 8K. Writing and reading 34 GB of scores also costs HBM bandwidth. FlashAttention computes the same O while keeping scores in **on-chip shared memory**, one small tile at a time.
 
 #### 7.2 Safe softmax first
 
-$\text{softmax}(s)_i = e^{s_i} / \sum_j e^{s_j}$. With big scores, $e^{s}$ overflows. So everyone subtracts the
-max first:
+$\text{softmax}(s)_i = e^{s_i} / \sum_j e^{s_j}$. With big scores, $e^{s}$ overflows. So everyone subtracts the max first:
 
 $$\text{softmax}(s)_i = \frac{e^{s_i - m}}{\sum_j e^{s_j - m}}, \qquad m = \max_j s_j$$
 
-Same result (the $e^{-m}$ cancels), and every exponent is ≤ 0. The catch: you need the max of the **whole row**
-before you start. Online softmax removes that catch.
+Same result (the $e^{-m}$ cancels), and every exponent is ≤ 0. The catch: you need the max of the **whole row** before you start. Online softmax removes that catch.
 
 #### 7.3 Online softmax on a toy
 
@@ -883,16 +839,14 @@ One query row, 4 keys, in 2 tiles of 2. Scores s = [2, 1 | 3, 0], values (one fe
 
 ![[d6-7-online-softmax.svg]] [[d6-7-online-softmax.html|▶ Step through it]]
 
-**Tile 1** (s = [2, 1]): its max is 2. p = [e⁰, e⁻¹] = [1, 0.368]. Sum 1.368. Σ p·v = 1·1 + 0.368·3 = 2.104. The
-state starts empty (m = −∞), so it becomes m = 2, l = 1.368, o = 2.104.
+**Tile 1** (s = [2, 1]): its max is 2. p = [e⁰, e⁻¹] = [1, 0.368]. Sum 1.368. Σ p·v = 1·1 + 0.368·3 = 2.104. The state starts empty (m = −∞), so it becomes m = 2, l = 1.368, o = 2.104.
 
 **Tile 2** (s = [3, 0]): its max is 3, bigger than 2. p = [1, e⁻³] = [1, 0.050]. Sum 1.050. Σ p·v = 2.000.
 - new max 3; the old state was computed against max 2, so scale it by $e^{2-3} = 0.368$;
 - l = 0.368 · 1.368 + 1 · 1.050 = **1.553**;
 - o = 0.368 · 2.104 + 1 · 2.000 = **2.774**.
 
-**Answer:** o / l = 2.774 / 1.553 = **1.786**. The exact softmax of [2, 1, 3, 0] is [0.237, 0.087, 0.644, 0.032],
-and 0.237·1 + 0.087·3 + 0.644·2 + 0.032·0 = **1.786**. Same.
+**Answer:** o / l = 2.774 / 1.553 = **1.786**. The exact softmax of [2, 1, 3, 0] is [0.237, 0.087, 0.644, 0.032], and 0.237·1 + 0.087·3 + 0.644·2 + 0.032·0 = **1.786**. Same.
 
 #### 7.4 Why it's exact
 
@@ -922,16 +876,14 @@ Inside one tile, the lanes change roles:
 
 ![[d6-8-shuffle.svg]] [[d6-8-shuffle.html|▶ Step through it]]
 
-`__shfl_xor_sync(mask, v, off)` returns the value `v` held by lane `lane XOR off`. Each lane swaps with a partner
-and keeps the max:
+`__shfl_xor_sync(mask, v, off)` returns the value `v` held by lane `lane XOR off`. Each lane swaps with a partner and keeps the max:
 
 ```cpp
 for (int off = 16; off > 0; off >>= 1)
     m_tile = fmaxf(m_tile, __shfl_xor_sync(0xffffffff, m_tile, off));
 ```
 
-With 32 lanes: offsets 16, 8, 4, 2, 1 → **5 steps**, and then **every** lane holds the max. The sum works the same
-way with `+=`. Registers move lane to lane directly; no shared memory, no `__syncthreads()`.
+With 32 lanes: offsets 16, 8, 4, 2, 1 → **5 steps**, and then **every** lane holds the max. The sum works the same way with `+=`. Registers move lane to lane directly; no shared memory, no `__syncthreads()`.
 
 #### 7.7 The code, with real indices
 
@@ -944,9 +896,7 @@ Block (qt = 10, h = 3, b = 0), warp w = 2, lane 7:
 - PV: lane 7 sums `S[row][c] · Vj[c·64 + 7]` over c, and the same for feature 39; then `o = o · e_run + pv · e_tile`;
 - after 256 tiles: `O[row][7] = o / l_run`.
 
-**First tile:** `m_run = −∞`, so `e_run = exp(−∞) = 0`. That correctly wipes the empty initial `l` and `o` (both 0
-anyway). Seeding m with **NaN** instead would poison everything: story S5's `cudaMemset(0xFF)` bug, because the
-bytes 0xFFFFFFFF are a NaN, not −∞.
+**First tile:** `m_run = −∞`, so `e_run = exp(−∞) = 0`. That correctly wipes the empty initial `l` and `o` (both 0 anyway). Seeding m with **NaN** instead would poison everything: story S5's `cudaMemset(0xFF)` bug, because the bytes 0xFFFFFFFF are a NaN, not −∞.
 
 #### 7.8 The measured story
 
@@ -959,30 +909,25 @@ bytes 0xFFFFFFFF are a NaN, not −∞.
 | PyTorch explicit (cuBLAS) | 105 ms | |
 | PyTorch fused SDPA | 63 ms | |
 
-The kernel is **not faster** than PyTorch (1.5× slower than explicit). Its win is memory: no 34 GB score tensor, and
-max error vs PyTorch of 6.7 × 10⁻⁷.
+The kernel is **not faster** than PyTorch (1.5× slower than explicit). Its win is memory: no 34 GB score tensor, and max error vs PyTorch of 6.7 × 10⁻⁷.
 
 #### 7.9 Questions people usually ask next
 
 ##### "Why is your kernel slower than PyTorch's explicit path?"
 
-PyTorch's two big matmuls run in cuBLAS, which is register-blocked far more aggressively. This kernel reads both
-operands of both matmuls from shared memory and uses no tensor cores, so it is bound by shared-memory bandwidth.
+PyTorch's two big matmuls run in cuBLAS, which is register-blocked far more aggressively. This kernel reads both operands of both matmuls from shared memory and uses no tensor cores, so it is bound by shared-memory bandwidth.
 
 ##### "What did FlashAttention-2 change?"
 
-It parallelises over query blocks (as this kernel's grid already does), cuts non-matmul work, and splits work
-between warps so they don't need to share partial results. This kernel's grid change (3,358 → 2,377 ms) is that idea.
+It parallelises over query blocks (as this kernel's grid already does), cuts non-matmul work, and splits work between warps so they don't need to share partial results. This kernel's grid change (3,358 → 2,377 ms) is that idea.
 
 ##### "Why divide by l only at the end?"
 
-Dividing every tile would cost a division per element per tile and then need undoing at the next rescale. Keeping o
-unnormalised and dividing once is cheaper and just as exact.
+Dividing every tile would cost a division per element per tile and then need undoing at the next rescale. Keeping o unnormalised and dividing once is cheaper and just as exact.
 
 ##### "What about the backward pass?"
 
-FlashAttention's backward recomputes the scores tile by tile from Q, K, V (plus the saved m and l), instead of storing
-them. Checkpointing again (§6). This project only implemented the forward.
+FlashAttention's backward recomputes the scores tile by tile from Q, K, V (plus the saved m and l), instead of storing them. Checkpointing again (§6). This project only implemented the forward.
 
 #### 7.10 Check your understanding
 
@@ -1016,12 +961,10 @@ them. Checkpointing again (§6). This project only implemented the forward.
 ### 8. Deep dive: shared-memory bank conflicts from scratch
 
 The single line `const int KS = D + 1;` made the FlashAttention kernel **7.0×** faster. This section explains why.
-Order: what banks are → a toy with 8 banks → the rule and its one exception → the score loop with stride 64 and 65
-→ checking every other access in the kernel → questions → check.
+Order: what banks are → a toy with 8 banks → the rule and its one exception → the score loop with stride 64 and 65 → checking every other access in the kernel → questions → check.
 
 > [!important] The one sentence to hold on to
-> Shared memory is split into **32 banks**; word address `a` lives in bank `a mod 32`; if two lanes of a warp hit the
-> **same bank at different addresses**, their reads are served one after another.
+> Shared memory is split into **32 banks**; word address `a` lives in bank `a mod 32`; if two lanes of a warp hit the **same bank at different addresses**, their reads are served one after another.
 
 #### 8.1 What banks are
 
@@ -1034,8 +977,7 @@ So `bank(a) = a mod 32`.
 
 #### 8.2 A toy with 8 banks
 
-Use 8 banks and 8 lanes. A 2-D array `T[8][8]` stored row after row: `T[r][c]` is word `8r + c`, bank `(8r + c) mod 8
-= c`.
+Use 8 banks and 8 lanes. A 2-D array `T[8][8]` stored row after row: `T[r][c]` is word `8r + c`, bank `(8r + c) mod 8 = c`.
 
 - **Read a row** (lane ℓ reads `T[0][ℓ]`): banks 0, 1, …, 7. All different → **1 cycle**.
 - **Read a column** (lane ℓ reads `T[ℓ][0]`): words 0, 8, 16, …, 56 → banks all **0**. Eight different addresses in one bank → **8 cycles** (an 8-way conflict).
@@ -1049,8 +991,7 @@ $$\text{conflict degree} = \max_{\text{bank}} \#\{\text{distinct addresses in th
 
 A degree-k conflict makes the access take k cycles.
 
-**Exception: broadcast.** If several lanes read the **same address**, it's served once and broadcast. So "all 32
-lanes read `Qi[row·64 + x]`" costs 1 cycle, not 32.
+**Exception: broadcast.** If several lanes read the **same address**, it's served once and broadcast. So "all 32 lanes read `Qi[row·64 + x]`" costs 1 cycle, not 32.
 
 #### 8.4 The score loop: stride 64 vs 65
 
@@ -1059,14 +1000,11 @@ lanes read `Qi[row·64 + x]`" costs 1 cycle, not 32.
 In the score phase, lane c owns key c and walks over features x. At a fixed x, lane c reads `Kj[c · stride + x]`.
 
 **Stride 64 (= D):** bank = (64c + x) mod 32 = **x mod 32** for every c, because 64 is a multiple of 32. At x = 5:
-lanes 0, 1, 2, …, 31 → banks 5, 5, 5, …, 5. 32 different addresses in one bank → **32-way conflict**. Every one of
-the 64 feature steps costs 32 cycles instead of 1.
+lanes 0, 1, 2, …, 31 → banks 5, 5, 5, …, 5. 32 different addresses in one bank → **32-way conflict**. Every one of the 64 feature steps costs 32 cycles instead of 1.
 
-**Stride 65 (= D + 1):** bank = (65c + x) mod 32 = **(c + x) mod 32**. At x = 5: lanes 0, 1, 2, …, 31 → banks
-5, 6, 7, …, 31, 0, …, 4. All different → **no conflict**.
+**Stride 65 (= D + 1):** bank = (65c + x) mod 32 = **(c + x) mod 32**. At x = 5: lanes 0, 1, 2, …, 31 → banks 5, 6, 7, …, 31, 0, …, 4. All different → **no conflict**.
 
-Measured: **2,377 → 339 ms (7.0×)** from that one line. Not 32×, because the kernel has other work, and the
-conflict was in the hottest loop but not the only cost.
+Measured: **2,377 → 339 ms (7.0×)** from that one line. Not 32×, because the kernel has other work, and the conflict was in the hottest loop but not the only cost.
 
 #### 8.5 Checking every other access in the kernel
 
@@ -1081,32 +1019,25 @@ A padding fix in one place can break another. Go through each shared access with
 | PV read `Vj[c·64 + x]`, lane owns x | consecutive x | none, so V needs no padding |
 | PV read `S[(r0 + r)·32 + c]` | same address for all lanes | broadcast |
 
-Correctness is unchanged: the store and the load use the **same** stride 65, so every element is found where it
-was put.
+Correctness is unchanged: the store and the load use the **same** stride 65, so every element is found where it was put.
 
 #### 8.6 Questions people usually ask next
 
 ##### "Why didn't the V tile need padding?"
 
-In the PV phase, lanes own **features** (x varies across the warp), so `Vj[c·64 + x]` is a row read: consecutive
-banks. Only the K tile is read down a column (key varies across the warp).
+In the PV phase, lanes own **features** (x varies across the warp), so `Vj[c·64 + x]` is a row read: consecutive banks. Only the K tile is read down a column (key varies across the warp).
 
 ##### "Is padding the only fix?"
 
-No. **Swizzling** stores element (r, c) at column `c XOR f(r)`, so rows land in different banks without wasting a
-column. CUTLASS and modern kernels use it, since padding breaks the alignment that wide vector loads need. Padding is
-the simplest fix and costs 32 floats here.
+No. **Swizzling** stores element (r, c) at column `c XOR f(r)`, so rows land in different banks without wasting a column. CUTLASS and modern kernels use it, since padding breaks the alignment that wide vector loads need. Padding is the simplest fix and costs 32 floats here.
 
 ##### "Why was the 1-row-per-warp kernel still slow after the fix?"
 
-At 1 row per warp, the score loop does 2 shared loads per FMA (a K value and a Q value). That pinned it to the
-shared-memory roof (~8 TFLOP/s; measured 6.5). Four rows per warp let one `Kj` load feed 4 FMAs: 339 → 160 ms
-(story S2).
+At 1 row per warp, the score loop does 2 shared loads per FMA (a K value and a Q value). That pinned it to the shared-memory roof (~8 TFLOP/s; measured 6.5). Four rows per warp let one `Kj` load feed 4 FMAs: 339 → 160 ms (story S2).
 
 ##### "How would you find a conflict without a profiler?"
 
-Exactly as here: for the hot loop, write lane ℓ's address, take `mod 32`, and look for repeats. Nsight Compute would
-report "shared memory bank conflicts" directly, but it needed root on this server.
+Exactly as here: for the hot loop, write lane ℓ's address, take `mod 32`, and look for repeats. Nsight Compute would report "shared memory bank conflicts" directly, but it needed root on this server.
 
 #### 8.7 Check your understanding
 

@@ -13,8 +13,7 @@ Part of [[Interview plan (Nov 2026)]]. Repo `sysml` (branch `main`, one commit `
 **How this note is built:** one study guide, [[#Study guide]]. Each part goes *idea → tiny example → formula → the code → every variable with its shape → the code traced on small numbers → where the output goes next → questions → check*. Theory and code are never in separate sections.
 
 
-**Resume bullet (part 1 of 2, both resumes):** "Optimized CUDA matrix multiplication through coalescing, shared-memory tiling, and
-2D register blocking, achieving **51.3×** speedup over the naive GPU kernel and **48.2%** of cuBLAS performance on an H200."
+**Resume bullet (part 1 of 2, both resumes):** "Optimized CUDA matrix multiplication through coalescing, shared-memory tiling, and 2D register blocking, achieving **51.3×** speedup over the naive GPU kernel and **48.2%** of cuBLAS performance on an H200."
 Today covers this bullet. Streams, checkpointing and FlashAttention are tomorrow ([[Day 06 - CUDA II]]).
 
 **Before you start, know two repo facts** (prep pack, "Read this first"):
@@ -81,8 +80,7 @@ $$A = \begin{bmatrix}1&2&0&1\\0&1&2&1\\2&0&1&0\\1&1&0&2\end{bmatrix}\quad B = \b
 ### Part 1. The whole pipeline in shapes
 
 > [!important] The one sentence to hold on to
-> Three flat arrays of N² floats live on the GPU (`dA`, `dB`, `dC`); every kernel reads `dA` and `dB`, writes `dC`, and
-> `dC` is then copied back and compared with the cuBLAS answer.
+> Three flat arrays of N² floats live on the GPU (`dA`, `dB`, `dC`); every kernel reads `dA` and `dB`, writes `dC`, and `dC` is then copied back and compared with the cuBLAS answer.
 
 #### 1.1 A matrix is one flat array
 
@@ -207,17 +205,13 @@ So one kernel run turns **two arrays of N² floats into one array of N² floats*
 Every kernel today is read with one question: *which thread does what, and where does its data come from?* This part builds the model, then reads the first kernel with it.
 
 > [!important] The one sentence to hold on to
-> A kernel launch is a **grid of blocks**; each block runs on one **SM**; the SM issues instructions for **32 threads
-> at a time (a warp)**; each thread finds its own piece of work from `blockIdx`, `blockDim` and `threadIdx`.
+> A kernel launch is a **grid of blocks**; each block runs on one **SM**; the SM issues instructions for **32 threads at a time (a warp)**; each thread finds its own piece of work from `blockIdx`, `blockDim` and `threadIdx`.
 
 #### 2.1 Why a GPU?
 
-A CPU core runs one thread very fast. A GPU runs **thousands of simple threads** at once. The H200 has **132 SMs**
-(streaming multiprocessors). Each SM has **128 FP32 lanes**. So it can do 132 × 128 = **16,896** float operations
-per clock.
+A CPU core runs one thread very fast. A GPU runs **thousands of simple threads** at once. The H200 has **132 SMs** (streaming multiprocessors). Each SM has **128 FP32 lanes**. So it can do 132 × 128 = **16,896** float operations per clock.
 
-Matrix multiplication fits this well. Each of the N² outputs `C[row][col]` is independent. So we give each output
-(or a small patch of outputs) to one thread.
+Matrix multiplication fits this well. Each of the N² outputs `C[row][col]` is independent. So we give each output (or a small patch of outputs) to one thread.
 
 #### 2.2 Grid → block → warp → thread
 
@@ -229,9 +223,7 @@ Four levels, from the top:
 - **warp:** 32 consecutive threads of a block. They issue **the same instruction together**. This matters for memory: the 32 loads of one warp instruction are served together.
 - **thread (lane):** one instance of the kernel code, with its own registers.
 
-Which threads form a warp? Threads are numbered with `threadIdx.x` varying fastest. In a 32 × 32 block, warp 0 is
-`threadIdx.y = 0, threadIdx.x = 0…31`; warp 1 is `threadIdx.y = 1`; and so on. **A warp = one value of `threadIdx.y`,
-all 32 values of `threadIdx.x`.** Every coalescing argument today uses this fact.
+Which threads form a warp? Threads are numbered with `threadIdx.x` varying fastest. In a 32 × 32 block, warp 0 is `threadIdx.y = 0, threadIdx.x = 0…31`; warp 1 is `threadIdx.y = 1`; and so on. **A warp = one value of `threadIdx.y`, all 32 values of `threadIdx.x`.** Every coalescing argument today uses this fact.
 
 **Who owns which part of C, at real size** (animated; blocks are sized by their real dimensions, no values):
 
@@ -297,8 +289,7 @@ Take block `(blockIdx.x, blockIdx.y) = (2, 1)` and thread `(threadIdx.x, threadI
 - `row = 2 · 32 + 5 = 69`;
 - `col = 1 · 32 + 3 = 35`.
 
-So this thread computes `C[69][35]`. Its warp is `threadIdx.y = 3` with `threadIdx.x = 0…31`. Those 32 threads have
-rows **64…95** and the same column 35. That one fact makes the naive kernel slow (Part 3).
+So this thread computes `C[69][35]`. Its warp is `threadIdx.y = 3` with `threadIdx.x = 0…31`. Those 32 threads have rows **64…95** and the same column 35. That one fact makes the naive kernel slow (Part 3).
 
 **Traced on the toy.** The thread with `row = 0`, `col = 3`. Row 0 of A is `[1, 2, 0, 1]`; column 3 of B is `[1, 0, 2, 1]`.
 
@@ -330,18 +321,15 @@ Everything else (block sizes, tile widths) is chosen as a multiple of 32 so warp
 
 ##### "What happens when threads of a warp take different branches?"
 
-**Divergence.** The warp runs both paths one after the other, with the inactive lanes masked off. The edge guards
-here (`if (row >= N …) return;`) only diverge in the last block, so they cost almost nothing.
+**Divergence.** The warp runs both paths one after the other, with the inactive lanes masked off. The edge guards here (`if (row >= N …) return;`) only diverge in the last block, so they cost almost nothing.
 
 ##### "What does `__syncthreads()` do exactly?"
 
-It is a barrier for **one block**: no thread passes it until every thread of the block reaches it. It can't sync
-across blocks. That's why kernels are written so that blocks never need each other's results.
+It is a barrier for **one block**: no thread passes it until every thread of the block reaches it. It can't sync across blocks. That's why kernels are written so that blocks never need each other's results.
 
 ##### "Why not one huge block?"
 
-A block must fit on one SM: at most 1,024 threads, and its registers and shared memory must fit. Many medium blocks
-also let the GPU spread work across all 132 SMs.
+A block must fit on one SM: at most 1,024 threads, and its registers and shared memory must fit. Many medium blocks also let the GPU spread work across all 132 SMs.
 
 #### 2.6 Check your understanding
 
@@ -373,28 +361,23 @@ also let the GPU spread work across all 132 SMs.
 Two swapped lines gave **10.9×**. This part explains why.
 
 > [!important] The one sentence to hold on to
-> HBM is read in whole **lines** (128 bytes = 32 floats); when the 32 lanes of a warp read **32 neighbouring floats**,
-> one line serves them all (**coalesced**); when their addresses are far apart, each lane needs its own line.
+> HBM is read in whole **lines** (128 bytes = 32 floats); when the 32 lanes of a warp read **32 neighbouring floats**, one line serves them all (**coalesced**); when their addresses are far apart, each lane needs its own line.
 
 #### 3.1 How global memory is fetched
 
-You never load one float from HBM. The memory system moves fixed chunks: **32-byte sectors**, grouped into
-**128-byte lines**. One line holds 32 floats.
+You never load one float from HBM. The memory system moves fixed chunks: **32-byte sectors**, grouped into **128-byte lines**. One line holds 32 floats.
 
-A warp issues one load instruction for all 32 lanes at once. The hardware looks at the 32 addresses and fetches
-**every line they touch**:
+A warp issues one load instruction for all 32 lanes at once. The hardware looks at the 32 addresses and fetches **every line they touch**:
 - 32 consecutive floats → **1 line** → every fetched byte is used;
 - 32 floats each N apart → **32 lines** → 1 useful float per line, 31 wasted.
 
 #### 3.2 A toy you can count
 
-Shrink everything: an 8 × 8 matrix, a "warp" of 8 lanes, and a "line" of 8 floats. The matrix is stored row after
-row, so `address = row · 8 + col`. Each row is exactly one line.
+Shrink everything: an 8 × 8 matrix, a "warp" of 8 lanes, and a "line" of 8 floats. The matrix is stored row after row, so `address = row · 8 + col`. Each row is exactly one line.
 
 ![[d5-7-coalescing.svg]] [[d5-7-coalescing.html|▶ Step through it]]
 
-**Naive (lane → row):** lane r reads `A[r·8 + k]`. At k = 0 the addresses are **0, 8, 16, …, 56**. That's one float
-from each of the 8 rows, so **8 lines** for 8 floats.
+**Naive (lane → row):** lane r reads `A[r·8 + k]`. At k = 0 the addresses are **0, 8, 16, …, 56**. That's one float from each of the 8 rows, so **8 lines** for 8 floats.
 
 **Coalesced (lane → column):** lane c reads `B[k·8 + c]`. At k = 0 the addresses are **0, 1, …, 7**: one line.
 
@@ -500,11 +483,9 @@ Recall (Part 2): a warp = 32 consecutive `threadIdx.x`, one `threadIdx.y`.
 - per step k: **2 lines**.
 
 That's 33 / 2 = 16.5× fewer line requests. The measured gain is **10.9×** (140.5 s → 12.9 s at N = 32768). Why less?
-The naive warp's 32 lines at step k are the **same lines** it needs at steps k + 1 … k + 31 (the next floats of the
-same 32 rows). Some of them survive in the L1 cache, which softens the penalty.
+The naive warp's 32 lines at step k are the **same lines** it needs at steps k + 1 … k + 31 (the next floats of the same 32 rows). Some of them survive in the L1 cache, which softens the penalty.
 
-Both kernels still read **2N floats from global memory per output** (one row of A, one column of B). Coalescing
-makes each fetch efficient; it doesn't create **reuse**. Tiling (Part 4) does.
+Both kernels still read **2N floats from global memory per output** (one row of A, one column of B). Coalescing makes each fetch efficient; it doesn't create **reuse**. Tiling (Part 4) does.
 
 **Where the output goes.** Nothing changes downstream: each thread still writes one float `acc` to `C[row*N + col]`, and `dC` goes to the same check (Part 7). Only the time changes: 140,486 ms → 12,927 ms. The next part attacks the remaining waste: 2N global loads per output.
 
@@ -512,24 +493,19 @@ makes each fetch efficient; it doesn't create **reuse**. Tiling (Part 4) does.
 
 ##### "Is coalescing about threads or about warps?"
 
-About **warps**. The hardware merges the addresses of one warp's load instruction. Two threads in different warps
-reading neighbouring floats don't help each other (except through the cache).
+About **warps**. The hardware merges the addresses of one warp's load instruction. Two threads in different warps reading neighbouring floats don't help each other (except through the cache).
 
 ##### "Does the naive kernel's B load cost 32 lines too?"
 
-No. All 32 lanes have the same `col` and `k`, so they read **one** address. The hardware fetches it once and
-broadcasts it. Only the A load (and the C store) are scattered.
+No. All 32 lanes have the same `col` and `k`, so they read **one** address. The hardware fetches it once and broadcasts it. Only the A load (and the C store) are scattered.
 
 ##### "How would you see this in a profiler?"
 
-Nsight Compute reports **sectors per request** for global loads. Coalesced float loads show 4 sectors (128 B) per
-request; the naive A load would show close to 32. The project never ran `ncu` (it needs root on this server), so the
-argument here is by hand, checked against the measured times.
+Nsight Compute reports **sectors per request** for global loads. Coalesced float loads show 4 sectors (128 B) per request; the naive A load would show close to 32. The project never ran `ncu` (it needs root on this server), so the argument here is by hand, checked against the measured times.
 
 ##### "Why not just make the naive kernel read A transposed?"
 
-That is the same fix in another form: whatever index varies with `threadIdx.x` must move along **contiguous**
-memory. Swapping the row/column mapping is the cheapest way to get there.
+That is the same fix in another form: whatever index varies with `threadIdx.x` must move along **contiguous** memory. Swapping the row/column mapping is the cheapest way to get there.
 
 #### 3.7 Check your understanding
 
@@ -561,24 +537,20 @@ memory. Swapping the row/column mapping is the cheapest way to get there.
 Coalescing made each fetch efficient. It did not remove any fetch. This part is about **reuse**.
 
 > [!important] The one sentence to hold on to
-> Every element of A is needed by a whole row of outputs, and every element of B by a whole column; **tiling** loads it
-> from HBM once per tile and reuses it from shared memory, and **register blocking** reuses it again from registers.
+> Every element of A is needed by a whole row of outputs, and every element of B by a whole column; **tiling** loads it from HBM once per tile and reuses it from shared memory, and **register blocking** reuses it again from registers.
 
 #### 4.1 Where the reuse is
 
-In C = A · B, the element `A[i][k]` is used by **every** output in row i: `C[i][0]`, `C[i][1]`, …, `C[i][N−1]`. That's
-N uses. Likewise `B[k][j]` is used by every output in column j.
+In C = A · B, the element `A[i][k]` is used by **every** output in row i: `C[i][0]`, `C[i][1]`, …, `C[i][N−1]`. That's N uses. Likewise `B[k][j]` is used by every output in column j.
 
 The naive and coalesced kernels fetch each element **once per use**: 2N floats per output, 2N³ float loads in total.
-At N = 32768 that's 7.0 × 10¹³ loads for 3.5 × 10¹³ FMAs. The hardware caches catch some of it, but by luck, not by
-design.
+At N = 32768 that's 7.0 × 10¹³ loads for 3.5 × 10¹³ FMAs. The hardware caches catch some of it, but by luck, not by design.
 
 #### 4.2 A 4 × 4 toy with TILE = 2
 
 ![[d5-8-tiling.svg]] [[d5-8-tiling.html|▶ Step through it]]
 
-C is cut into 2 × 2 tiles, one per block (4 blocks). The block owning C's top-left tile needs rows 0–1 of A and
-columns 0–1 of B. It walks along them in **two steps**:
+C is cut into 2 × 2 tiles, one per block (4 blocks). The block owning C's top-left tile needs rows 0–1 of A and columns 0–1 of B. It walks along them in **two steps**:
 1. **t = 0:** load A's tile (rows 0–1, cols 0–1) and B's tile (rows 0–1, cols 0–1) into shared memory. Each of the 4 threads does 2 FMAs.
 2. **t = 1:** load the next tiles (A cols 2–3, B rows 2–3). 2 more FMAs each. Now every output has its 4 terms.
 
@@ -600,8 +572,7 @@ $$\text{global loads per output} = \frac{2N}{\text{TILE}}$$
 | TILE = 32 | 2,048 floats | 32 / 4 = 8 FLOP/B |
 | TILE = 64 | 1,024 floats | 64 / 4 = 16 FLOP/B |
 
-(Arithmetic intensity = FLOPs per byte read from HBM. Each output needs 2N FLOPs and reads 4 · 2N / TILE bytes, so
-intensity = TILE / 4. Section 9 uses this.)
+(Arithmetic intensity = FLOPs per byte read from HBM. Each output needs 2N FLOPs and reads 4 · 2N / TILE bytes, so intensity = TILE / 4. Section 9 uses this.)
 
 #### 4.4 The code: the tiled kernel
 
@@ -737,11 +708,9 @@ __syncthreads();
 #### 4.6 The new bottleneck: shared memory, and what a bank is
 
 Look at the inner loop again: **every FMA reads two floats from shared memory**. Shared memory is fast, but not free.
-An SM serves about **32 four-byte words per clock** (32 banks), while it can do **128 FMAs per clock**. With 2 reads
-per FMA, the SM can feed only 16 FMAs per clock: **1/8 of its peak**.
+An SM serves about **32 four-byte words per clock** (32 banks), while it can do **128 FMAs per clock**. With 2 reads per FMA, the SM can feed only 16 FMAs per clock: **1/8 of its peak**.
 
-1/8 of 66.9 TFLOP/s is about **8.4 TFLOP/s**. The 1-to-1 kernel measures **8.6**. It sits right at this ceiling. The
-fix has to cut **shared reads per FMA**.
+1/8 of 66.9 TFLOP/s is about **8.4 TFLOP/s**. The 1-to-1 kernel measures **8.6**. It sits right at this ceiling. The fix has to cut **shared reads per FMA**.
 
 **Banks.** Shared memory is split into **32 banks**. Word address `a` (in 4-byte words) is in bank `a mod 32`. In one warp instruction:
 - 32 lanes reading 32 **different banks**: served in one go;
@@ -782,8 +751,7 @@ Check the inner loop of `mm_tiled_1to1<32>` for one warp (one `ty`, `tx` = 0…3
 ### Part 5. Several outputs per thread (strided vs contiguous tiles)
 
 > [!important] The one sentence to hold on to
-> Make the tile bigger than the block (TILE = BLK × F), so each thread owns **F × F outputs** and loads **F × F elements**
-> of each tile; *which* F × F elements it loads decides whether the global loads coalesce.
+> Make the tile bigger than the block (TILE = BLK × F), so each thread owns **F × F outputs** and loads **F × F elements** of each tile; *which* F × F elements it loads decides whether the global loads coalesce.
 
 #### 5.1 The idea, on the toy
 
@@ -912,16 +880,13 @@ As written, that is 2 reads of `sA` + 4 reads of `sB` = **6 shared reads for 4 F
 
 #### 5.3 Strided vs contiguous, measured
 
-Kernels 4 and 5 load a TILE × TILE tile with a 32 × 32 block, so each thread loads F × F = 2 × 2 elements
-(TILE = 64, F = 2). They differ only in **which** elements.
+Kernels 4 and 5 load a TILE × TILE tile with a 32 × 32 block, so each thread loads F × F = 2 × 2 elements (TILE = 64, F = 2). They differ only in **which** elements.
 
 - **Strided** (`c = tx + u·BLK`): for u = 0, lanes 0…31 load columns **0…31**; for u = 1, columns **32…63**. Each instruction: 32 consecutive floats = **1 line**.
 - **Contiguous** (`c = tx·F + u`): for u = 0, lanes load columns **0, 2, 4, …, 62**; for u = 1, columns 1, 3, …, 63. Each instruction spans 64 floats = **2 lines**, half of each unused.
 
 So the contiguous loader requests twice the lines per instruction. Measured: **3,790 vs 3,635 ms**, only 4% slower.
-The second instruction (u = 1) reads the other half of the same two lines, which is usually still in L1. Loading is
-also a small part of these kernels' time. The pair is a clean **controlled experiment**: same maths, same shared
-memory, same occupancy; only the access pattern differs.
+The second instruction (u = 1) reads the other half of the same two lines, which is usually still in L1. Loading is also a small part of these kernels' time. The pair is a clean **controlled experiment**: same maths, same shared memory, same occupancy; only the access pattern differs.
 
 **Where the output goes.** After the last tile, the F × F values of `acc` are written to C (`:162–169`): `C[(row0 + ty + i·BLK)·N + col0 + tx + j·BLK] = acc[i][j]`. Then `dC` goes to the same check. Step gain over the 1-to-1 tile: 8,148 → 3,635 ms (**2.24×**).
 
@@ -953,8 +918,7 @@ memory, same occupancy; only the access pattern differs.
 ### Part 6. 2D register blocking (mm_block2d)
 
 > [!important] The one sentence to hold on to
-> Each thread owns an **R × R patch** of C; per k it loads a **column of R values of A** and a **row of R values of B**
-> into registers and does all **R × R products** from them: 2R shared reads for R² FMAs.
+> Each thread owns an **R × R patch** of C; per k it loads a **column of R values of A** and a **row of R values of B** into registers and does all **R × R products** from them: 2R shared reads for R² FMAs.
 
 #### 6.1 The idea: an outer product per k
 
@@ -969,8 +933,7 @@ Each `av[i]` is used R times (once per j) and each `bv[j]` R times. Shared reads
 
 $$\frac{2R}{R^2} = \frac{2}{R} \qquad R = 4: \ \frac{8}{16} = 0.5$$
 
-That's 4× less shared traffic than the 1-to-1 kernel's 2. The same counting gives a ceiling of about **33.5 TFLOP/s**
-(Part 8). The kernel measures **25.7**.
+That's 4× less shared traffic than the 1-to-1 kernel's 2. The same counting gives a ceiling of about **33.5 TFLOP/s** (Part 8). The kernel measures **25.7**.
 
 In shapes: `av` is **R × 1**, `bv` is **1 × R**, and `reg += av · bv` is an **R × R** outer product. Toy numbers: `av = [1, 0]`, `bv = [2, 1]` gives
 
@@ -1096,8 +1059,7 @@ Count the shared reads: 4 values of k × (2 + 2) = 16 reads for 16 FMAs = **1 pe
 
 **The same thread at real size, start to finish.**
 
-Follow **one thread** of the final kernel, `mm_block2d<64, 4>`, at N = 32768. TILE = 64 and R = 4, so each block
-has 64/4 × 64/4 = **16 × 16 = 256 threads**, and each thread owns a **4 × 4 patch of C**.
+Follow **one thread** of the final kernel, `mm_block2d<64, 4>`, at N = 32768. TILE = 64 and R = 4, so each block has 64/4 × 64/4 = **16 × 16 = 256 threads**, and each thread owns a **4 × 4 patch of C**.
 
 1. **Which outputs?** Block (bx = 2, by = 1), thread (tx = 3, ty = 5): `rowBase = 1·64 + 5·4 = 84`, `colBase = 2·64 + 3·4 = 140` (`matmul_bench.cu:238–239`). It computes C rows **84–87**, columns **140–143**.
 2. **Loop over K in tiles of 64:** N / 64 = **512** iterations (`:247`).
@@ -1115,8 +1077,7 @@ Three notes on the code:
 
 #### 6.3 Occupancy: the price of registers
 
-**Occupancy** = active warps on an SM ÷ the maximum the SM can hold (64 warps = 2,048 threads). More warps let the
-SM hide memory waits: while one warp waits for a load, another computes.
+**Occupancy** = active warps on an SM ÷ the maximum the SM can hold (64 warps = 2,048 threads). More warps let the SM hide memory waits: while one warp waits for a load, another computes.
 
 Three things cap it: registers, shared memory and threads per block. The project's numbers (from `cuobjdump`):
 
@@ -1146,8 +1107,7 @@ More work per thread can beat more threads.
 | block2d, T = 64, R = 4 | 2,737 ms | 25.71 | **1.33×** over strided | 16 outputs per thread |
 | cuBLAS | 1,318 ms | 53.37 | | the ceiling |
 
-Headline numbers: 140,486 / 2,737 = **51.3×** over naive; 25.71 / 53.37 = **48.2%** of cuBLAS. Over the 1-to-1
-tile, register blocking is 8,148 / 2,737 = **3.0×**.
+Headline numbers: 140,486 / 2,737 = **51.3×** over naive; 25.71 / 53.37 = **48.2%** of cuBLAS. Over the 1-to-1 tile, register blocking is 8,148 / 2,737 = **3.0×**.
 
 **Where the output goes.** `reg[R][R]` → R × R floats of `dC` → `record` → `max_rel_err` against `hRef` (Part 7). Its time, 2,736.6 ms, is the number the resume's 51.3× and 48.2% are built from (Part 8).
 
@@ -1155,26 +1115,19 @@ tile, register blocking is 8,148 / 2,737 = **3.0×**.
 
 ##### "Why not make TILE huge?"
 
-Shared memory is limited (two 64 × 64 float tiles are already 32 KB per block), and a bigger tile means fewer blocks
-per SM. Past a point, the bottleneck has already moved to shared memory, so a bigger tile buys little. Registers
-are the next lever.
+Shared memory is limited (two 64 × 64 float tiles are already 32 KB per block), and a bigger tile means fewer blocks per SM. Past a point, the bottleneck has already moved to shared memory, so a bigger tile buys little. Registers are the next lever.
 
 ##### "Why is R = 2 slower than the strided F = 2 kernel?"
 
-Both give each thread 4 outputs. R = 2 uses a 1,024-thread block (only 1 block per SM) and the contiguous loader
-(stride-2 global loads, Part 5). Its reuse isn't larger than the strided kernel's. Only R = 4 cuts shared reads per FMA
-enough to win.
+Both give each thread 4 outputs. R = 2 uses a 1,024-thread block (only 1 block per SM) and the contiguous loader (stride-2 global loads, Part 5). Its reuse isn't larger than the strided kernel's. Only R = 4 cuts shared reads per FMA enough to win.
 
 ##### "Are there bank conflicts in `mm_block2d`?"
 
-Yes, by a hand count. With 16 × 16 threads, one warp spans two values of `ty`. The two `av` addresses are 4 rows
-(256 words) apart, so the **same bank**: a 2-way conflict. The `bv` addresses `k·64 + 4·tx + j` repeat banks every 8
-lanes: also 2-way. That's one more reason it stops at 48% of cuBLAS.
+Yes, by a hand count. With 16 × 16 threads, one warp spans two values of `ty`. The two `av` addresses are 4 rows (256 words) apart, so the **same bank**: a 2-way conflict. The `bv` addresses `k·64 + 4·tx + j` repeat banks every 8 lanes: also 2-way. That's one more reason it stops at 48% of cuBLAS.
 
 ##### "What does cuBLAS do that this doesn't?"
 
-Wide vector loads (`LDS.128`, `LDG.128`: 4 floats per instruction), double buffering (load the next tile while
-computing on this one), warp-level tiling, and bigger register blocks. All attack the same two limits.
+Wide vector loads (`LDS.128`, `LDG.128`: 4 floats per instruction), double buffering (load the next tile while computing on this one), warp-level tiling, and bigger register blocks. All attack the same two limits.
 
 #### 6.6 Check your understanding
 
@@ -1208,8 +1161,7 @@ computing on this one), warp-level tiling, and bigger register blocks. All attac
 The kernels produce `dC`. This part follows `dC` and the clock until they become one CSV row.
 
 > [!important] The one sentence to hold on to
-> cuBLAS runs first and its output is the reference; every kernel is timed with GPU events (once, or ten times if that
-> fits 30 s) and its first 4M outputs are compared with the reference.
+> cuBLAS runs first and its output is the reference; every kernel is timed with GPU events (once, or ten times if that fits 30 s) and its first 4M outputs are compared with the reference.
 
 #### 7.1 The reference: cuBLAS, and the column-major trick
 
@@ -1396,8 +1348,7 @@ Three things to know before you say "bit-exact":
 Interviewers ask "how far are you from peak, and why?" The roofline answers it with two numbers about the GPU and one about the kernel.
 
 > [!important] The one sentence to hold on to
-> A kernel can't beat **peak FLOP/s**, and it can't beat **bytes per second × FLOPs per byte**; whichever is lower is
-> its ceiling, and the gap between the ceiling and the measured speed says what else is limiting it.
+> A kernel can't beat **peak FLOP/s**, and it can't beat **bytes per second × FLOPs per byte**; whichever is lower is its ceiling, and the gap between the ceiling and the measured speed says what else is limiting it.
 
 #### 8.1 Two limits
 
@@ -1466,8 +1417,7 @@ double peak = (double)prop.multiProcessorCount * 128.0 * 2.0
 
 The 1-to-1 kernel could reach 38 TFLOP/s if only HBM mattered. It reaches 8.6. That gap is the clue for 8.5 below.
 
-(These intensities are the textbook counts. Caches add reuse the formula ignores; that's why the coalesced kernel,
-also "0.25", measures 5.4 TFLOP/s, above the 1.2 line. Use the roofline for direction, not for exact predictions.)
+(These intensities are the textbook counts. Caches add reuse the formula ignores; that's why the coalesced kernel, also "0.25", measures 5.4 TFLOP/s, above the 1.2 line. Use the roofline for direction, not for exact predictions.)
 
 #### 8.5 A second roof: shared memory
 
@@ -1479,8 +1429,7 @@ Now the "intensity" is FLOPs per byte read **from shared memory**:
 - 1-to-1: 2 shared reads (8 B) per FMA (2 FLOPs) → 0.25 FLOP/B → 0.25 × 33.5 = **8.4 TFLOP/s**. Measured **8.6**: right at it.
 - block2d R = 4: 0.5 reads (2 B) per FMA → 1 FLOP/B → **33.5 TFLOP/s**. Measured 25.7: under it, with 2-way bank conflicts (Part 6) and other overheads taking the rest.
 
-This is the story for "why did register blocking help so much?": it attacked the roof the kernel was actually
-pressing against.
+This is the story for "why did register blocking help so much?": it attacked the roof the kernel was actually pressing against.
 
 #### 8.6 Deriving the headline numbers, with the code
 
@@ -1516,23 +1465,19 @@ Both are FP32 SGEMM on CUDA cores (no tensor cores, no TF32), so the comparison 
 
 ##### "Is your kernel compute-bound?"
 
-By the HBM roofline, yes: intensity 16 is past the ridge of 14. But it runs at 38% of peak, so it isn't limited by
-the FMA units either. The binding limits are shared-memory traffic and instruction overheads, the "second roof".
+By the HBM roofline, yes: intensity 16 is past the ridge of 14. But it runs at 38% of peak, so it isn't limited by the FMA units either. The binding limits are shared-memory traffic and instruction overheads, the "second roof".
 
 ##### "Where does 4.8 TB/s come from?"
 
-It's the H200's HBM3e spec bandwidth. Measured copy bandwidth is usually somewhat lower, so real ceilings sit a bit
-under the drawn line.
+It's the H200's HBM3e spec bandwidth. Measured copy bandwidth is usually somewhat lower, so real ceilings sit a bit under the drawn line.
 
 ##### "How would you get closer to cuBLAS?"
 
-Raise reuse further (bigger register blocks, warp tiling), cut instruction count (128-bit vector loads), hide latency
-(double-buffered tiles, `cp.async`), and fix the stride-R global loader and the 2-way bank conflicts.
+Raise reuse further (bigger register blocks, warp tiling), cut instruction count (128-bit vector loads), hide latency (double-buffered tiles, `cp.async`), and fix the stride-R global loader and the 2-way bank conflicts.
 
 ##### "Why 2N³ and not N³?"
 
-Each term is one multiply and one add. An FMA does both, so N³ FMAs = 2N³ FLOPs. Everyone (cuBLAS, papers) counts
-this way.
+Each term is one multiply and one add. An FMA does both, so N³ FMAs = 2N³ FLOPs. Everyone (cuBLAS, papers) counts this way.
 
 #### 8.8 Check your understanding
 

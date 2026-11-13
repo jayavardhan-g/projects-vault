@@ -12,9 +12,7 @@ Part of [[Interview plan (Nov 2026)]]. Two course projects, half a day each. Abo
 
 > [!warning] Your code is not on the server yet
 > The plan asked you to copy the CS728 and LeNet-5 code and reports into
-> `/data/jayavardhan/projects/interview_materials/{cs728,lenet}/`. As of Nov 10 neither folder exists, and there is
-> no prep pack. **Copy them before Day 9.** Until then the code blocks (B1, B2) below are a reading checklist, not line
-> numbers. Tell Claude when they're copied; it can then add line numbers and write a prep pack the evening before.
+> `/data/jayavardhan/projects/interview_materials/{cs728,lenet}/`. As of Nov 10 neither folder exists, and there is no prep pack. **Copy them before Day 9.** Until then the code blocks (B1, B2) below are a reading checklist, not line numbers. Tell Claude when they're copied; it can then add line numbers and write a prep pack the evening before.
 > Until then, use `LongContext_RAG/heads/` as the worked example for retrieval heads (it implements the same score).
 
 **Resume bullets (resume 4):**
@@ -158,9 +156,7 @@ Find and trace: the LeNet-5 definition; the IMP loop (per-round rate, rewind or 
 Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 > [!warning] Your CS728 and LeNet-5 code is not on the server
-> Sections 1–2 read a **worked example**: your own `LongContext_RAG/heads/` (branch `main`, `bfb2ec9`), which scores
-> retrieval heads the way Wu et al. do. It's the same idea as CS728's Hit Count. Section 3 gives the pruning pipeline
-> as a figure. Once the course code is copied to `interview_materials/`, ask Claude to add its snippets here.
+> Sections 1–2 read a **worked example**: your own `LongContext_RAG/heads/` (branch `main`, `bfb2ec9`), which scores retrieval heads the way Wu et al. do. It's the same idea as CS728's Hit Count. Section 3 gives the pruning pipeline as a figure. Once the course code is copied to `interview_materials/`, ask Claude to add its snippets here.
 
 ```mermaid
 flowchart TB
@@ -174,8 +170,7 @@ flowchart TB
 
 ### The flow, step by step
 
-One probe through the scorer (illustrative numbers). The haystack is 2,000 tokens; the needle "The secret code is
-4721" sits at positions 500–507; the model answers "4721".
+One probe through the scorer (illustrative numbers). The haystack is 2,000 tokens; the needle "The secret code is 4721" sits at positions 500–507; the model answers "4721".
 
 1. **Prefill** everything except the last prompt token (`scorer.py:74`). Then decode one token at a time, so each step's attention is a clean `[layers, heads, keys]` tensor (`:83–101`).
 2. **The step that emits "47":** for every head at once, take the argmax over keys (`copy_hits`, `:138`).
@@ -340,31 +335,22 @@ def global_masks(model, keep_frac):
 
 ### 4. Deep dive: retrieval heads, Hit Count and Recall@k, from scratch
 
-Sections 1–2 above walk `scorer.py` and `_aggregate`. This section builds the idea on a 10-token prompt and 4 heads,
-so you can compute every tensor by hand. Order: what a head "looks at" → the copy rule → `copy_hits` line by line →
-coverage across steps → copy-precision → how CS728 turns heads into a tool retriever → Recall@k and lost in the
-middle → why attention is captured only at decode → questions → check.
+Sections 1–2 above walk `scorer.py` and `_aggregate`. This section builds the idea on a 10-token prompt and 4 heads, so you can compute every tensor by hand. Order: what a head "looks at" → the copy rule → `copy_hits` line by line → coverage across steps → copy-precision → how CS728 turns heads into a tool retriever → Recall@k and lost in the middle → why attention is captured only at decode → questions → check.
 
 > [!important] The one sentence to hold on to
-> A retrieval head is one that, while the model writes a fact it read earlier, puts its **largest attention weight on
-> exactly that token in the context**; count how often each head does this on probe questions, keep the best few, and
-> their attention becomes a training-free retriever.
+> A retrieval head is one that, while the model writes a fact it read earlier, puts its **largest attention weight on exactly that token in the context**; count how often each head does this on probe questions, keep the best few, and their attention becomes a training-free retriever.
 
 #### 4.1 What a head "looks at"
 
-At every decode step, each attention head produces a row of weights over all previous positions, summing to 1 (Day 1
-§5). The position with the **largest** weight (the argmax) is where that head is "looking" most. Llama-3.1-8B has 32
-layers × 32 heads = **1,024** such rows per step.
+At every decode step, each attention head produces a row of weights over all previous positions, summing to 1 (Day 1 §5). The position with the **largest** weight (the argmax) is where that head is "looking" most. Llama-3.1-8B has 32 layers × 32 heads = **1,024** such rows per step.
 
 #### 4.2 The copy rule
 
-Wu et al. call a head **retrieval** if it copies: when the model emits token $w$, the head's argmax position $j$
-holds that very token, inside the passage being retrieved (the **needle**). Both halves are needed:
+Wu et al. call a head **retrieval** if it copies: when the model emits token $w$, the head's argmax position $j$ holds that very token, inside the passage being retrieved (the **needle**). Both halves are needed:
 - argmax inside the needle, but a different token → it's attending, not copying;
 - the right token, but the argmax elsewhere → the model got the token some other way.
 
-**Toy probe.** Prompt of 10 tokens; the needle is positions 4–7, "code is 47 21". The model is answering and now
-emits "47".
+**Toy probe.** Prompt of 10 tokens; the needle is positions 4–7, "code is 47 21". The model is answering and now emits "47".
 
 ![[d09-1-copy-hit.svg]] [[d09-1-copy-hit.html|▶ Step through it]]
 
@@ -377,8 +363,7 @@ emits "47".
 
 #### 4.3 `copy_hits`, line by line (`scorer.py:121–143`)
 
-Use token ids `prompt_ids = [11, 12, 13, 14, 15, 16, 47, 21, 17, 18]` (so id 47 is "47" and id 21 is "21"), needle
-start 4, end 8 (exclusive), and `attn` of shape [2 layers, 2 heads, 10 keys] with the rows above.
+Use token ids `prompt_ids = [11, 12, 13, 14, 15, 16, 47, 21, 17, 18]` (so id 47 is "47" and id 21 is "21"), needle start 4, end 8 (exclusive), and `attn` of shape [2 layers, 2 heads, 10 keys] with the rows above.
 
 ```python
 j = attn.argmax(dim=-1)                                  # [[0, 6], [7, 6]]            shape [2, 2]
@@ -394,16 +379,14 @@ return j, in_span & (tok_at_j == generated_token)        # hit = [[F, T], [F, T]
 
 #### 4.4 Coverage over the whole answer (`scorer.py:83–106`)
 
-The model emits several tokens. Each step's hits mark which **needle positions** each head has copied, in `covered`
-of shape [layers, heads, needle_len]:
+The model emits several tokens. Each step's hits mark which **needle positions** each head has copied, in `covered` of shape [layers, heads, needle_len]:
 
 ```python
 rel = (j - ns).clamp(0, klen - 1)                        # needle-relative position: [[0, 2], [3, 2]]
 covered |= torch.zeros_like(covered).scatter_(2, rel.unsqueeze(-1), hit.unsqueeze(-1))
 ```
 
-`scatter_` writes each head's `hit` value at index `rel` along the needle axis; `|=` keeps every position ever
-copied. (L0 H0's `rel` was clamped from −4 to 0, but its hit is False, so nothing is marked.)
+`scatter_` writes each head's `hit` value at index `rel` along the needle axis; `|=` keeps every position ever copied. (L0 H0's `rel` was clamped from −4 to 0, but its hit is False, so nothing is marked.)
 
 Second step: the model emits "21". Say the argmaxes are L0 H0 → 9, L0 H1 → 7, L1 H0 → 7, L1 H1 → 6.
 
@@ -414,8 +397,7 @@ Second step: the model emits "21". Say the argmaxes are L0 H0 → 9, L0 H1 → 7
 | L1 H0 | miss | hit at 7 | {7} | 0.25 |
 | L1 H1 | hit at 6 | miss ("47" ≠ "21") | {6} | 0.25 |
 
-Notice the ceiling: the answer copies only 2 of the 4 needle tokens ("code is" isn't repeated), so **no head can score
-above 0.5** on this probe.
+Notice the ceiling: the answer copies only 2 of the 4 needle tokens ("code is" isn't repeated), so **no head can score above 0.5** on this probe.
 
 #### 4.5 Copy-precision, the fairer score (`run_head_id.py:129–142`)
 
@@ -423,9 +405,7 @@ To remove that ceiling, `_aggregate` also computes, over **all** probes:
 
 $$\text{precision}_h = \frac{\text{decode steps where head } h \text{ hit}}{\text{decode steps whose emitted token was in the needle}}$$
 
-On our probe, both steps were "copyable" (47 and 21 are in the needle), so the denominator is 2: L0 H1 = 2/2 = **1.0**,
-L1 H0 = 1/2, L1 H1 = 1/2, L0 H0 = 0. It's **micro-averaged** (steps are pooled across probes before dividing), so a
-probe with a single copy step can't swing the result.
+On our probe, both steps were "copyable" (47 and 21 are in the needle), so the denominator is 2: L0 H1 = 2/2 = **1.0**, L1 H0 = 1/2, L1 H1 = 1/2, L0 H0 = 0. It's **micro-averaged** (steps are pooled across probes before dividing), so a probe with a single copy step can't swing the result.
 
 #### 4.6 From scores to a retriever: CS728's Hit Count
 
@@ -434,8 +414,7 @@ CS728's task: a prompt lists many **tools** (name + description); given a query,
 2. **Select:** count hits per head; keep the **top 10** heads.
 3. **Retrieve:** for a new query, sum the selected heads' attention **mass** over each tool's tokens; rank tools by that sum. No training at all.
 
-**Tiny example.** 4 heads, 3 probes. Hits: H1 = 3, H2 = 0, H3 = 2, H4 = 3. Keep the top 2: **H1, H4**. A new query,
-tools A, B, C; B is correct.
+**Tiny example.** 4 heads, 3 probes. Hits: H1 = 3, H2 = 0, H3 = 2, H4 = 3. Keep the top 2: **H1, H4**. A new query, tools A, B, C; B is correct.
 
 | | A | B | C |
 |---|---|---|---|
@@ -447,42 +426,29 @@ B ranks first: a Recall@1 hit.
 
 #### 4.7 Recall@k and lost in the middle
 
-**Recall@k** = the share of queries whose correct tool is among the top k. Recall@1 = top-1 accuracy. With 4 queries
-whose correct tools rank 1, 3, 1 and 7: Recall@1 = 2/4 = **50%**, Recall@5 = 3/4 = **75%**.
+**Recall@k** = the share of queries whose correct tool is among the top k. Recall@1 = top-1 accuracy. With 4 queries whose correct tools rank 1, 3, 1 and 7: Recall@1 = 2/4 = **50%**, Recall@5 = 3/4 = **75%**.
 
-Your resume: Recall@1 1.3% → 40.7%, Recall@5 25.5% → 66.9%. Know exactly what the 1.3% baseline was (it isn't in any
-file on the server).
+Your resume: Recall@1 1.3% → 40.7%, Recall@5 25.5% → 66.9%. Know exactly what the 1.3% baseline was (it isn't in any file on the server).
 
-**Lost in the middle** (Liu et al., 2023): models use information at the **start** and **end** of a long context best
-and the middle worst (a U-shaped curve). Heads chosen because they **copy by content** are less tied to position, so
-summing them over each tool can help tools in the middle of the list.
+**Lost in the middle** (Liu et al., 2023): models use information at the **start** and **end** of a long context best and the middle worst (a U-shaped curve). Heads chosen because they **copy by content** are less tied to position, so summing them over each tool can help tools in the middle of the list.
 
 #### 4.8 Why attention is read only at decode steps
 
-`capture.py`'s docstring explains: fast attention kernels (SDPA, FlashAttention) never store the weight matrix, so
-weights are only visible on the slow "eager" path. An eager **prefill** over T = 8,192 tokens would build a
-[32 heads, T, T] matrix per layer: 32 × 8,192² × 2 bytes ≈ **4 GiB per layer**. A **decode** step has one query, so the
-matrix is only [32, 1, T] ≈ 0.5 MB. So the scorer prefills all but the last prompt token with SDPA (`scorer.py:74`),
-then feeds that last token and every new token one at a time under eager attention, with a forward hook copying out
-each layer's weights.
+`capture.py`'s docstring explains: fast attention kernels (SDPA, FlashAttention) never store the weight matrix, so weights are only visible on the slow "eager" path. An eager **prefill** over T = 8,192 tokens would build a [32 heads, T, T] matrix per layer: 32 × 8,192² × 2 bytes ≈ **4 GiB per layer**. A **decode** step has one query, so the matrix is only [32, 1, T] ≈ 0.5 MB. So the scorer prefills all but the last prompt token with SDPA (`scorer.py:74`), then feeds that last token and every new token one at a time under eager attention, with a forward hook copying out each layer's weights.
 
 #### 4.9 Questions people usually ask next
 
 ##### "Why argmax and not the total attention on the needle?"
 
-The argmax tests a sharp claim: *this head is pointing at the token being copied*. Total mass would also reward heads
-that spread attention vaguely over the needle. CS728's retrieval step does use mass (summed over a tool), because it
-needs a score for every tool, not a yes/no.
+The argmax tests a sharp claim: *this head is pointing at the token being copied*. Total mass would also reward heads that spread attention vaguely over the needle. CS728's retrieval step does use mass (summed over a tool), because it needs a score for every tool, not a yes/no.
 
 ##### "Why do so few heads do this?"
 
-Wu et al. found under 5% of heads are retrieval heads, consistently across model families and tasks, and present
-already in base models. Most heads do other jobs (position tracking, syntax, attending to the first token).
+Wu et al. found under 5% of heads are retrieval heads, consistently across model families and tasks, and present already in base models. Most heads do other jobs (position tracking, syntax, attending to the first token).
 
 ##### "Would you ship 40.7% Recall@1 over a trained retriever?"
 
-Not as the only retriever. Its strength is needing no training data and no extra model. A practical design is to use
-it to **re-rank** a shortlist from a cheap embedding retriever, or as a feature. Say that honestly.
+Not as the only retriever. Its strength is needing no training data and no extra model. A practical design is to use it to **re-rank** a shortlist from a cheap embedding retriever, or as a feature. Say that honestly.
 
 #### 4.10 Check your understanding
 
@@ -515,19 +481,14 @@ it to **re-rank** a shortlist from a cheap embedding retriever, or as a feature.
 
 ### 5. Deep dive: magnitude pruning, layer-wise vs global, from scratch
 
-Section 3 above gives the pipeline and a 6-line sketch. This section builds pruning from zero on 16 weights, then on
-LeNet-5's real layer sizes. Order: what pruning is → masks → one-shot vs iterative → layer-wise vs global on a toy →
-LeNet-5's counts and the starved conv1 → the sketch line by line → what p = 0.83 means → questions → check.
+Section 3 above gives the pipeline and a 6-line sketch. This section builds pruning from zero on 16 weights, then on LeNet-5's real layer sizes. Order: what pruning is → masks → one-shot vs iterative → layer-wise vs global on a toy → LeNet-5's counts and the starved conv1 → the sketch line by line → what p = 0.83 means → questions → check.
 
 > [!important] The one sentence to hold on to
-> Pruning sets the smallest-magnitude weights to zero and keeps them zero with a mask; if you remove the same
-> **fraction from every layer**, a tiny layer like LeNet's conv1 (150 weights) is cut to almost nothing, while ranking
-> **all weights together** lets it keep the large weights it needs.
+> Pruning sets the smallest-magnitude weights to zero and keeps them zero with a mask; if you remove the same **fraction from every layer**, a tiny layer like LeNet's conv1 (150 weights) is cut to almost nothing, while ranking **all weights together** lets it keep the large weights it needs.
 
 #### 5.1 What pruning is
 
-A trained network has many weights close to zero that barely affect the output. **Magnitude pruning** assumes small
-$|w|$ means unimportant: remove the smallest ones, keep the rest. "3.75% of weights remain" means **96.25% sparsity**.
+A trained network has many weights close to zero that barely affect the output. **Magnitude pruning** assumes small $|w|$ means unimportant: remove the smallest ones, keep the rest. "3.75% of weights remain" means **96.25% sparsity**.
 
 #### 5.2 Masks
 
@@ -543,14 +504,11 @@ During retraining, the mask is reapplied after every optimiser step, so a pruned
 
 #### 5.3 One-shot vs iterative
 
-Removing 96% of weights at once usually breaks the network. **Iterative magnitude pruning (IMP)** removes a fraction
-per round and retrains (or **rewinds** the surviving weights to their early values, as in the lottery-ticket paper)
-between rounds:
+Removing 96% of weights at once usually breaks the network. **Iterative magnitude pruning (IMP)** removes a fraction per round and retrains (or **rewinds** the surviving weights to their early values, as in the lottery-ticket paper) between rounds:
 
 $$\text{remaining after } n \text{ rounds} = (1 - p)^n$$
 
-At p = 20% per round: 0.8¹⁴ = 4.4%, 0.8¹⁵ = **3.5%**. Reaching 3.75% takes about 15 rounds. (Your exact per-round rate
-is in your code; check it.)
+At p = 20% per round: 0.8¹⁴ = 4.4%, 0.8¹⁵ = **3.5%**. Reaching 3.75% takes about 15 rounds. (Your exact per-round rate is in your code; check it.)
 
 #### 5.4 Layer-wise vs global, on 16 weights
 
@@ -565,8 +523,7 @@ Two layers. Layer 1 is small, with **large** weights; layer 2 is big, with small
 
 ![[d09-2-pruning.svg]] [[d09-2-pruning.html|▶ Step through it]]
 
-Layer-wise pruning forces the same fraction everywhere, regardless of how important each layer's weights are. Global
-pruning lets layers with large weights keep more.
+Layer-wise pruning forces the same fraction everywhere, regardless of how important each layer's weights are. Global pruning lets layers with large weights keep more.
 
 #### 5.5 LeNet-5: where the weights are
 
@@ -581,13 +538,9 @@ Classic LeNet-5 (your variant may differ slightly; check your code):
 | fc3 | 84 → 10 | 840 | 1.4% | 32 |
 | **total** | | **61,470** (+ 236 biases) | | |
 
-Layer-wise pruning leaves conv1 about **6 weights**: one per 25-weight filter, roughly. conv1 is the first feature
-detector (edges, strokes). With almost nothing left, the network loses robustness first: clean digits may still pass,
-but **corrupted** ones (MNIST-C: noise, blur, fog…) fail. That's your "starved conv1" diagnosis: layer-wise lost
-**3.89 pp** on MNIST-C, 7× the dense model's gap; global pruning at the same sparsity closed it to 0.13 pp.
+Layer-wise pruning leaves conv1 about **6 weights**: one per 25-weight filter, roughly. conv1 is the first feature detector (edges, strokes). With almost nothing left, the network loses robustness first: clean digits may still pass, but **corrupted** ones (MNIST-C: noise, blur, fog…) fail. That's your "starved conv1" diagnosis: layer-wise lost **3.89 pp** on MNIST-C, 7× the dense model's gap; global pruning at the same sparsity closed it to 0.13 pp.
 
-As a size check: 61,706 float32 parameters × 4 bytes = 246,824 bytes ≈ 246.8 kB (241.0 KiB). The resume's 245.6 KB is
-close to that; the exact figure depends on your variant and how the file was measured.
+As a size check: 61,706 float32 parameters × 4 bytes = 246,824 bytes ≈ 246.8 kB (241.0 KiB). The resume's 245.6 KB is close to that; the exact figure depends on your variant and how the file was measured.
 
 #### 5.6 The sketch in section 3, line by line
 
@@ -609,8 +562,7 @@ For **layer-wise**, the threshold would be computed inside the loop, once per `w
 
 #### 5.7 What "p = 0.83" means
 
-You compared global-pruned and dense models' MNIST-C accuracy over **5 seeds**. A **paired** test looks at the
-per-seed differences. Toy differences (pp): 0.30, −0.30, 0.20, −0.30, 0.25.
+You compared global-pruned and dense models' MNIST-C accuracy over **5 seeds**. A **paired** test looks at the per-seed differences. Toy differences (pp): 0.30, −0.30, 0.20, −0.30, 0.25.
 
 | quantity | value |
 |---|---|
@@ -619,32 +571,25 @@ per-seed differences. Toy differences (pp): 0.30, −0.30, 0.20, −0.30, 0.25.
 | $t = \bar d / (s / \sqrt{5})$ | 0.03 / 0.136 = **0.22** |
 | two-sided p (t-distribution, 4 degrees of freedom) | **0.84** |
 
-A p-value is the chance of seeing a difference at least this large **if there were truly no difference**. p = 0.84
-means the data are entirely consistent with "no difference". It is **not** proof that the two are equal: with 5
-seeds, the test can't detect small gaps. Say "no significant difference (p = 0.83, paired test over 5 seeds)" and know
-which test you actually ran.
+A p-value is the chance of seeing a difference at least this large **if there were truly no difference**. p = 0.84 means the data are entirely consistent with "no difference". It is **not** proof that the two are equal: with 5 seeds, the test can't detect small gaps. Say "no significant difference (p = 0.83, paired test over 5 seeds)" and know which test you actually ran.
 
 #### 5.8 Questions people usually ask next
 
 ##### "Why prune at all if the model is already small?"
 
-LeNet-5 is a teaching case. The point is the method and the finding (layer-wise vs global, robustness), which carry
-over to big networks.
+LeNet-5 is a teaching case. The point is the method and the finding (layer-wise vs global, robustness), which carry over to big networks.
 
 ##### "Does 96% sparsity make it 25× faster?"
 
-Not by itself. Dense hardware still multiplies the zeros. Speed needs sparse kernels or structured pruning (whole
-channels or filters). Unstructured sparsity mainly saves storage, if you store it in a sparse format.
+Not by itself. Dense hardware still multiplies the zeros. Speed needs sparse kernels or structured pruning (whole channels or filters). Unstructured sparsity mainly saves storage, if you store it in a sparse format.
 
 ##### "Why select the model on a validation split?"
 
-If you pick the best round or seed by **test** accuracy, the test number is no longer an unbiased estimate. Choosing
-on validation keeps the test set honest.
+If you pick the best round or seed by **test** accuracy, the test number is no longer an unbiased estimate. Choosing on validation keeps the test set honest.
 
 ##### "Is magnitude really the best importance score?"
 
-It's the simplest and works well. Alternatives use gradients or the loss change (e.g. SNIP, movement pruning), at more
-cost.
+It's the simplest and works well. Alternatives use gradients or the loss change (e.g. SNIP, movement pruning), at more cost.
 
 #### 5.9 Check your understanding
 
@@ -675,19 +620,14 @@ cost.
 
 ### 6. Deep dive: PGD adversarial attacks from scratch
 
-Your resume says pruning raised PGD robustness from 51.98% to 82.18%. This section builds the attack from zero on a
-2-number input, so every step can be checked by hand. Order: what an adversarial example is → the ε-ball → FGSM → PGD
-step by step → why a linear model is easy to analyse → the attack in code → gradient masking, the hostile question →
-questions → check.
+Your resume says pruning raised PGD robustness from 51.98% to 82.18%. This section builds the attack from zero on a 2-number input, so every step can be checked by hand. Order: what an adversarial example is → the ε-ball → FGSM → PGD step by step → why a linear model is easy to analyse → the attack in code → gradient masking, the hostile question → questions → check.
 
 > [!important] The one sentence to hold on to
-> PGD repeatedly nudges the input a small step in the direction that **increases the loss** (the sign of its
-> gradient), then clips it back so no pixel moves more than ε; robust accuracy is the accuracy that survives this.
+> PGD repeatedly nudges the input a small step in the direction that **increases the loss** (the sign of its gradient), then clips it back so no pixel moves more than ε; robust accuracy is the accuracy that survives this.
 
 #### 6.1 What an adversarial example is
 
-Take an image the model classifies correctly. Change each pixel by a tiny amount, too little for a person to notice,
-chosen to push the model towards a wrong answer. If the prediction flips, that image is an **adversarial example**.
+Take an image the model classifies correctly. Change each pixel by a tiny amount, too little for a person to notice, chosen to push the model towards a wrong answer. If the prediction flips, that image is an **adversarial example**.
 Robust accuracy = the share of test images whose prediction does **not** flip under the attack.
 
 #### 6.2 The ε-ball (L∞)
@@ -708,16 +648,14 @@ $$x = x_0 + \varepsilon \cdot \text{sign}\big(\nabla_x \mathcal{L}(x_0, y)\big)$
 
 #### 6.4 PGD: many small steps, projected back
 
-**Projected gradient descent** (Madry et al.) repeats smaller steps of size α and, after each one, **projects** back
-into the box (clips each pixel to $[x_0 - ε, x_0 + ε]$ and to [0, 1]):
+**Projected gradient descent** (Madry et al.) repeats smaller steps of size α and, after each one, **projects** back into the box (clips each pixel to $[x_0 - ε, x_0 + ε]$ and to [0, 1]):
 
 $$x_{t+1} = \text{clip}_{x_0, \varepsilon}\Big(x_t + \alpha \cdot \text{sign}\big(\nabla_x \mathcal{L}(x_t, y)\big)\Big)$$
 
 Many small steps can follow a curved loss surface that a single FGSM step would overshoot.
 
 **Toy.** A linear classifier on 2 inputs: score $s = 2x_1 - x_2$; class "positive" if $s > 0$. Start $x_0 = (0.3, 0.2)$:
-$s = 0.4$, correct. The loss rises as $s$ falls, so the gradient's sign is $\text{sign}(-w) = (-1, +1)$: lower $x_1$,
-raise $x_2$. Step α = 0.04.
+$s = 0.4$, correct. The loss rises as $s$ falls, so the gradient's sign is $\text{sign}(-w) = (-1, +1)$: lower $x_1$, raise $x_2$. Step α = 0.04.
 
 **With ε = 0.15:**
 
@@ -729,8 +667,7 @@ raise $x_2$. Step α = 0.04.
 | 3 | (0.18, 0.32) | (0.18, 0.32) | 0.04 |
 | 4 | (0.14, 0.36) | **(0.15, 0.35)** | **−0.05** → fooled |
 
-**With ε = 0.1**, the box is [0.2, 0.4] × [0.1, 0.3]; step 3's (0.18, 0.32) is clipped to **(0.20, 0.30)** and stays
-there: $s$ = 0.10, still correct.
+**With ε = 0.1**, the box is [0.2, 0.4] × [0.1, 0.3]; step 3's (0.18, 0.32) is clipped to **(0.20, 0.30)** and stays there: $s$ = 0.10, still correct.
 
 ![[d09-3-pgd.svg]] [[d09-3-pgd.html|▶ Step through it]]
 
@@ -741,8 +678,7 @@ For a linear score $s = w \cdot x$, the worst point in the box is a corner, and 
 $$\Delta s = \varepsilon \lVert w \rVert_1 = \varepsilon (|2| + |-1|) = 3\varepsilon$$
 
 So it's fooled once $0.4 - 3\varepsilon < 0$, i.e. **ε > 0.133**. That matches the table: 0.1 survives, 0.15 doesn't.
-It also shows why high-dimensional inputs are fragile: with 784 pixels, many tiny changes add up ($\lVert w \rVert_1$
-grows with dimension).
+It also shows why high-dimensional inputs are fragile: with 784 pixels, many tiny changes add up ($\lVert w \rVert_1$ grows with dimension).
 
 #### 6.6 PGD in code (illustration, not your code)
 
@@ -775,9 +711,7 @@ def pgd(model, x0, y, eps=0.1, alpha=0.01, steps=40):
 
 #### 6.7 The hostile question: gradient masking
 
-"Pruning alone raised robust accuracy from 52% to 82%. Isn't that suspicious?" It might be **gradient masking**: the
-model isn't more robust, but its gradients have become less useful (flat, noisy or saturated), so a gradient-based
-attack fails to find adversarial examples that still exist.
+"Pruning alone raised robust accuracy from 52% to 82%. Isn't that suspicious?" It might be **gradient masking**: the model isn't more robust, but its gradients have become less useful (flat, noisy or saturated), so a gradient-based attack fails to find adversarial examples that still exist.
 
 How to check (Athalye et al., 2018, list similar tests):
 1. **Increase ε:** at a large enough ε, accuracy must fall to near 0. If it doesn't, the attack is broken.
@@ -791,18 +725,15 @@ Unless you ran these, say: "PGD at ε = …, … steps; I didn't rule out gradie
 
 ##### "Why the sign of the gradient, not the gradient itself?"
 
-Under an L∞ budget, every pixel may move up to ε independently. The way to change the loss most is to push **every**
-pixel the full allowed amount in its helpful direction. That's the sign.
+Under an L∞ budget, every pixel may move up to ε independently. The way to change the loss most is to push **every** pixel the full allowed amount in its helpful direction. That's the sign.
 
 ##### "Why could pruning genuinely help robustness?"
 
-A sparser model has fewer weights, so a smaller $\lVert w \rVert_1$ in the linear picture, and fewer paths for tiny
-input changes to add up. Some papers report modest gains. A 30-point jump still deserves the checks above.
+A sparser model has fewer weights, so a smaller $\lVert w \rVert_1$ in the linear picture, and fewer paths for tiny input changes to add up. Some papers report modest gains. A 30-point jump still deserves the checks above.
 
 ##### "Is this the same PGD as in optimisation?"
 
-Yes: projected gradient descent is a general method (take a gradient step, project back onto the allowed set). Here
-it **ascends** the loss over the input.
+Yes: projected gradient descent is a general method (take a gradient step, project back onto the allowed set). Here it **ascends** the loss over the input.
 
 #### 6.9 Check your understanding
 
@@ -833,20 +764,14 @@ it **ascends** the loss over the input.
 
 ### 7. Deep dive: INT8 quantisation from scratch, and why 3.27× not 4×
 
-Your resume says INT8 shrank LeNet-5 from 245.6 KB to 75.0 KB at a cost of 0.17 pp clean accuracy. This section
-builds weight quantisation from zero on 4 numbers. Order: why fewer bits → symmetric quantisation step by step → the
-error bound → affine (zero-point) quantisation → per-tensor vs per-channel → where 3.27× comes from → questions →
-check.
+Your resume says INT8 shrank LeNet-5 from 245.6 KB to 75.0 KB at a cost of 0.17 pp clean accuracy. This section builds weight quantisation from zero on 4 numbers. Order: why fewer bits → symmetric quantisation step by step → the error bound → affine (zero-point) quantisation → per-tensor vs per-channel → where 3.27× comes from → questions → check.
 
 > [!important] The one sentence to hold on to
-> Store each weight as an 8-bit integer $q = \text{round}(w / s)$ with one float **scale** $s$ per tensor, and read it
-> back as $q \cdot s$; that's 4× smaller than float32 for the weights, with an error of at most $s/2$ per weight.
+> Store each weight as an 8-bit integer $q = \text{round}(w / s)$ with one float **scale** $s$ per tensor, and read it back as $q \cdot s$; that's 4× smaller than float32 for the weights, with an error of at most $s/2$ per weight.
 
 #### 7.1 Why fewer bits?
 
-A float32 weight takes 4 bytes. An int8 takes 1. For a network whose weights are roughly bell-shaped around zero, 256
-evenly spaced levels are usually enough to keep accuracy. Smaller weights also mean less memory traffic, which is
-what limits speed on most hardware.
+A float32 weight takes 4 bytes. An int8 takes 1. For a network whose weights are roughly bell-shaped around zero, 256 evenly spaced levels are usually enough to keep accuracy. Smaller weights also mean less memory traffic, which is what limits speed on most hardware.
 
 #### 7.2 Symmetric quantisation, on 4 numbers
 
@@ -875,18 +800,15 @@ Rounding moves a number by at most half a step, so every weight's error is at mo
 
 $$\frac{s}{2} = \frac{0.010236}{2} = 0.0051$$
 
-All four errors above are below that. The bound depends on the **largest** weight: one outlier of 13.0 would make $s$
-ten times bigger and every other weight's error ten times larger. That's why outliers matter in quantisation.
+All four errors above are below that. The bound depends on the **largest** weight: one outlier of 13.0 would make $s$ ten times bigger and every other weight's error ten times larger. That's why outliers matter in quantisation.
 
 #### 7.4 Affine quantisation: a zero point
 
-Activations after ReLU are all ≥ 0; symmetric quantisation would waste the negative half of the range. **Affine**
-quantisation maps $[\min, \max]$ onto 0…255 with a **zero point** $z$:
+Activations after ReLU are all ≥ 0; symmetric quantisation would waste the negative half of the range. **Affine** quantisation maps $[\min, \max]$ onto 0…255 with a **zero point** $z$:
 
 $$q = \text{round}(x / s) + z, \qquad x \approx (q - z)\, s$$
 
-Range [−0.5, 1.5]: $s = 2 / 255 = 0.00784$, $z = \text{round}(0.5 / s) = \text{round}(63.75) = 64$. Then 0.0 → 64, and
-1.0 → round(127.5) + 64 = 192 → read back as (192 − 64) × 0.00784 = 1.004.
+Range [−0.5, 1.5]: $s = 2 / 255 = 0.00784$, $z = \text{round}(0.5 / s) = \text{round}(63.75) = 64$. Then 0.0 → 64, and 1.0 → round(127.5) + 64 = 192 → read back as (192 − 64) × 0.00784 = 1.004.
 
 #### 7.5 Per-tensor vs per-channel
 
@@ -899,28 +821,23 @@ Know which your code used.
 
 $$\frac{245.6}{75.0} = 3.27 \qquad\text{(the resume rounds to 3.28)}$$
 
-If every byte were float32 weights turned into int8, the file would be 245.6 / 4 = **61.4 KB**. The extra ~13.6 KB is
-the usual suspects:
+If every byte were float32 weights turned into int8, the file would be 245.6 / 4 = **61.4 KB**. The extra ~13.6 KB is the usual suspects:
 - **scales and zero points** (one or more floats per tensor or channel);
 - **biases**, often kept in float32 or int32;
 - any layers left in float (often the first or last layer, for accuracy);
 - **file overhead:** a saved PyTorch file stores tensor names and metadata, which is a larger share of a tiny model.
 
-For LeNet-5 the weights are 61,470 numbers; biases are only 236, so biases alone can't explain 13.6 KB. Open your
-saved file and list its tensors and dtypes to give the exact breakdown.
+For LeNet-5 the weights are 61,470 numbers; biases are only 236, so biases alone can't explain 13.6 KB. Open your saved file and list its tensors and dtypes to give the exact breakdown.
 
 #### 7.7 Questions people usually ask next
 
 ##### "Post-training quantisation or quantisation-aware training?"
 
-**PTQ** quantises a trained model, using a small calibration set to pick activation ranges. **QAT** simulates the
-rounding during training (straight-through gradient, as in FSQ on Day 7), so the weights adapt. PTQ is enough for
-LeNet at 8 bits (your 0.17 pp loss shows it); QAT matters more at 4 bits.
+**PTQ** quantises a trained model, using a small calibration set to pick activation ranges. **QAT** simulates the rounding during training (straight-through gradient, as in FSQ on Day 7), so the weights adapt. PTQ is enough for LeNet at 8 bits (your 0.17 pp loss shows it); QAT matters more at 4 bits.
 
 ##### "Does INT8 make it faster?"
 
-Only if the arithmetic runs in int8 (int8 kernels on CPU or GPU). If you dequantise back to float before computing,
-you save storage and memory traffic but not arithmetic.
+Only if the arithmetic runs in int8 (int8 kernels on CPU or GPU). If you dequantise back to float before computing, you save storage and memory traffic but not arithmetic.
 
 ##### "Why 127 and not 128?"
 

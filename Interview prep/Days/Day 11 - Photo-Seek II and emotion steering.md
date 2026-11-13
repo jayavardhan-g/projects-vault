@@ -6,9 +6,7 @@ tags: [interview, day, photo-seek, faces, emotion-steering]
 ---
 # Day 11 (Wed Nov 18): Photo-Seek II (faces), then emotion steering
 
-Part of [[Interview plan (Nov 2026)]]. About 7.25 h. Morning: `photo_seek`, branch `upgrade-2026-10` (prep pack
-[[Photo-Seek - prep]], Trace 2, stories 4.1–4.3). Afternoon: `emotion_steering` (branch `main`, one commit `d725cbe`;
-prep pack [[Emotion steering - prep]]).
+Part of [[Interview plan (Nov 2026)]]. About 7.25 h. Morning: `photo_seek`, branch `upgrade-2026-10` (prep pack [[Photo-Seek - prep]], Trace 2, stories 4.1–4.3). Afternoon: `emotion_steering` (branch `main`, one commit `d725cbe`; prep pack [[Emotion steering - prep]]).
 
 **Code, explained:** the figures, the code to read and what each snippet does are in [[#Code, explained]], right after section B.
 
@@ -173,8 +171,7 @@ Skim `faces/detect.py` (127 SCRFD `detect_array`) and `embed/arcface.py` (72 ali
 Read this **with the files open**. It starts with a picture of the whole day and **the flow, step by step** (one concrete input followed through every function). Then each part has its own figure, the exact code (copied from the repo at the commit named below, so the line numbers match) and what that code does.
 
 Morning: `photo_seek`, branch `upgrade-2026-10`
-(`aa5d476`, paths under `src/photoseek/`). Afternoon: `emotion_steering/Project.ipynb` (`d725cbe`); notebook
-references are **cell N, line L**.
+(`aa5d476`, paths under `src/photoseek/`). Afternoon: `emotion_steering/Project.ipynb` (`d725cbe`); notebook references are **cell N, line L**.
 
 ---
 
@@ -375,8 +372,7 @@ flowchart TB
 
 ##### The flow, step by step (steering)
 
-The Gradio demo with the prompt "I am waiting for the results.", **Joy = 5**, **layer 9**, guard on, seed 0
-(perplexities below are illustrative).
+The Gradio demo with the prompt "I am waiting for the results.", **Joy = 5**, **layer 9**, guard on, seed 0 (perplexities below are illustrative).
 
 1. `set_layer(9)` makes the active vectors `all_layer_vectors[10]`: index 10 is layer 9's output, since index 0 is the embeddings (cell 4:61).
 2. `vec = 5 × v_joy`, a vector of norm 5 (cell 5:12–15).
@@ -537,15 +533,10 @@ return result
 
 ### 7. Deep dive: face embeddings and ArcFace from scratch
 
-Part 1 above starts from ArcFace vectors already in the database. This section explains where they come from and why
-a single distance threshold (0.75) can tell people apart. Order: the face pipeline → "same person" as an angle →
-training as classification → why plain softmax isn't enough → the additive angular margin, number by number → what
-Photo-Seek does (and doesn't) do with it → questions → check.
+Part 1 above starts from ArcFace vectors already in the database. This section explains where they come from and why a single distance threshold (0.75) can tell people apart. Order: the face pipeline → "same person" as an angle → training as classification → why plain softmax isn't enough → the additive angular margin, number by number → what Photo-Seek does (and doesn't) do with it → questions → check.
 
 > [!important] The one sentence to hold on to
-> ArcFace trains a face network as a classifier over thousands of people, but makes the right person win **even after
-> its angle is pushed 28.6° away**. That squeezes every person into a tight cone, so "cosine distance below a
-> threshold" works as a same-person test for people the network never saw.
+> ArcFace trains a face network as a classifier over thousands of people, but makes the right person win **even after its angle is pushed 28.6° away**. That squeezes every person into a tight cone, so "cosine distance below a threshold" works as a same-person test for people the network never saw.
 
 #### 7.1 From photo to vector
 
@@ -570,26 +561,20 @@ Two unit vectors' **cosine distance** is $1 - \cos\theta$:
 | 75.5° | 0.250 | **0.750** (Photo-Seek's threshold) |
 | 90° | 0.000 | 1.000 |
 
-We want: two photos of the same person → small angle; two different people → large angle. Whether that holds depends
-entirely on how the network was trained.
+We want: two photos of the same person → small angle; two different people → large angle. Whether that holds depends entirely on how the network was trained.
 
 #### 7.3 Training as classification
 
-Training data: millions of face crops labelled with **which person** (WebFace600K: about 600k people). The network
-ends in a classifier with one **weight vector $W_j$ per person**, also normalised to length 1. Think of $W_j$ as
-"the centre direction of person j".
+Training data: millions of face crops labelled with **which person** (WebFace600K: about 600k people). The network ends in a classifier with one **weight vector $W_j$ per person**, also normalised to length 1. Think of $W_j$ as "the centre direction of person j".
 
-The score ("logit") for person j is $s \cos\theta_j$, where $\theta_j$ is the angle between the face vector $x$ and
-$W_j$, and $s$ is a fixed scale (64). Softmax turns scores into probabilities; the loss is $-\ln p(\text{true person})$.
+The score ("logit") for person j is $s \cos\theta_j$, where $\theta_j$ is the angle between the face vector $x$ and $W_j$, and $s$ is a fixed scale (64). Softmax turns scores into probabilities; the loss is $-\ln p(\text{true person})$.
 
-**Toy:** 3 people. A face of person y sits at $\theta_y = 60°$ from its own centre; the other centres are at 80° and
-85°:
+**Toy:** 3 people. A face of person y sits at $\theta_y = 60°$ from its own centre; the other centres are at 80° and 85°:
 - logits: $64 \cos 60° = 32.0$, $64 \cos 80° = 11.1$, $64 \cos 85° = 5.6$;
 - $p(y) = e^{32} / (e^{32} + e^{11.1} + e^{5.6}) \approx 1.0000$; loss ≈ 0.
 
 **The problem:** the face is 60° from its own centre, which is far (distance 0.5), yet the loss is already zero.
-Training stops pushing. Faces of one person end up spread over a wide region that only has to be *closer to its own
-centre than to the others*. With 600k people, those regions touch, and a fixed threshold can't separate new people.
+Training stops pushing. Faces of one person end up spread over a wide region that only has to be *closer to its own centre than to the others*. With 600k people, those regions touch, and a fixed threshold can't separate new people.
 
 #### 7.4 The fix: an additive angular margin
 
@@ -611,22 +596,15 @@ Same toy, with the margin:
 
 ![[d11-1-arcface.svg]] [[d11-1-arcface.html|▶ Step through it]]
 
-At 60°, the face now **loses** to person 2 (1.5 vs 11.1), so the loss is large and the gradient pulls $x$ toward
-$W_y$. The loss only becomes small once $\theta_y + 28.6°$ is clearly smaller than the angle to any other centre. So
-every person is packed into a cone well inside its region, with a **gap** of about $m$ to the neighbours.
+At 60°, the face now **loses** to person 2 (1.5 vs 11.1), so the loss is large and the gradient pulls $x$ toward $W_y$. The loss only becomes small once $\theta_y + 28.6°$ is clearly smaller than the angle to any other centre. So every person is packed into a cone well inside its region, with a **gap** of about $m$ to the neighbours.
 
-**Why "angular"?** Earlier margins were added to the cosine ($\cos\theta - m$, CosFace) or multiplied the angle
-(SphereFace). Adding $m$ to the **angle** gives a constant geodesic gap on the sphere, which is easy to reason about
-and trains stably.
+**Why "angular"?** Earlier margins were added to the cosine ($\cos\theta - m$, CosFace) or multiplied the angle (SphereFace). Adding $m$ to the **angle** gives a constant geodesic gap on the sphere, which is easy to reason about and trains stably.
 
-**What $s$ does.** Unit vectors give cosines in [−1, 1]; softmax over such small numbers can never get close to
-probability 1. Multiplying by $s = 64$ lets the loss actually reach zero for a well-placed face.
+**What $s$ does.** Unit vectors give cosines in [−1, 1]; softmax over such small numbers can never get close to probability 1. Multiplying by $s = 64$ lets the loss actually reach zero for a well-placed face.
 
 #### 7.5 What this buys Photo-Seek
 
-The network is trained on 600k people and then used on **your** family, whom it never saw. Because every training
-person was packed into a tight cone, new people tend to form tight cones too. So a single number, "distance below
-0.75", works as a same-person test for strangers. Clustering (§8) relies on exactly that.
+The network is trained on 600k people and then used on **your** family, whom it never saw. Because every training person was packed into a tight cone, new people tend to form tight cones too. So a single number, "distance below 0.75", works as a same-person test for strangers. Clustering (§8) relies on exactly that.
 
 #### 7.6 What Photo-Seek does and doesn't do with ArcFace
 
@@ -656,9 +634,7 @@ loss = F.cross_entropy(logits, labels)
 > - `.bool()`: converts to True/False: nonzero → True. A one-hot `[0., 1., 0.]` becomes `[False, True, False]`, usable as a mask. [[Function glossary#x.bool|→ examples]]
 > - `F.cross_entropy(logits, target)`: softmax + negative log-probability of the correct class, averaged over the batch. Logits `[[2.0, 0.5, -1.0]]`, target `[0]` → 0.2413. [[Function glossary#F.cross_entropy|→ examples]]
 
-On the toy (one face, 3 people, true person 0): `cos = [0.500, 0.174, 0.087]`, `theta = [60°, 80°, 85°]`,
-`target[0] = cos(88.6°) = 0.024`, `logits = [1.5, 11.1, 5.6]`, loss = 9.6. The `clamp` keeps `acos` away from ±1,
-where its gradient is infinite.
+On the toy (one face, 3 people, true person 0): `cos = [0.500, 0.174, 0.087]`, `theta = [60°, 80°, 85°]`, `target[0] = cos(88.6°) = 0.024`, `logits = [1.5, 11.1, 5.6]`, loss = 9.6. The `clamp` keeps `acos` away from ±1, where its gradient is infinite.
 
 #### 7.8 Questions people usually ask next
 
@@ -669,13 +645,11 @@ Margin-softmax losses compare every face against all class centres at once, trai
 
 ##### "Will it work on profile faces?"
 
-Less well. That's why the eval uses **CPLFW** (cross-pose LFW): 11,215 faces where the same person appears at
-different angles. Its starting BCubed F1 (95.91) is lower than LFW's (99.83).
+Less well. That's why the eval uses **CPLFW** (cross-pose LFW): 11,215 faces where the same person appears at different angles. Its starting BCubed F1 (95.91) is lower than LFW's (99.83).
 
 ##### "Why 512 numbers?"
 
-It's the network's design (and CLIP's too, by coincidence). Enough to separate hundreds of thousands of identities,
-small enough to store and compare cheaply: 2 KB per face in float32.
+It's the network's design (and CLIP's too, by coincidence). Enough to separate hundreds of thousands of identities, small enough to store and compare cheaply: 2 KB per face in float32.
 
 #### 7.9 Check your understanding
 
@@ -706,15 +680,10 @@ small enough to store and compare cheaply: 2 KB per face in float32.
 
 ### 8. Deep dive: clustering faces and scoring it with BCubed from scratch
 
-Section 2 above walks `IdentityClusterer.refine`. This section builds the clustering ideas from zero and explains the
-metric behind "95.9 → 97.6". Order: the task → why not k-means → agglomerative average linkage, step by step →
-HDBSCAN in one paragraph → the average-linkage identity behind story 4.2 → the refine rules on an example → the code
-line by line → BCubed → questions → check.
+Section 2 above walks `IdentityClusterer.refine`. This section builds the clustering ideas from zero and explains the metric behind "95.9 → 97.6". Order: the task → why not k-means → agglomerative average linkage, step by step → HDBSCAN in one paragraph → the average-linkage identity behind story 4.2 → the refine rules on an example → the code line by line → BCubed → questions → check.
 
 > [!important] The one sentence to hold on to
-> Group face vectors into people **without knowing how many people there are**, by merging the closest groups while
-> their **average** pairwise distance stays under 0.75; later updates must measure distance the same way, as
-> $1 - x \cdot \text{mean(members)}$ with the mean **not** normalised.
+> Group face vectors into people **without knowing how many people there are**, by merging the closest groups while their **average** pairwise distance stays under 0.75; later updates must measure distance the same way, as $1 - x \cdot \text{mean(members)}$ with the mean **not** normalised.
 
 #### 8.1 The task
 
@@ -723,8 +692,7 @@ Nobody tells you the number of people, and some faces are junk (blurry, a poster
 
 #### 8.2 Why not k-means
 
-k-means needs **k**, the number of clusters, up front. A photo library doesn't know how many people it holds. And
-k-means puts **every** point in some cluster, so junk faces would be forced into a person (decision 18).
+k-means needs **k**, the number of clusters, up front. A photo library doesn't know how many people it holds. And k-means puts **every** point in some cluster, so junk faces would be forced into a person (decision 18).
 
 #### 8.3 Agglomerative clustering with average linkage
 
@@ -758,29 +726,23 @@ Result: **two people**, {a, b, c} and {d, e}. Nobody said "k = 2"; the threshold
 
 ![[d11-2-agglo.svg]]
 
-**Why "average" and not "single" or "complete"?** Single linkage (closest pair) chains: one in-between face can glue
-two people together. Complete linkage (farthest pair) splits a person whose photos vary. Average is the compromise.
+**Why "average" and not "single" or "complete"?** Single linkage (closest pair) chains: one in-between face can glue two people together. Complete linkage (farthest pair) splits a person whose photos vary. Average is the compromise.
 
-**Cost:** it needs all pairwise distances, $N^2$ of them. For 5,606 faces that's 31 million numbers (about 126 MB in
-float32): fine here, the limit for big libraries.
+**Cost:** it needs all pairwise distances, $N^2$ of them. For 5,606 faces that's 31 million numbers (about 126 MB in float32): fine here, the limit for big libraries.
 
 #### 8.4 HDBSCAN in one paragraph
 
-HDBSCAN (the shipped default) is **density-based**: a cluster is a region where faces are packed densely, and faces
-in sparse regions are labelled **noise**. Its knob is `min_cluster_size`, not a distance threshold. On CPLFW the
-dev-tuned agglomerative 0.75 started higher (95.91 BCubed F1) than HDBSCAN (91.75), which is why the eval uses it.
+HDBSCAN (the shipped default) is **density-based**: a cluster is a region where faces are packed densely, and faces in sparse regions are labelled **noise**. Its knob is `min_cluster_size`, not a distance threshold. On CPLFW the dev-tuned agglomerative 0.75 started higher (95.91 BCubed F1) than HDBSCAN (91.75), which is why the eval uses it.
 
 #### 8.5 The identity behind story 4.2
 
-`refine()` must ask "how far is face x from identity j?" and compare that with the **same** 0.75 threshold. The
-consistent answer is the average-linkage distance from x to all of j's members. That has a short form:
+`refine()` must ask "how far is face x from identity j?" and compare that with the **same** 0.75 threshold. The consistent answer is the average-linkage distance from x to all of j's members. That has a short form:
 
 $$\frac{1}{n}\sum_{i=1}^{n} (1 - x \cdot m_i) = 1 - x \cdot \Big(\frac{1}{n}\sum_{i=1}^{n} m_i\Big) = 1 - x \cdot \bar m$$
 
 So one dot product with the **mean** gives the average distance, as long as $\bar m$ is left as it is.
 
-**The bug was normalising $\bar m$.** The mean of unit vectors is **shorter** than 1 (they point in different
-directions). Rescaling it to length 1 makes $x \cdot \bar m$ bigger, so every face looks **closer** than it really is.
+**The bug was normalising $\bar m$.** The mean of unit vectors is **shorter** than 1 (they point in different directions). Rescaling it to length 1 makes $x \cdot \bar m$ bigger, so every face looks **closer** than it really is.
 
 **Numbers.** Members at −50°, 0°, 50°; candidate x at 75°; threshold 0.75.
 
@@ -792,9 +754,7 @@ directions). Rescaling it to length 1 makes $x \cdot \bar m$ bigger, so every fa
 
 ![[d11-3-centroid.svg]]
 
-On CPLFW this pulled **100–170 noise faces** into identities in the first refine, even with **zero** user answers. A
-"no answers" control run, which should change nothing, exposed it (story 4.2). The fix is the
-`means = …mean(axis=0)` line below, with no normalisation.
+On CPLFW this pulled **100–170 noise faces** into identities in the first refine, even with **zero** user answers. A "no answers" control run, which should change nothing, exposed it (story 4.2). The fix is the `means = …mean(axis=0)` line below, with no normalisation.
 
 #### 8.6 The refine rules on one face
 
@@ -807,8 +767,7 @@ Face f, not pinned, assigned to identity 7. Distances: {7: 0.40, 9: 0.38, 12: 0.
 | rejected 7, and 9 were 0.80 | nearest allowed (9) is 0.80 > 0.75 | **unassigned** → leftover clustering |
 | f is pinned | skipped | stays where the user put it |
 
-Pinned faces never move: otherwise the loop would undo its own training signal (decision 21). A face moves only on
-evidence (decision 22), which fixed story 4.1, where re-clustering from the pinned faces split people apart.
+Pinned faces never move: otherwise the loop would undo its own training signal (decision 21). A face moves only on evidence (decision 22), which fixed story 4.1, where re-clustering from the pinned faces split people apart.
 
 #### 8.7 The code, line by line
 
@@ -849,21 +808,18 @@ Run it for face f of §8.6 with "the user rejected 7". Identities `[7, 9, 12]`, 
 | 246 | `elif isfinite(0.38) and 0.38 <= 0.75` | True |
 | 247 | `assign[fid] = identities[1]` | **9** |
 
-`X @ means.T` is a matrix product: row i, column j = face i's dot product with identity j's mean (Day 1's matmul
-picture). One line computes all N × 3 distances.
+`X @ means.T` is a matrix product: row i, column j = face i's dot product with identity j's mean (Day 1's matmul picture). One line computes all N × 3 distances.
 
 #### 8.8 BCubed: scoring a clustering
 
-Why not plain accuracy? The predicted cluster names ("cluster 3") don't correspond to true names ("Anna"), so you
-can't compare labels directly. **BCubed** scores **each face** by looking only at its own cluster and its own person:
+Why not plain accuracy? The predicted cluster names ("cluster 3") don't correspond to true names ("Anna"), so you can't compare labels directly. **BCubed** scores **each face** by looking only at its own cluster and its own person:
 
 - **precision(face)** = the share of its **predicted cluster** that has its **true person**;
 - **recall(face)** = the share of its **true person** that's in its **predicted cluster**.
 
 Average each over faces; F1 = $2PR / (P + R)$.
 
-**Toy:** 6 faces; true people A A A B B C; predicted clusters {1, 2, 3, 4}, {5}, {6}. Face 4 (a B) was wrongly put with
-the As.
+**Toy:** 6 faces; true people A A A B B C; predicted clusters {1, 2, 3, 4}, {5}, {6}. Face 4 (a B) was wrongly put with the As.
 
 ![[d11-4-bcubed.svg]]
 
@@ -877,35 +833,27 @@ the As.
 
 F1 = 2 · 0.750 · 0.833 / (0.750 + 0.833) = **0.789**.
 
-One misplaced face lowered the precision of **four** faces (its cluster-mates) and the recall of **two** (its true
-group). That's why BCubed suits clustering: every face's experience counts, and big clusters don't swamp the score the
-way they do in pairwise F1.
+One misplaced face lowered the precision of **four** faces (its cluster-mates) and the recall of **two** (its true group). That's why BCubed suits clustering: every face's experience counts, and big clusters don't swamp the score the way they do in pairwise F1.
 
-**The project's number:** BCubed F1 95.91 → 97.57 after 1,000 simulated reviews on 5,606 CPLFW test faces. As an
-error: $1 - F1$ went 4.09% → 2.43%, a **41%** cut ($1.66 / 4.09$).
+**The project's number:** BCubed F1 95.91 → 97.57 after 1,000 simulated reviews on 5,606 CPLFW test faces. As an error: $1 - F1$ went 4.09% → 2.43%, a **41%** cut ($1.66 / 4.09$).
 
 #### 8.9 Questions people usually ask next
 
 ##### "How was 0.75 chosen?"
 
-On a **dev** half of the identities (1,906 people), never on the test half (decision 19). The shipped default config
-(HDBSCAN) was not updated to that winner: own it.
+On a **dev** half of the identities (1,906 people), never on the test half (decision 19). The shipped default config (HDBSCAN) was not updated to that winner: own it.
 
 ##### "Why keep identity ids stable in `persist`?"
 
-Corrections and pinned faces refer to identity ids. If a refine renumbered identities, every stored correction would
-point at the wrong person. `persist` (`cluster.py:341`) keeps ids and never writes pinned faces.
+Corrections and pinned faces refer to identity ids. If a refine renumbered identities, every stored correction would point at the wrong person. `persist` (`cluster.py:341`) keeps ids and never writes pinned faces.
 
 ##### "What happens to faces that end up unassigned?"
 
-They're clustered **among themselves** (`cluster.py:261–273`) with the same threshold. A tight group of leftovers can
-become a new person; the rest stay unassigned.
+They're clustered **among themselves** (`cluster.py:261–273`) with the same threshold. A tight group of leftovers can become a new person; the rest stay unassigned.
 
 ##### "Isn't a 2-D example misleading?"
 
-The rules are the same in 512-d; only the numbers change. For a large cluster, the mean's length is about
-$\sqrt{\text{average pairwise cosine}}$: members averaging cosine 0.6 give a mean of length about 0.77. So the
-normalised-centroid error of §8.5 is the same size in 512-d as in the toy.
+The rules are the same in 512-d; only the numbers change. For a large cluster, the mean's length is about $\sqrt{\text{average pairwise cosine}}$: members averaging cosine 0.6 give a mean of length about 0.77. So the normalised-centroid error of §8.5 is the same size in 512-d as in the toy.
 
 #### 8.10 Check your understanding
 
@@ -936,20 +884,14 @@ normalised-centroid error of §8.5 is the same size in 512-d as in the toy.
 
 ### 9. Deep dive: active learning with corrections from scratch
 
-Sections 1 and 3 above walk `next_batch` and `refine`. This section explains why *which* faces you ask about matters
-more than anything else in this project. Order: the idea → d1 and d2 → three ways to choose, on a toy → why margin
-wins → answers as constraints → measuring it honestly → the code line by line → questions → check.
+Sections 1 and 3 above walk `next_batch` and `refine`. This section explains why *which* faces you ask about matters more than anything else in this project. Order: the idea → d1 and d2 → three ways to choose, on a toy → why margin wins → answers as constraints → measuring it honestly → the code line by line → questions → check.
 
 > [!important] The one sentence to hold on to
-> A person's time is the scarce resource, so ask about the faces where **one answer settles a decision the clustering
-> was unsure about**: those nearly tied between two people (smallest margin $d_2 - d_1$). Then treat every answer as
-> a hard constraint, never a hint.
+> A person's time is the scarce resource, so ask about the faces where **one answer settles a decision the clustering was unsure about**: those nearly tied between two people (smallest margin $d_2 - d_1$). Then treat every answer as a hard constraint, never a hint.
 
 #### 9.1 The idea
 
-The clustering of §8 makes mistakes. A user can fix them ("this is Anna", "this isn't Ravi"), but they'll answer
-maybe a few dozen questions, not 5,000. **Active learning** = the system chooses which faces to show, to get the most
-improvement per answer.
+The clustering of §8 makes mistakes. A user can fix them ("this is Anna", "this isn't Ravi"), but they'll answer maybe a few dozen questions, not 5,000. **Active learning** = the system chooses which faces to show, to get the most improvement per answer.
 
 #### 9.2 Two numbers per face: d1 and d2
 
@@ -980,8 +922,7 @@ Note f3: it's assigned to 9 although 7 is only 0.03 farther. f2 is assigned to 7
 - **Uncertainty** picks faces **far from their own person**. f1 is far from 7, but it's even farther from everyone else: whatever the answer, it probably stays with 7 or becomes unassigned. Its answer fixes one face.
 - **Margin** picks faces **on a boundary**. f2 sits between 7 and 9. "Is this Anna (7)?" decides which side of the 7/9 border it belongs on, exactly the decision the clustering was guessing.
 
-`_spread` then caps the batch at **2 questions per proposed identity**, so one messy person can't take the whole
-batch (decision 20). Here neither batch hits the cap.
+`_spread` then caps the batch at **2 questions per proposed identity**, so one messy person can't take the whole batch (decision 20). Here neither batch hits the cap.
 
 #### 9.4 Why margin won
 
@@ -993,8 +934,7 @@ Measured after 1,000 simulated reviews on 5,606 CPLFW test faces (BCubed F1, sta
 | uncertainty (the shipped default) | 97.23 | → 2.77% | 32% |
 | random (median of 3 seeds) | 96.19 | → 3.81% | 7% |
 
-Error cut = (4.09 − 2.43) / 4.09 = 0.41. Random barely helps: most random faces were already right, so the answer
-changes nothing.
+Error cut = (4.09 − 2.43) / 4.09 = 0.41. Random barely helps: most random faces were already right, so the answer changes nothing.
 
 #### 9.5 Answers become constraints
 
@@ -1006,16 +946,13 @@ changes nothing.
 | "not 7" (reject) | a `reject (f, 7)` row | **cannot-link**: f's distance to 7 becomes ∞ |
 | "this is Anna" (name) | name + confirm (2 rows) | pinned to Anna's identity |
 
-They're **hard** constraints, not hints. If the model could move a face the user labelled, the loop would undo its
-own training signal (decision 21). The cost: a wrong user answer is never corrected.
+They're **hard** constraints, not hints. If the model could move a face the user labelled, the loop would undo its own training signal (decision 21). The cost: a wrong user answer is never corrected.
 
 The table is **append-only** (decision 24): corrections are both training data and history.
 
 #### 9.6 Commit only after success
 
-After 25 pending corrections, `refine()` runs (section 3 above): fit the adapter head (if ≥ 20 labels over ≥ 3
-identities), read every reject as a cannot-link, run the clusterer, persist. **Only then** does line 333 mark the
-corrections consumed. A crash mid-refine leaves them pending, so the next refine retries with the same answers.
+After 25 pending corrections, `refine()` runs (section 3 above): fit the adapter head (if ≥ 20 labels over ≥ 3 identities), read every reject as a cannot-link, run the clusterer, persist. **Only then** does line 333 mark the corrections consumed. A crash mid-refine leaves them pending, so the next refine retries with the same answers.
 This is the same "check everything, then commit" rule as Day 2's admission fix.
 
 #### 9.7 What the numbers really say
@@ -1059,8 +996,7 @@ With the toy: `identities = [7, 9, 12]`, candidates f1–f4.
 | 129 | `others.min(axis=1)` | `d2 = [0.95, 0.42, 0.33, 0.85]` |
 | 130 | `proposed_ids` | `[7, 7, 9, 7]` |
 
-Line 126 is **fancy indexing**: two index arrays, `[0, 1, 2, 3]` and `[0, 0, 1, 0]`, pick cells (0,0), (1,0), (2,1),
-(3,0). With one identity, there's no "second closest", so `d2` is set to 2.0, the largest possible cosine distance.
+Line 126 is **fancy indexing**: two index arrays, `[0, 1, 2, 3]` and `[0, 0, 1, 0]`, pick cells (0,0), (1,0), (2,1), (3,0). With one identity, there's no "second closest", so `d2` is set to 2.0, the largest possible cosine distance.
 
 `src/photoseek/faces/active.py:137–149` (`upgrade-2026-10`)
 ```python
@@ -1085,8 +1021,7 @@ elif strategy == "random":
 | 142 | `np.argsort(d2 - d1)` | sorting `[0.25, 0.02, 0.03, 0.20]` → `[1, 2, 3, 0]` = f2, f3, f4, f1 |
 | 146–147 | seeded generator, `permutation` | a different but reproducible shuffle each round |
 
-`argsort` returns the **positions** that would sort the array, not the sorted values. The minus sign in `-d1` turns
-"largest first" into an ascending sort. `kind="stable"` keeps ties in their original order, so runs are repeatable.
+`argsort` returns the **positions** that would sort the array, not the sorted values. The minus sign in `-d1` turns "largest first" into an ascending sort. `kind="stable"` keeps ties in their original order, so runs are repeatable.
 The `reason` string is shown to the user next to the face.
 
 #### 9.9 Questions people usually ask next
@@ -1098,18 +1033,15 @@ It doesn't know which are wrong; that's the point. Margin is the best proxy for 
 ##### "Why did uncertainty sampling break the first refine?" (story 4.1)
 
 The old refine rebuilt each person from their **pinned** faces. Uncertainty pins **outliers**, the least typical faces.
-A person seeded from outliers is centred on their edge, so the rest of the person split off (LFW recall 99.73 →
-96.88). The fix: keep current identities and move faces only on evidence.
+A person seeded from outliers is centred on their edge, so the rest of the person split off (LFW recall 99.73 → 96.88). The fix: keep current identities and move faces only on evidence.
 
 ##### "Wouldn't fine-tuning on the corrections help more?"
 
-That's what the adapter head tried, and it added nothing: tens to hundreds of labels are too few to improve a model
-trained on 600k people. The gain comes from the constraints and the sampler.
+That's what the adapter head tried, and it added nothing: tens to hundreds of labels are too few to improve a model trained on 600k people. The gain comes from the constraints and the sampler.
 
 ##### "How would you evaluate with real users?"
 
-Count questions until the user stops correcting, log disagreements with earlier answers (real users err), and check
-that a no-answers refine stays flat (story 4.2's control).
+Count questions until the user stops correcting, log disagreements with earlier answers (real users err), and check that a no-answers refine stays flat (story 4.2's control).
 
 #### 9.10 Check your understanding
 
@@ -1142,21 +1074,15 @@ that a no-answers refine stays flat (story 4.2's control).
 
 ### 10. Deep dive: activation steering from scratch
 
-Part 2 above walks the notebook's cells. This section builds the method from zero on numbers small enough to check
-by hand. Order: hidden states → a direction from two groups of sentences → normalise and scale → which layer index →
-the hook, prefill vs decode → same-seed comparisons → perplexity → the guard ladder → what the results do and don't
-show → questions → check.
+Part 2 above walks the notebook's cells. This section builds the method from zero on numbers small enough to check by hand. Order: hidden states → a direction from two groups of sentences → normalise and scale → which layer index → the hook, prefill vs decode → same-seed comparisons → perplexity → the guard ladder → what the results do and don't show → questions → check.
 
 > [!important] The one sentence to hold on to
 > Average the model's hidden state over joyful sentences and over sad ones; their **difference** is a "joy" direction.
-> Adding a multiple of it to one middle layer's output, at the last position on every step, nudges what the model
-> writes, and a perplexity guard backs off when the push breaks fluency.
+> Adding a multiple of it to one middle layer's output, at the last position on every step, nudges what the model writes, and a perplexity guard backs off when the push breaks fluency.
 
 #### 10.1 Hidden states: one vector per token per layer
 
-Llama 3.2 1B has **16 layers** and a hidden size of **2048**. For a prompt of T tokens, each layer reads and writes a
-`[T, 2048]` tensor: one vector per token (Day 1's residual stream). With `output_hidden_states=True`, the model returns
-**17** of them:
+Llama 3.2 1B has **16 layers** and a hidden size of **2048**. For a prompt of T tokens, each layer reads and writes a `[T, 2048]` tensor: one vector per token (Day 1's residual stream). With `output_hidden_states=True`, the model returns **17** of them:
 
 | index | what it is |
 |---|---|
@@ -1168,13 +1094,11 @@ Llama 3.2 1B has **16 layers** and a hidden size of **2048**. For a prompt of T 
 
 So layer L's output is index **L + 1**. That off-by-one is story S5.
 
-The **last** token's vector is the one that predicts the next word, so it's the natural summary of "where the model's
-head is" after reading the sentence.
+The **last** token's vector is the one that predicts the next word, so it's the natural summary of "where the model's head is" after reading the sentence.
 
 #### 10.2 A direction from two groups of sentences
 
-Take 3 joyful and 3 sad sentences (the project uses 15 + 15 per axis). Run each, keep the last token's state at one
-layer. Shrink 2048 numbers to **3**:
+Take 3 joyful and 3 sad sentences (the project uses 15 + 15 per axis). Run each, keep the last token's state at one layer. Shrink 2048 numbers to **3**:
 
 | joy sentence | state | | sad sentence | state |
 |---|---|---|---|---|
@@ -1185,17 +1109,14 @@ layer. Shrink 2048 numbers to **3**:
 
 **Difference of means:** $(2.5 - 0.5,\ 0.83 - 1.17,\ 0.5 - 0.5) = (2, -0.33, 0)$.
 
-Everything the two groups **share** (sentence length, "I am …" structure) cancels in the subtraction. What's left is
-what differs on average: here, mostly feature 1.
+Everything the two groups **share** (sentence length, "I am …" structure) cancels in the subtraction. What's left is what differs on average: here, mostly feature 1.
 
 ![[d11-5-steer.svg]] [[d11-5-steer.html|▶ Step through it]]
 
 **Check it separates them.** Project each state onto the direction (dot product with the unit vector below):
-joy sentences give 1.81, 2.80, 2.38; sad ones give −0.16, 0.82, 0.25. Every joy sentence scores higher than every sad
-one.
+joy sentences give 1.81, 2.80, 2.38; sad ones give −0.16, 0.82, 0.25. Every joy sentence scores higher than every sad one.
 
-Plutchik's 8 emotions come as 4 opposite pairs (joy–sadness, trust–disgust, fear–anger, surprise–anticipation), so one
-vector per axis covers two emotions: $+v$ toward one pole, $-v$ toward the other.
+Plutchik's 8 emotions come as 4 opposite pairs (joy–sadness, trust–disgust, fear–anger, surprise–anticipation), so one vector per axis covers two emotions: $+v$ toward one pole, $-v$ toward the other.
 
 #### 10.3 Normalise, then scale
 
@@ -1203,21 +1124,17 @@ Length of the difference: $\sqrt{2^2 + 0.33^2} = 2.03$. Divide by it:
 
 $$v = \frac{(2, -0.33, 0)}{2.03} = (0.986,\ -0.164,\ 0) \qquad \lVert v \rVert = 1$$
 
-Now the slider value **is** the size of the push: Joy = 5 adds $5v$, a vector of length exactly 5. A new prompt whose
-last state is $h = (1.2, 1.9, -0.3)$ becomes
+Now the slider value **is** the size of the push: Joy = 5 adds $5v$, a vector of length exactly 5. A new prompt whose last state is $h = (1.2, 1.9, -0.3)$ becomes
 
 $$h + 5v = (1.2 + 4.93,\ 1.9 - 0.82,\ -0.3) = (6.13,\ 1.08,\ -0.3)$$
 
 Its projection on $v$ goes from 0.87 to 5.87: exactly +5, and nothing else about $h$ changes.
 
-**The catch** (design D5): the residual stream's own size grows with depth, so a push of length 5 is large at an early
-layer and small at a late one. A fraction of the layer's mean residual norm would be a fairer unit.
+**The catch** (design D5): the residual stream's own size grows with depth, so a push of length 5 is large at an early layer and small at a late one. A fraction of the layer's mean residual norm would be a fairer unit.
 
 #### 10.4 The hook: where and when the vector is added
 
-A **forward hook** is a function PyTorch calls right after a module's `forward`, with its output; if the hook returns
-something, that replaces the output. The notebook registers one on `model.model.layers[9]` and adds the vector to the
-**last position** of that layer's output:
+A **forward hook** is a function PyTorch calls right after a module's `forward`, with its output; if the hook returns something, that replaces the output. The notebook registers one on `model.model.layers[9]` and adds the vector to the **last position** of that layer's output:
 
 `hidden[:, -1, :] += vec`
 
@@ -1229,16 +1146,11 @@ What "last position" means changes during generation:
 | decode step 1 | 1 (the new token) | that token |
 | decode step 2, 3, … | 1 each | each new token |
 
-So every **generated** token is steered at layer 9, plus the last prompt token. Earlier prompt tokens aren't. But the
-steered states feed layers 10–15, whose keys and values go into the **KV cache**, so later tokens keep attending to
-steered history. (Exercise 3 in the prep pack: turn the cache off and the effect weakens, because past tokens are
-recomputed unsteered.)
+So every **generated** token is steered at layer 9, plus the last prompt token. Earlier prompt tokens aren't. But the steered states feed layers 10–15, whose keys and values go into the **KV cache**, so later tokens keep attending to steered history. (Exercise 3 in the prep pack: turn the cache off and the effect weakens, because past tokens are recomputed unsteered.)
 
 #### 10.5 Same seed, so the only difference is the vector
 
-Generation samples at temperature 0.8, so two runs differ even without steering. `torch.manual_seed(seed)` right
-before `generate` makes the baseline (strength 0) and the steered run draw the **same** random numbers. Until their
-tokens diverge, any difference comes from the vector (story S2).
+Generation samples at temperature 0.8, so two runs differ even without steering. `torch.manual_seed(seed)` right before `generate` makes the baseline (strength 0) and the steered run draw the **same** random numbers. Until their tokens diverge, any difference comes from the vector (story S2).
 
 #### 10.6 Perplexity: "how surprised is the model?"
 
@@ -1254,8 +1166,7 @@ It's the "effective number of choices" per token: ppl 4 ≈ as unsure as a fair 
 
 **Steered** continuation, each token half as likely: $p = 0.25, 0.125, 0.0625, 0.03125$ → ppl = $2^{3.5}$ = **11.31**.
 
-Ratio = 11.31 / 5.66 = **2.0**. Both texts are scored by the **unsteered** model: "how odd does the normal model find
-what its steered self wrote?" Broken text ("interploggrus") gets a very high ppl.
+Ratio = 11.31 / 5.66 = **2.0**. Both texts are scored by the **unsteered** model: "how odd does the normal model find what its steered self wrote?" Broken text ("interploggrus") gets a very high ppl.
 
 #### 10.7 The guard: a ladder of strengths
 
@@ -1387,12 +1298,10 @@ Toy: 3 prompt tokens + 4 generated = 7 ids; vocabulary V.
 | 48 | `[:, prompt_len - 1:]` | from position 2 on: the 4 continuation tokens, ln p = −0.693, −1.386, −2.079, −2.773 |
 | 48 | `math.exp(-mean)` | $e^{1.733}$ = 5.66 |
 
-`gather` picks, in each row of V numbers, the one at the target token's index. It's run with no hook registered, so the
-scoring model is unsteered.
+`gather` picks, in each row of V numbers, the one at the target token's index. It's run with no hook registered, so the scoring model is unsteered.
 
 `Project.ipynb` cell 6, lines 66–85: the ladder loop (shown in section 6 above). Line 71,
-`ratio = ppl / base_ppl if base_ppl else float("nan")`; line 77 accepts when the guard is off, the ratio isn't finite,
-or ratio ≤ 1.75.
+`ratio = ppl / base_ppl if base_ppl else float("nan")`; line 77 accepts when the guard is off, the ratio isn't finite, or ratio ≤ 1.75.
 
 #### 10.9 What the results show, and don't
 
@@ -1410,18 +1319,15 @@ Steering every prompt token (ActAdd- and CAA-style) is stronger and collapses so
 
 ##### "Why difference of means and not a trained probe?"
 
-It needs no training, 120 forward passes in total, and it's the standard baseline in the steering papers. A probe or
-PCA (as in RepE) might find a cleaner direction; that wasn't tried.
+It needs no training, 120 forward passes in total, and it's the standard baseline in the steering papers. A probe or PCA (as in RepE) might find a cleaner direction; that wasn't tried.
 
 ##### "Why perplexity under the unsteered model, not the steered one?"
 
-The steered model may find its own odd text perfectly likely. The unsteered model is the reference for "normal
-English".
+The steered model may find its own odd text perfectly likely. The unsteered model is the reference for "normal English".
 
 ##### "Would it work on a bigger model?"
 
-Probably as well or better (larger models tend to have cleaner linear features). The cost is the same; the strength
-scale would need retuning because residual norms differ.
+Probably as well or better (larger models tend to have cleaner linear features). The cost is the same; the strength scale would need retuning because residual norms differ.
 
 #### 10.11 Check your understanding
 

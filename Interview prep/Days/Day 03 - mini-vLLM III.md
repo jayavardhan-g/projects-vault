@@ -98,8 +98,7 @@ for each chunk of scores s_j (with values v_j):
 output = acc / ℓ
 ```
 
-This equals softmax(s)·V exactly, without storing all the scores; subtracting the max prevents overflow. You will see it
-again on the CUDA day, in FlashAttention.
+This equals softmax(s)·V exactly, without storing all the scores; subtracting the max prevents overflow. You will see it again on the CUDA day, in FlashAttention.
 
 **Why the fused kernel is 7.49× faster:**
 - **Naive:** `gather_kv` copies the scattered blocks into a new contiguous tensor (read + write all of KV), then runs attention (read KV again).
@@ -139,8 +138,7 @@ README:
 
 ### B3. Benchmarks (50 min, deep)
 
-`benchmarks/serving.py`: 86 `run_hf`, 168 `run_ours`, **229 `paired_rounds`**, 263 `run_mode`. How is each arrival
-generated? Where is the ratio computed?
+`benchmarks/serving.py`: 86 `run_hf`, 168 `run_ours`, **229 `paired_rounds`**, 263 `run_mode`. How is each arrival generated? Where is the ratio computed?
 
 ### B4. Server (30 min, skim)
 
@@ -167,8 +165,7 @@ flowchart TB
 
 ### The flow, step by step
 
-One pure-decode step on the live server, with **two** running requests: request 0 has **300** tokens of context,
-request 1 has **40**. Block size 16.
+One pure-decode step on the live server, with **two** running requests: request 0 has **300** tokens of context, request 1 has **40**. Block size 16.
 
 1. **A request arrives.** The HTTP handler calls `EngineLoop.submit` (`server.py:156`). `engine.add_request` runs first, so a request that can never fit is rejected before anything is registered (`:175`). Then `_work.set()` wakes the loop.
 2. **The loop steps.** `run()` (`:211`) calls `engine.step()`. The scheduler returns both requests with one token each, so `query_lens = [1, 1]`.
@@ -617,18 +614,14 @@ engine.scheduler.stats = type(engine.scheduler.stats)()
 
 ### 5. Deep dive: the GPU and Triton execution model from scratch
 
-Section 2 above reads the kernel. This section explains the machine it runs on, from zero. Order: what a GPU is →
-what a kernel launch is → Triton's "one program, many lanes" model → masks → strides → this kernel's grid → questions
-→ check.
+Section 2 above reads the kernel. This section explains the machine it runs on, from zero. Order: what a GPU is → what a kernel launch is → Triton's "one program, many lanes" model → masks → strides → this kernel's grid → questions → check.
 
 > [!important] The one sentence to hold on to
-> A Triton kernel is **one small program** that the GPU runs **many copies of at once**. Each copy asks
-> `tl.program_id` which piece of the work is its own, then works on a whole **vector of lanes** at a time.
+> A Triton kernel is **one small program** that the GPU runs **many copies of at once**. Each copy asks `tl.program_id` which piece of the work is its own, then works on a whole **vector of lanes** at a time.
 
 #### 5.1 What a GPU is, for this kernel
 
-A GPU is many small processors working side by side. The H200 that ran these numbers has **132 SMs** (streaming
-multiprocessors). Each SM runs hundreds of threads at once.
+A GPU is many small processors working side by side. The H200 that ran these numbers has **132 SMs** (streaming multiprocessors). Each SM runs hundreds of threads at once.
 
 Two kinds of memory matter here:
 - **HBM** (the GPU's main memory): 141 GB, read at about **4.8 TB/s**. The weights and the KV cache live here.
@@ -638,17 +631,14 @@ The whole game is: **read each byte from HBM once, then do as much work as possi
 
 #### 5.2 What a kernel launch is
 
-The CPU does not run GPU code itself. It **launches a kernel**: it sends "run this function over this grid" to the
-GPU. The call returns at once, and the GPU works through its queue.
+The CPU does not run GPU code itself. It **launches a kernel**: it sends "run this function over this grid" to the GPU. The call returns at once, and the GPU works through its queue.
 
 Each launch costs the CPU a few microseconds (Python, PyTorch dispatch, the driver). One big kernel pays that once.
-Ten thousand tiny ones pay it ten thousand times. That turns out to be the main story of the 7.49× (§6.7) and of
-Day 4's 0.88× (Day 4 §7).
+Ten thousand tiny ones pay it ten thousand times. That turns out to be the main story of the 7.49× (§6.7) and of Day 4's 0.88× (Day 4 §7).
 
 #### 5.3 Triton's model on a tiny example
 
-You write the code for **one program**. You launch a **grid** of programs. Each one is the same code with a different
-`program_id`.
+You write the code for **one program**. You launch a **grid** of programs. Each one is the same code with a different `program_id`.
 
 Tiny example (an illustration, not from the repo): add two vectors of **10** numbers with `BLOCK = 4`.
 - Grid = ⌈10 / 4⌉ = **3 programs**.
@@ -671,23 +661,19 @@ def kernel(...): ...
 kernel[grid](args, BLOCK_N=128, num_warps=4)`: turns a Python function into a **GPU kernel** that Triton compiles on first use (one compile per new set of constexpr values). You launch it with square brackets: `kernel[grid](...)` runs one program per grid cell. `grid = (2, 32)` launches 64 programs. [[Function glossary#triton.jit|→ examples]]
 > - `HEAD_DIM: tl.constexpr`: marks a kernel argument as a **compile-time constant**. Triton specialises the kernel for its value, so it can size vectors: `tl.arange(0, HEAD_DIM)` needs a constant (and a power of two). Changing it triggers a new compile. [[Function glossary#tl.constexpr|→ examples]]
 
-`x + y` here adds **4 numbers in one line**. A Triton program thinks in vectors (blocks). Triton maps the lanes onto
-real threads for you: `num_warps=4` gives 4 × 32 = **128 threads** per program.
+`x + y` here adds **4 numbers in one line**. A Triton program thinks in vectors (blocks). Triton maps the lanes onto real threads for you: `num_warps=4` gives 4 × 32 = **128 threads** per program.
 
 #### 5.4 Masks: why `mask` and `other` are everywhere
 
-Block sizes must be powers of two (4, 128, …), but data lengths aren't. Program 2 above would read positions 10 and
-11, which don't exist. `mask=offs < n` turns those lanes off:
+Block sizes must be powers of two (4, 128, …), but data lengths aren't. Program 2 above would read positions 10 and 11, which don't exist. `mask=offs < n` turns those lanes off:
 - a masked lane **never touches memory**;
 - `tl.load` returns `other` for it instead (0 here).
 
-The decode kernel does the same at the end of a context. With `ctx_len = 300` and tiles of 128, the third tile covers
-positions 256–383, and **84** of its lanes (300–383) are masked.
+The decode kernel does the same at the end of a context. With `ctx_len = 300` and tiles of 128, the third tile covers positions 256–383, and **84** of its lanes (300–383) are masked.
 
 #### 5.5 Strides: how a program finds an element
 
-Memory is one long line of numbers. A 4-D tensor is just a rule for where each element sits. The rule is the
-**strides**: how far to jump for +1 along each axis.
+Memory is one long line of numbers. A 4-D tensor is just a rule for where each element sits. The rule is the **strides**: how far to jump for +1 along each axis.
 
 The K cache of one layer has shape `[N, 16, 8, 64]` (blocks, slot in block, KV head, dim). Its strides are:
 
@@ -699,8 +685,7 @@ The K cache of one layer has shape `[N, 16, 8, 64]` (blocks, slot in block, KV h
 | dim | 64 | 1 | neighbours |
 
 So K for physical block 7, slot 3, KV head 1, dim 0 sits at $7 \cdot 8192 + 3 \cdot 512 + 1 \cdot 64 + 0 = 58{,}944$.
-The kernel receives these strides as arguments (`stride_kb`, `stride_kp`, …) and builds exactly this sum. That way it
-works for any layout, not just this one.
+The kernel receives these strides as arguments (`stride_kb`, `stride_kp`, …) and builds exactly this sum. That way it works for any layout, not just this one.
 
 #### 5.6 This kernel's grid
 
@@ -711,32 +696,26 @@ works for any layout, not just this one.
 - `kv_head = q_head // num_kv_groups`: with 32 query heads and 8 KV heads, groups of 4 share a KV head (GQA);
 - its output is one vector of 64 floats.
 
-At 32 sequences × 32 heads that is **1,024 programs**, about 8 per SM on 132 SMs. That is enough to keep the GPU busy,
-so the kernel doesn't split one sequence's context across programs (split-K, "FlashDecoding"). Split-K would help
-when there are few sequences with very long contexts: then 1 sequence × 32 heads = only 32 programs for 132 SMs.
+At 32 sequences × 32 heads that is **1,024 programs**, about 8 per SM on 132 SMs. That is enough to keep the GPU busy, so the kernel doesn't split one sequence's context across programs (split-K, "FlashDecoding"). Split-K would help when there are few sequences with very long contexts: then 1 sequence × 32 heads = only 32 programs for 132 SMs.
 
 #### 5.7 Questions people usually ask next
 
 ##### "Is a Triton program the same as a CUDA thread?"
 
 No. A program is closer to a CUDA **thread block**: a group of threads (here 128) that Triton coordinates for you.
-In CUDA you write the code for one thread and manage the block yourself (Day 5). In Triton you write vector code for
-the whole block.
+In CUDA you write the code for one thread and manage the block yourself (Day 5). In Triton you write vector code for the whole block.
 
 ##### "Why must `HEAD_DIM` be a power of two?"
 
-`tl.arange(0, HEAD_DIM)` needs a power-of-two length. That's why `paged_attention_decode` checks
-`head_dim & (head_dim - 1)` (zero only for powers of two: 64 = `1000000₂`, 63 = `0111111₂`, and their AND is 0).
+`tl.arange(0, HEAD_DIM)` needs a power-of-two length. That's why `paged_attention_decode` checks `head_dim & (head_dim - 1)` (zero only for powers of two: 64 = `1000000₂`, 63 = `0111111₂`, and their AND is 0).
 
 ##### "Why pass strides instead of assuming a contiguous layout?"
 
-Strides make the kernel correct for any view of a tensor (a slice or a transpose has different strides). It also
-means one formula serves q, K, V and the output.
+Strides make the kernel correct for any view of a tensor (a slice or a transpose has different strides). It also means one formula serves q, K, V and the output.
 
 ##### "Why Triton and not CUDA C++?"
 
-Faster to write and iterate. Triton handles the thread mapping inside a program, and this kernel is simple enough that
-hand control over shared memory and warps isn't needed. CUDA gives that control when it is needed (Days 5–6).
+Faster to write and iterate. Triton handles the thread mapping inside a program, and this kernel is simple enough that hand control over shared memory and warps isn't needed. CUDA gives that control when it is needed (Days 5–6).
 
 #### 5.8 Check your understanding
 
@@ -768,13 +747,11 @@ hand control over shared memory and warps isn't needed. CUDA gives that control 
 ### 6. Deep dive: online softmax and the fused decode kernel from scratch
 
 Section 2 above shows the kernel's code. This section builds it from zero, on numbers small enough to check by hand.
-Order: what decode attention computes → safe softmax → online softmax on 4 numbers → why it is exact → the kernel's
-loop on a toy block table → why −∞ and not 0 → where the 7.49× really comes from → questions → check.
+Order: what decode attention computes → safe softmax → online softmax on 4 numbers → why it is exact → the kernel's loop on a toy block table → why −∞ and not 0 → where the 7.49× really comes from → questions → check.
 
 > [!important] The one sentence to hold on to
 > Walk the context in tiles, keeping only a running max `m`, a running sum `l` and a running weighted sum `acc`.
-> Rescale the old sums by $e^{m_\text{old} - m_\text{new}}$ when the max grows. At the end, `acc / l` is exactly
-> softmax-weighted V, and no context-sized tensor was ever written.
+> Rescale the old sums by $e^{m_\text{old} - m_\text{new}}$ when the max grows. At the end, `acc / l` is exactly softmax-weighted V, and no context-sized tensor was ever written.
 
 #### 6.1 What one decode step computes, per (sequence, head)
 
@@ -783,25 +760,21 @@ One new query vector `q` (64 numbers) and a context of `n` past tokens, each wit
 2. **weights**: $w_j = e^{s_j} / \sum_i e^{s_i}$ (softmax);
 3. **output**: $o = \sum_j w_j\, v_j$ (64 numbers).
 
-The naive path does this literally. It first **gathers** the scattered K and V blocks into new contiguous tensors,
-then computes all `n` scores, then the weights, then the sum. The fused kernel never builds any of those tensors.
+The naive path does this literally. It first **gathers** the scattered K and V blocks into new contiguous tensors, then computes all `n` scores, then the weights, then the sum. The fused kernel never builds any of those tensors.
 
 #### 6.2 Safe softmax: subtract the max first
 
-$e^{1000}$ overflows (Python raises `OverflowError`; float32 already overflows past $e^{88.7}$). But softmax doesn't
-change if you subtract the same number from every score:
+$e^{1000}$ overflows (Python raises `OverflowError`; float32 already overflows past $e^{88.7}$). But softmax doesn't change if you subtract the same number from every score:
 
 $$\frac{e^{s_j}}{\sum_i e^{s_i}} = \frac{e^{s_j - m}}{\sum_i e^{s_i - m}}$$
 
 Pick $m = \max_j s_j$. Then every exponent is ≤ 0, and every $e^{\cdot}$ lies in (0, 1]. No overflow.
 
-The catch: you need the max **before** you start, which means seeing every score first. Online softmax removes that
-need.
+The catch: you need the max **before** you start, which means seeing every score first. Online softmax removes that need.
 
 #### 6.3 Online softmax on 4 numbers
 
-Scores `s = [2, 4, 1, 3]`, values `v = [[1,0], [0,1], [1,1], [2,0]]`, processed in **2 chunks of 2** (a chunk plays
-the role of the kernel's 128-token tile).
+Scores `s = [2, 4, 1, 3]`, values `v = [[1,0], [0,1], [1,1], [2,0]]`, processed in **2 chunks of 2** (a chunk plays the role of the kernel's 128-token tile).
 
 ![[d3-6-online.svg]] [[d3-6-online.html|▶ Step through it]]
 
@@ -827,8 +800,7 @@ $0.087 \cdot [1,0] + 0.644 \cdot [0,1] + 0.032 \cdot [1,1] + 0.237 \cdot [2,0] =
 
 #### 6.4 Why it is exact, not an approximation
 
-Suppose the max **does** grow, from $m_\text{old}$ to $m_\text{new}$. Everything in `l` and `acc` was computed as
-$e^{s - m_\text{old}}$. But it should now be $e^{s - m_\text{new}}$. One multiplication fixes every old term at once:
+Suppose the max **does** grow, from $m_\text{old}$ to $m_\text{new}$. Everything in `l` and `acc` was computed as $e^{s - m_\text{old}}$. But it should now be $e^{s - m_\text{new}}$. One multiplication fixes every old term at once:
 
 $$e^{s - m_\text{old}} \cdot e^{m_\text{old} - m_\text{new}} = e^{s - m_\text{new}}$$
 
@@ -849,8 +821,7 @@ The only memory used is one number `m`, one number `l` and one 64-vector `acc`, 
 
 ![[d03s-online.svg]] [[d03s-online.html|▶ Step through it]]
 
-The kernel runs this loop with real paging. Toy: block size **B = 4**, `ctx_len = 10`, tiles of **BLOCK_N = 8**,
-block table **[7, 2, 5]** (logical block 0 is physical block 7, and so on).
+The kernel runs this loop with real paging. Toy: block size **B = 4**, `ctx_len = 10`, tiles of **BLOCK_N = 8**, block table **[7, 2, 5]** (logical block 0 is physical block 7, and so on).
 
 ![[d3-6-addr.svg]] [[d3-6-addr.html|▶ Step through it]]
 
@@ -879,8 +850,7 @@ Line by line, for **tile 1** (`start_n = 8`):
 - `phys_block = tl.load(table + logical_block, mask=valid, other=0)` = `[5, 5, 0, 0, 0, 0, 0, 0]`. The masked lanes never read the table, which matters: logical block 3 doesn't exist (the table has only 3 entries).
 
 Slot `phys·4 + offset` for the two valid lanes = 20 and 21. This is Day 1's slot formula, done for 8 tokens at once.
-In the real cache, `kv_base = phys_block · stride_kb + offset_in_block · stride_kp` = `phys·8192 + offset·512`; adding
-`kv_head·64 + d` gives each element's address (§5.5).
+In the real cache, `kv_base = phys_block · stride_kb + offset_in_block · stride_kp` = `phys·8192 + offset·512`; adding `kv_head·64 + d` gives each element's address (§5.5).
 
 `src/mini_vllm/paged_attention_triton.py:123–129`
 ```python
@@ -909,8 +879,7 @@ out = acc / l_i
 - `l_i * alpha + tl.sum(p)` and `acc * alpha + tl.sum(p[:, None] * v, axis=0)`: the §6.3 updates. `p[:, None] * v` scales each of the 8 value rows by its weight; summing over axis 0 leaves one 64-vector.
 - After the last tile, `out = acc / l_i`. It is stored once: 64 numbers per program.
 
-With the real numbers from the flow above (`ctx_len = 300`, BLOCK_N = 128) the loop runs **3 times** (starts 0, 128,
-256). The last tile masks 84 lanes, and its valid lanes read logical blocks 16, 17, 18.
+With the real numbers from the flow above (`ctx_len = 300`, BLOCK_N = 128) the loop runs **3 times** (starts 0, 128, 256). The last tile masks 84 lanes, and its valid lanes read logical blocks 16, 17, 18.
 
 #### 6.6 Why −∞, and why the mask on the load too
 
@@ -921,10 +890,7 @@ Two layers of protection, for two different dangers:
    - Toy: real scores [2, 4] plus 2 masked lanes at score 0 → $l = 1.135 + 2e^{-4} = 1.172$ instead of 1.135. Every output weight comes out **3% too small**.
    - In a real 128-lane tile, 84 masked lanes would each add a wrong term.
 
-Why not compute softmax normally and "multiply the bad lanes by zero afterwards"? Because a bad lane can still win the
-**max**. Say a stale score is 120 and the real max is 4. Then every real term is $e^{4-120} \approx 4 \times 10^{-51}$,
-below float32's smallest number, so it rounds to 0. Then $l = 0$ and the output is $0/0$ = NaN. With −∞ the masked
-lane can never be the max.
+Why not compute softmax normally and "multiply the bad lanes by zero afterwards"? Because a bad lane can still win the **max**. Say a stale score is 120 and the real max is 4. Then every real term is $e^{4-120} \approx 4 \times 10^{-51}$, below float32's smallest number, so it rounds to 0. Then $l = 0$ and the output is $0/0$ = NaN. With −∞ the masked lane can never be the max.
 
 #### 6.7 Where the 7.49× really comes from
 
@@ -932,8 +898,7 @@ lane can never be the max.
 
 ![[d03s-launches.svg]] [[d03s-launches.html|▶ Step through it]]
 
-The README measured (32 requests, up to 96 new tokens each, five paired rounds): naive **379.1** tok/s in 5.58 s,
-fused **2,839.9** tok/s in 0.74 s.
+The README measured (32 requests, up to 96 new tokens each, five paired rounds): naive **379.1** tok/s in 5.58 s, fused **2,839.9** tok/s in 0.74 s.
 
 A first guess says "decode is memory-bound, and fused moves fewer bytes". Check it with numbers:
 
@@ -944,51 +909,34 @@ A first guess says "decode is memory-bound, and fused moves fewer bytes". Check 
 | reading all weights once (2.47 GB at 4.8 TB/s) | ≈ **0.5 ms** |
 | reading the KV once (32 seqs × ~150 tokens × 16 layers × 2 KiB) | ≈ 160 MB ≈ **0.03 ms** |
 
-(Step counts and context sizes are estimates; the timings are the README's.) Even several extra copies of the KV are
-well under a millisecond. Bytes can't explain a 50 ms difference.
+(Step counts and context sizes are estimates; the timings are the README's.) Even several extra copies of the KV are well under a millisecond. Bytes can't explain a 50 ms difference.
 
-**Launches can.** The naive path loops in Python over **every sequence in every layer**: 32 × 16 = 512 iterations per
-step. Each iteration issues about 15–20 small GPU operations (copy the block ids to the GPU, index K and V,
-`repeat_interleave` twice, three dtype casts, two matmuls, scale, mask, softmax, …). That's **≈ 9,000 kernel launches
-per step**, plus 512 host-to-device copies. At a few microseconds each, that is tens of milliseconds: the measured gap.
+**Launches can.** The naive path loops in Python over **every sequence in every layer**: 32 × 16 = 512 iterations per step. Each iteration issues about 15–20 small GPU operations (copy the block ids to the GPU, index K and V, `repeat_interleave` twice, three dtype casts, two matmuls, scale, mask, softmax, …). That's **≈ 9,000 kernel launches per step**, plus 512 host-to-device copies. At a few microseconds each, that is tens of milliseconds: the measured gap.
 The fused path launches **one kernel per layer** (16 per step).
 
-This is what the module docstring says too: the naive gather's Python loop "is the whole of the project's 2.9×
-deficit against the HF baseline". So say it like this: **the fused kernel removes thousands of tiny launches and the
-materialised gather; at these context lengths, launch overhead is the dominant cost, not HBM bytes.** Bytes start to
-dominate only at long contexts, where the KV read grows past the weight read.
+This is what the module docstring says too: the naive gather's Python loop "is the whole of the project's 2.9× deficit against the HF baseline". So say it like this: **the fused kernel removes thousands of tiny launches and the materialised gather; at these context lengths, launch overhead is the dominant cost, not HBM bytes.** Bytes start to dominate only at long contexts, where the KV read grows past the weight read.
 
 #### 6.8 Why prefill stays on the naive path
 
-A decode query sits at the **last** position, so every key in the context is in its past: the only mask needed is
-"position < `ctx_len`". A prefill has many queries, each needing its own causal cut-off. The kernel builds no causal
-mask, so `can_use_decode_kernel` sends any step containing a prefill to the naive path. That's one reason real vLLM is
-6.6× faster on TTFT (it runs a fused, chunked prefill).
+A decode query sits at the **last** position, so every key in the context is in its past: the only mask needed is "position < `ctx_len`". A prefill has many queries, each needing its own causal cut-off. The kernel builds no causal mask, so `can_use_decode_kernel` sends any step containing a prefill to the naive path. That's one reason real vLLM is 6.6× faster on TTFT (it runs a fused, chunked prefill).
 
 #### 6.9 Questions people usually ask next
 
 ##### "Why are `m`, `l` and `acc` float32 when the cache is bf16?"
 
-bf16 has only 8 bits of mantissa; summing 300 terms in it would lose accuracy. The naive reference also softmaxes in
-float32. So if the two paths disagree, it's a gather bug, not rounding.
+bf16 has only 8 bits of mantissa; summing 300 terms in it would lose accuracy. The naive reference also softmaxes in float32. So if the two paths disagree, it's a gather bug, not rounding.
 
 ##### "Then why do 12 of 32 requests diverge from the naive path?"
 
-Both are float32 inside, but they add the terms in a **different order**, and the inputs are bf16. Greedy decoding
-takes an argmax, and near-ties flip. The README graded all 12: the largest top-2 logit gap at a divergence was 0.125,
-and **6 of the 12 were exact ties** (gap 0.0000). No confident disagreement anywhere.
+Both are float32 inside, but they add the terms in a **different order**, and the inputs are bf16. Greedy decoding takes an argmax, and near-ties flip. The README graded all 12: the largest top-2 logit gap at a divergence was 0.125, and **6 of the 12 were exact ties** (gap 0.0000). No confident disagreement anywhere.
 
 ##### "What is FlashDecoding (split-K), and why not here?"
 
-It splits one long context across several programs, each producing its own (m, l, acc). A second pass combines them
-with the same rescaling trick. It helps when there are too few (sequence, head) pairs to fill the GPU. With 1,024
-programs, there are enough here.
+It splits one long context across several programs, each producing its own (m, l, acc). A second pass combines them with the same rescaling trick. It helps when there are too few (sequence, head) pairs to fill the GPU. With 1,024 programs, there are enough here.
 
 ##### "How was the kernel tested?"
 
-By breaking it on purpose. Three silent bugs (wrong KV head, attending to the stale tail, ignoring the block table)
-each failed 19 of 28 tests. "Ignoring the block table" first failed only **2**: a lone sequence got blocks 0, 1, 2, …,
-where logical = physical. The tests now fragment the pool first.
+By breaking it on purpose. Three silent bugs (wrong KV head, attending to the stale tail, ignoring the block table) each failed 19 of 28 tests. "Ignoring the block table" first failed only **2**: a lone sequence got blocks 0, 1, 2, …, where logical = physical. The tests now fragment the pool first.
 
 #### 6.10 Check your understanding
 
@@ -1021,13 +969,10 @@ where logical = physical. The tests now fragment the pool first.
 
 ### 7. Deep dive: benchmarking a server honestly from scratch
 
-Section 3 above reads `benchmarks/serving.py`. This section explains **why** each of its choices exists. Order: the
-four metrics → identical work → when a request "arrives" → drift and paired rounds → the median and its
-representative round → what the numbers still hide → questions → check.
+Section 3 above reads `benchmarks/serving.py`. This section explains **why** each of its choices exists. Order: the four metrics → identical work → when a request "arrives" → drift and paired rounds → the median and its representative round → what the numbers still hide → questions → check.
 
 > [!important] The one sentence to hold on to
-> Give both systems **exactly the same work**, start every clock at **submission**, run the two arms **back to back**
-> in alternating order, and report the **median of the per-round ratios**, because a shared GPU's speed drifts.
+> Give both systems **exactly the same work**, start every clock at **submission**, run the two arms **back to back** in alternating order, and report the **median of the per-round ratios**, because a shared GPU's speed drifts.
 
 #### 7.1 The four numbers, on one request
 
@@ -1073,8 +1018,7 @@ def tpot(self) -> float | None:
 #### 7.2 Rule 1: identical work
 
 The first write-up compared a baseline forced to exactly `--max-new-tokens` against a server running varied lengths.
-That's different amounts of work, so the ratio (4.4×) measured the workload as much as the system. Now both arms get
-the **same per-request length list**, in two modes:
+That's different amounts of work, so the ratio (4.4×) measured the workload as much as the system. Now both arms get the **same per-request length list**, in two modes:
 - **uniform:** every request gets 128 tokens. A static batch whose members all finish together wastes nothing, so this strips out continuous batching's advantage. It's the conservative floor: **3.82×**.
 - **varied:** lengths spread 0.2–1.0 × 128. Realistic, and where continuous batching should win more.
 
@@ -1085,35 +1029,28 @@ How a static batch wastes work, on a toy batch of 4 with lengths [128, 40, 90, 6
 
 The real run recorded `static_batch_waste_frac = 0.265` (3,840 computed to deliver 2,824).
 
-Why does varied score *lower* in tok/s (3.68× against 3.82×)? All 32 requests arrive at once, so wall time is set by
-the longest request. Shorter lengths deliver fewer tokens in about the same wall time, in **both** arms. Request
-throughput shows the real difference: 19.35 against 5.26 req/s.
+Why does varied score *lower* in tok/s (3.68× against 3.82×)? All 32 requests arrive at once, so wall time is set by the longest request. Shorter lengths deliver fewer tokens in about the same wall time, in **both** arms. Request throughput shows the real difference: 19.35 against 5.26 req/s.
 
 #### 7.3 Rule 2: start every clock at submission
 
 ![[d3-7-arrival.svg]]
 
-HF static batching runs batches one after another. A request in batch 4 waits behind batches 1–3 before its batch
-even starts. The first version timed each HF request from **its batch's start**, which deleted that wait. The wait is
-the main part of the baseline's TTFT, and exactly the cost continuous batching removes.
+HF static batching runs batches one after another. A request in batch 4 waits behind batches 1–3 before its batch even starts. The first version timed each HF request from **its batch's start**, which deleted that wait. The wait is the main part of the baseline's TTFT, and exactly the cost continuous batching removes.
 
 `benchmarks/serving.py:142–142`
 ```python
 arrival=start,
 ```
 
-Corrected, the baseline's TTFT p50 went from **24.6 ms to 2,448 ms**. The fix made the result look better for the
-project, which is the direction that deserves the most suspicion. It was kept because the old number was wrong.
+Corrected, the baseline's TTFT p50 went from **24.6 ms to 2,448 ms**. The fix made the result look better for the project, which is the direction that deserves the most suspicion. It was kept because the old number was wrong.
 
 #### 7.4 Rule 3: pair the arms, because the GPU drifts
 
-This is a shared server. The naive arm alone measured **287, 378, 379, 379, 379** tok/s across five rounds of the same
-command. A neighbour's job can slow either arm at any time.
+This is a shared server. The naive arm alone measured **287, 378, 379, 379, 379** tok/s across five rounds of the same command. A neighbour's job can slow either arm at any time.
 
 ![[d3-7-paired.svg]]
 
-The fix: in each round, run **both arms back to back** and take the **ratio** inside that round. A slowdown that hits
-both arms cancels in the ratio. Alternate which arm goes first, so neither always gets the warmer GPU.
+The fix: in each round, run **both arms back to back** and take the **ratio** inside that round. A slowdown that hits both arms cancels in the ratio. Alternate which arm goes first, so neither always gets the warmer GPU.
 
 `benchmarks/serving.py:237–248`
 ```python
@@ -1134,9 +1071,7 @@ for r in range(args.repeats):
 - `hf_first = r % 2 == 0`: rounds 0, 2, 4 run HF first; rounds 1, 3 run ours first.
 - `ratio = ours tok/s ÷ HF tok/s`, one per round.
 
-The real case: one three-round run had paired ratios **7.61, 4.76, 7.51**. Taking each arm's median separately and
-dividing gave **4.77×**. The paired median is **7.51×**. The middle round was disturbed, and the separate medians had
-mixed numbers from different machine conditions.
+The real case: one three-round run had paired ratios **7.61, 4.76, 7.51**. Taking each arm's median separately and dividing gave **4.77×**. The paired median is **7.51×**. The middle round was disturbed, and the separate medians had mixed numbers from different machine conditions.
 
 #### 7.5 The median, and the round it came from
 
@@ -1156,11 +1091,9 @@ With ratios `[7.61, 4.76, 7.51]`:
 - the count is odd (3), so `ratios.index(7.51)` = **2**: round 3 is the representative round;
 - with an even count the median is the average of the middle two and may match no round, so the code picks the round **closest** to it.
 
-The detailed table (TTFT, latency, …) is printed for that **one real round**. An average across rounds would mix
-numbers measured under different loads, and describe a run that never happened.
+The detailed table (TTFT, latency, …) is printed for that **one real round**. An average across rounds would mix numbers measured under different loads, and describe a run that never happened.
 
-Why the median and not the mean? One disturbed round (4.76) pulls the mean down to 6.63. The median ignores a single
-outlier.
+Why the median and not the mean? One disturbed round (4.76) pulls the mean down to 6.63. The median ignores a single outlier.
 
 #### 7.6 Two smaller rules
 
@@ -1177,23 +1110,19 @@ outlier.
 
 ##### "Why ratios instead of just running each arm many times?"
 
-Many runs average out random noise, but not **systematic drift**: if a neighbour runs for an hour, every run in that
-hour is slow. Pairing makes both arms see the same conditions.
+Many runs average out random noise, but not **systematic drift**: if a neighbour runs for an hour, every run in that hour is slow. Pairing makes both arms see the same conditions.
 
 ##### "Is the 3.82× the kernel's speedup?"
 
-No. The cleanest kernel number is the **7.49×** (fused vs naive, everything else identical). The 3.82× compares the
-whole system (paging, continuous batching, the kernel) against HF static batching. Quote each for what it measures.
+No. The cleanest kernel number is the **7.49×** (fused vs naive, everything else identical). The 3.82× compares the whole system (paging, continuous batching, the kernel) against HF static batching. Quote each for what it measures.
 
 ##### "Why was TTFT unchanged by the kernel (0.0997 vs 0.0999 s)?"
 
-TTFT is dominated by prefill, and the kernel only touches decode. A kernel that "improved" TTFT would suggest a
-measurement bug.
+TTFT is dominated by prefill, and the kernel only touches decode. A kernel that "improved" TTFT would suggest a measurement bug.
 
 ##### "Open loop or closed loop?"
 
-Closed loop: N clients, each sends its next request only after its reply. Open loop: requests arrive on a schedule,
-whatever the server's speed. Closed loop hides overload (clients slow down with the server); open loop exposes it.
+Closed loop: N clients, each sends its next request only after its reply. Open loop: requests arrive on a schedule, whatever the server's speed. Closed loop hides overload (clients slow down with the server); open loop exposes it.
 This benchmark is a single burst, closest to a closed loop with N = 32.
 
 #### 7.9 Check your understanding
@@ -1225,19 +1154,14 @@ This benchmark is a single burst, closest to a closed loop with N = 32.
 
 ### 8. Deep dive: the async server from scratch
 
-Section 4 above reads `server.py`. This section builds the idea from zero. Order: the problem → asyncio in five
-ideas → the design (one loop, many waiters) → the loop line by line → the lost wake-up race → streaming text safely
-→ failures and warm-up → questions → check.
+Section 4 above reads `server.py`. This section builds the idea from zero. Order: the problem → asyncio in five ideas → the design (one loop, many waiters) → the loop line by line → the lost wake-up race → streaming text safely → failures and warm-up → questions → check.
 
 > [!important] The one sentence to hold on to
-> The engine is **not** made concurrent. One background coroutine calls `step()`; every HTTP handler just **waits** on
-> its own future. A single `await asyncio.sleep(0)` per step lets new requests join the next step.
+> The engine is **not** made concurrent. One background coroutine calls `step()`; every HTTP handler just **waits** on its own future. A single `await asyncio.sleep(0)` per step lets new requests join the next step.
 
 #### 8.1 The problem
 
-Many HTTP clients send requests at any time. The engine has **one** rule: only one caller of `step()`, and
-`add_request` only **between** steps (the block pool and the radix tree assume it). Threads and locks would work, but
-they're easy to get wrong. asyncio gives a simpler answer.
+Many HTTP clients send requests at any time. The engine has **one** rule: only one caller of `step()`, and `add_request` only **between** steps (the block pool and the radix tree assume it). Threads and locks would work, but they're easy to get wrong. asyncio gives a simpler answer.
 
 #### 8.2 asyncio in five ideas
 
@@ -1247,8 +1171,7 @@ they're easy to get wrong. asyncio gives a simpler answer.
 4. **Future:** a box that will hold a result later. `await future` sleeps until someone calls `future.set_result(x)`.
 5. **Event / Queue:** an Event wakes waiters when `.set()` is called; a Queue passes items from a producer to an `await queue.get()`.
 
-Idea 3 is the key one. A tiny experiment (plain asyncio, run to check the order): a loop does 3 "steps", and a
-handler B was created before step 0.
+Idea 3 is the key one. A tiny experiment (plain asyncio, run to check the order): a loop does 3 "steps", and a handler B was created before step 0.
 
 | the loop between steps | order of events |
 |---|---|
@@ -1300,9 +1223,7 @@ for submission in self._pending.values():
 > [!info] New functions in this code
 > - `.values()`: all the values of a dict, without the keys. [[Function glossary#dict.values|→ examples]]
 
-`_drain_streams` with numbers: a request's `output_token_ids` is `[5, 9, 2]` and `num_streamed` is 1. The loop
-pushes `9` and `2` (the slice `[1:]`), then sets `num_streamed = 3`. Next step it pushes only what's new. The engine
-needed no new callback API: the request's own token list is the source.
+`_drain_streams` with numbers: a request's `output_token_ids` is `[5, 9, 2]` and `num_streamed` is 1. The loop pushes `9` and `2` (the slice `[1:]`), then sets `num_streamed = 3`. Next step it pushes only what's new. The engine needed no new callback API: the request's own token list is the source.
 
 #### 8.6 The lost wake-up race, and why it can't happen here
 
@@ -1314,19 +1235,13 @@ if not self.engine.scheduler.has_unfinished_requests():
     await self._work.wait()
 ```
 
-Imagine an `await` sat between the check and `clear()`. Then a handler could run in that gap: it submits a request and
-calls `_work.set()`. The loop then resumes and calls `clear()`, **erasing that wake-up**, and waits forever with work
-pending. Because there is no await between the check and the clear, no handler can run in between (idea 3). The race
-is impossible by construction.
+Imagine an `await` sat between the check and `clear()`. Then a handler could run in that gap: it submits a request and calls `_work.set()`. The loop then resumes and calls `clear()`, **erasing that wake-up**, and waits forever with work pending. Because there is no await between the check and the clear, no handler can run in between (idea 3). The race is impossible by construction.
 
 #### 8.7 Streaming text: a token is not a character
 
-One token can hold **half** of a multi-byte character. "é" is 2 bytes in UTF-8, `C3 A9`. If a token ends after `C3`,
-decoding just that gives the replacement character `�` (U+FFFD), and the next token fixes it. Sent one token at a
-time, the client would see broken text.
+One token can hold **half** of a multi-byte character. "é" is 2 bytes in UTF-8, `C3 A9`. If a token ends after `C3`, decoding just that gives the replacement character `�` (U+FFFD), and the next token fixes it. Sent one token at a time, the client would see broken text.
 
-The fix: decode the **whole output so far**, send only the new suffix, and **hold the frame back** while the decoded
-text still ends in `�`. The concatenated deltas then equal the non-streaming text exactly, which the tests check.
+The fix: decode the **whole output so far**, send only the new suffix, and **hold the frame back** while the decoded text still ends in `�`. The concatenated deltas then equal the non-streaming text exactly, which the tests check.
 
 #### 8.8 Failures, hang-ups and warm-up
 
@@ -1351,30 +1266,25 @@ except BaseException as exc:  # noqa: BLE001 - re-raised after fan-out
 - **Client hangs up:** the streaming handler polls `is_disconnected()` after every frame and calls `cancel`, which aborts the request and frees its blocks. The first version relied on the generator being closed, and a killed `curl` left a request decoding for 12 s for nobody.
 - **Warm-up** (`server.py:452–458`): the first request to a fresh server took **17.0 s** (2.72 s to the first token, then 462 ms per token). Warmed, the same request took **0.36 s** (21.7 ms, then 10.9 ms per token): 47× faster. None of it was model work: CUDA context, cuBLAS handles, Triton compiling. A throwaway request at start-up pays it, then its cache entry and stats are cleared.
 
-The README tested the server by **breaking it**: 8 deliberate mutations. With the first version of the suite, **5 of
-the 8** were either missed or caught only by a hang. Tests were added, and the hangs rewritten, until each failed fast.
+The README tested the server by **breaking it**: 8 deliberate mutations. With the first version of the suite, **5 of the 8** were either missed or caught only by a hang. Tests were added, and the hangs rewritten, until each failed fast.
 
 #### 8.9 Questions people usually ask next
 
 ##### "Isn't `step()` blocking the event loop?"
 
-Yes, on purpose: during a step nothing else runs. Steps take milliseconds, and handlers only need to run between
-steps. A long-running blocking call would be a problem; a short one done in a loop with a yield is the design.
+Yes, on purpose: during a step nothing else runs. Steps take milliseconds, and handlers only need to run between steps. A long-running blocking call would be a problem; a short one done in a loop with a yield is the design.
 
 ##### "Why one engine loop and not one task per request?"
 
-Each request needs a share of the **same** forward pass. Only one caller can decide the batch. Per-request tasks would
-need locks around the engine and would lose batching.
+Each request needs a share of the **same** forward pass. Only one caller can decide the batch. Per-request tasks would need locks around the engine and would lose batching.
 
 ##### "What happens with 1,000 concurrent clients?"
 
-They all wait cheaply (a coroutine and a future each). The scheduler admits as many as memory allows. The rest wait in
-its queue. TTFT grows with the queue, but nothing breaks.
+They all wait cheaply (a coroutine and a future each). The scheduler admits as many as memory allows. The rest wait in its queue. TTFT grows with the queue, but nothing breaks.
 
 ##### "Why a future and a queue?"
 
-A buffered caller wants one final result: a future. A streaming caller wants tokens as they come: a queue, ended by
-a `None` sentinel.
+A buffered caller wants one final result: a future. A streaming caller wants tokens as they come: a queue, ended by a `None` sentinel.
 
 #### 8.10 Check your understanding
 
@@ -1405,8 +1315,7 @@ a `None` sentinel.
 
 ## C. Rebuild it yourself (20 min)
 
-Make random `s` (length 1000) and `V` (1000×64). Compute in chunks of 16 with the update rule, and assert it matches
-`softmax(s) @ V` within 1e-6. Then remove the max subtraction and watch it overflow with scores near 1000.
+Make random `s` (length 1000) and `V` (1000×64). Compute in chunks of 16 with the update rule, and assert it matches `softmax(s) @ V` within 1e-6. Then remove the max subtraction and watch it overflow with scores near 1000.
 
 ## E. Questions (for today's self-quiz)
 

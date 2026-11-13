@@ -6,9 +6,7 @@ tags: [interview, day, decs, microexchange, systems]
 ---
 # Day 13 (Fri Nov 20): the DECS KV server, then Micro Exchange
 
-Part of [[Interview plan (Nov 2026)]]. About 7 h. Morning: `decs` (branch `main`, one commit `82de05e`; prep pack
-[[DECS KV server - prep]]). Afternoon: `microexchange`, **branch `upgrade-2026-10`** (HEAD `1fc2869`; `main` is the original;
-prep pack [[Micro Exchange - prep]]). Read the branch with `git show upgrade-2026-10:<path>`.
+Part of [[Interview plan (Nov 2026)]]. About 7 h. Morning: `decs` (branch `main`, one commit `82de05e`; prep pack [[DECS KV server - prep]]). Afternoon: `microexchange`, **branch `upgrade-2026-10`** (HEAD `1fc2869`; `main` is the original; prep pack [[Micro Exchange - prep]]). Read the branch with `git show upgrade-2026-10:<path>`.
 
 **Micro Exchange starts from zero at [[#Part 7. What an exchange does (start here)]]**: what an exchange is → the two-thread design → the ring → the book → the log → numbers and tests → interview cards.
 
@@ -72,8 +70,7 @@ Morning: `decs/project/` (`82de05e`). Afternoon: `microexchange`, branch **`upgr
 ### Part 1. One GET through the DECS server
 
 > [!important] The one sentence to hold on to
-> A worker thread takes the request, asks the cache, and only on a miss borrows a database connection, runs three
-> round trips to Postgres, fills the cache and replies.
+> A worker thread takes the request, asks the cache, and only on a miss borrows a database connection, runs three round trips to Postgres, fills the cache and replies.
 
 #### 1.1 The picture
 
@@ -203,8 +200,7 @@ Part 6 measures the two costs: a cache hit costs ~90 µs of server CPU and a mis
 
 $$S = h \cdot 90 + (1 - h) \cdot 270\ \mu s$$
 
-At h = 0.9: $S = 81 + 27 = 108\ \mu s$, so the plateau is $1 / 108\ \mu s \approx 9{,}260$ req/s. At h = 0 it's
-~3,700. The cache roughly triples what one core can serve.
+At h = 0.9: $S = 81 + 27 = 108\ \mu s$, so the plateau is $1 / 108\ \mu s \approx 9{,}260$ req/s. At h = 0 it's ~3,700. The cache roughly triples what one core can serve.
 
 #### 2.2 LRU on a tiny example
 
@@ -349,8 +345,7 @@ index[key] = items.begin();
 - `put(4, d)` on `[1, 3, 2]` (full): key 4 isn't present, and the size is 3 ≥ 3. So it reads `items.back()` = `(2, b)`, removes key 2 from the map, then pops it. Then it builds `(4, d)` at the front, `[4, 1, 3]`, and stores its iterator.
 - Updating an existing key erases its old node first, so a key never appears twice.
 
-**One mutex** (`lock_guard` at the top of each method) guards both structures. Even `get` must lock: `splice` writes
-to the list. Every request serialises on that lock, which is part of the ~90 µs.
+**One mutex** (`lock_guard` at the top of each method) guards both structures. Even `get` must lock: `splice` writes to the list. Every request serialises on that lock, which is part of the ~90 µs.
 
 **Where the output goes.** `get` returns `true` and fills `value`: the handler replies at once (Part 1, line 100). `get` returns `false`: the handler goes to the pool (Part 3) and Postgres, then calls `put` with the row. `put` returns nothing; its effect is the changed `items` and `index`.
 
@@ -359,13 +354,11 @@ to the list. Every request serialises on that lock, which is part of the ~90 µs
 ### Part 3. The connection pool
 
 > [!important] The one sentence to hold on to
-> A queue of already-open Postgres connections behind a mutex; `acquire` sleeps on a condition variable until one is
-> free, and `release` puts it back and wakes one sleeper.
+> A queue of already-open Postgres connections behind a mutex; `acquire` sleeps on a condition variable until one is free, and `release` puts it back and wakes one sleeper.
 
 #### 3.1 Why a pool
 
-Opening a Postgres connection forks a backend process and authenticates: milliseconds each time. So the server opens
-a few connections at start-up and **lends** them out.
+Opening a Postgres connection forks a backend process and authenticates: milliseconds each time. So the server opens a few connections at start-up and **lends** them out.
 
 #### 3.2 The code
 
@@ -447,8 +440,7 @@ cv.notify_one();
 ### Part 4. The 43 ms floor (Nagle meets delayed ACK)
 
 > [!important] The one sentence to hold on to
-> The response leaves in two small `write()` calls; Nagle holds the second until the first is ACKed, and the client
-> delays that ACK about 40 ms, so every request takes about 43 ms.
+> The response leaves in two small `write()` calls; Nagle holds the second until the first is ACKed, and the client delays that ACK about 40 ms, so every request takes about 43 ms.
 
 There is no project code for this part: the two writes are inside cpp-httplib. What the project's own code decides is only that it never turns `TCP_NODELAY` on.
 
@@ -465,8 +457,7 @@ cpp-httplib writes the response in **two** `write()` calls: headers, then body. 
 3. The client got the headers but has nothing to send back, so it **delays the ACK** ~40 ms.
 4. The ACK timer fires, the ACK arrives, Nagle releases the body: the response completes after ~43 ms.
 
-**The evidence:** k6's `http_req_receiving` (first byte to last byte) averages **42.7 ms**. That gap *is* the held
-body. Waiting for the first byte (the real server time) is tiny.
+**The evidence:** k6's `http_req_receiving` (first byte to last byte) averages **42.7 ms**. That gap *is* the held body. Waiting for the first byte (the real server time) is tiny.
 
 **The fixes:** `srv.set_tcp_nodelay(true)` (turn Nagle off), or write headers and body in **one** call (`writev`).
 
@@ -515,11 +506,9 @@ Cache-aside = write the DB, then update the cache, with no lock covering both. T
 | 3 | | `cache.put("y")` | y | y |
 | 4 | `cache.put("x")` | | y | **x** ← stale |
 
-Every later GET returns "x" until key 7 is evicted, while the DB says "y". A slow GET that read the old row can do the
-same thing after a PUT.
+Every later GET returns "x" until key 7 is evicted, while the DB says "y". A slow GET that read the old row can do the same thing after a PUT.
 
-Standard fixes: on a write, **delete** the cache entry instead of setting it (the next read refills it); version each
-value and refuse older versions; or Facebook's **leases** (Memcache paper, NSDI 2013).
+Standard fixes: on a write, **delete** the cache entry instead of setting it (the next read refills it); version each value and refuse older versions; or Facebook's **leases** (Memcache paper, NSDI 2013).
 
 #### 5.2 The connection leak
 
@@ -560,23 +549,19 @@ The fix is one word: drop the type on line 192 (`conn = pool.acquire();`) so it 
 
 ##### "Why a list and not a vector for the LRU order?"
 
-Moving an element to the front of a vector shifts everything before it: O(n). A linked list relinks one node in O(1),
-and its iterators stay valid when other nodes move, which the map relies on.
+Moving an element to the front of a vector shifts everything before it: O(n). A linked list relinks one node in O(1), and its iterators stay valid when other nodes move, which the map relies on.
 
 ##### "How would you make the cache scale across cores?"
 
-**Shard** it: N independent caches, each with its own mutex, chosen by `hash(key) % N`. Requests for different
-shards no longer wait for one another. Or use approximate LRU (Redis samples a few keys and evicts the oldest).
+**Shard** it: N independent caches, each with its own mutex, chosen by `hash(key) % N`. Requests for different shards no longer wait for one another. Or use approximate LRU (Redis samples a few keys and evicts the oldest).
 
 ##### "How big should the pool be?"
 
-Too few connections and threads queue in `acquire`; too many and Postgres thrashes its own cores. A common starting
-point is (DB cores × 2) + spindles (HikariCP's rule), then measure.
+Too few connections and threads queue in `acquire`; too many and Postgres thrashes its own cores. A common starting point is (DB cores × 2) + spindles (HikariCP's rule), then measure.
 
 ##### "Why do 800 threads help on a 12-CPU machine?"
 
-Not for parallelism: each keep-alive connection pins a worker thread in cpp-httplib, so you need about one thread per
-connection. An **event loop** (epoll) would serve thousands of connections with a few threads.
+Not for parallelism: each keep-alive connection pins a worker thread in cpp-httplib, so you need about one thread per connection. An **event loop** (epoll) would serve thousands of connections with a few threads.
 
 #### 5.4 Check your understanding (Parts 2 to 5)
 
@@ -610,13 +595,11 @@ connection. An **event loop** (epoll) would serve thousands of connections with 
 Parts 1–5 show what the server does. This part shows **how to reason about its numbers**. Two one-line laws predict both measured curves. There is no project code here: the inputs are the k6 results and the CPU readings.
 
 > [!important] The one sentence to hold on to
-> In-flight requests = throughput × latency (**N = X·R**), and a resource's busy fraction = throughput × its time per
-> request (**U = X·S**). The resource with the largest S caps throughput at **1/S**.
+> In-flight requests = throughput × latency (**N = X·R**), and a resource's busy fraction = throughput × its time per request (**U = X·S**). The resource with the largest S caps throughput at **1/S**.
 
 #### 6.1 What a closed-loop load test is
 
-k6 runs **N virtual users** (VUs). Each one sends a request, waits for the reply, and only then sends the next. That is
-a **closed loop**: the load slows down when the server slows down.
+k6 runs **N virtual users** (VUs). Each one sends a request, waits for the reply, and only then sends the next. That is a **closed loop**: the load slows down when the server slows down.
 
 So a VU is always in one of two places: waiting for a reply, or in k6's own short gap before the next request.
 
@@ -654,8 +637,7 @@ Turn it around to **measure** the time per request from two numbers you have: $S
 
 A miss costs 3× a hit: three round trips to Postgres (`BEGIN`, `SELECT`, `COMMIT`) plus the libpqxx work.
 
-A resource can't be busy more than 100%, so $X \le 1/S$. For cache hits: $1 / 90\ \mu s \approx 11{,}150$ req/s. That is
-the plateau.
+A resource can't be busy more than 100%, so $X \le 1/S$. For cache hits: $1 / 90\ \mu s \approx 11{,}150$ req/s. That is the plateau.
 
 Tie this back to the code: the ~90 µs is Part 1's hit path (lines 99–101, one `cache.get` under the mutex). The ~270 µs is the miss path (lines 106–120: `acquire`, three round trips, `release`, `cache.put`).
 
@@ -688,16 +670,14 @@ get-only $0.043 \times 3{,}620 \approx 155$ VUs, and latency starts rising after
 
 #### 6.5 Using the laws on the resume claims
 
-**"CPU saturation at 11K TPS" holds, read per core.** U = 100% on the server core, and X stopped growing at 1/S. The
-whole machine was at 26%, so say "the pinned server core saturated".
+**"CPU saturation at 11K TPS" holds, read per core.** U = 100% on the server core, and X stopped growing at 1/S. The whole machine was at 26%, so say "the pinned server core saturated".
 
 **"I/O saturation at 3.1K TPS" does not hold.** At the put-only plateau:
 - the server core is at 75%, so it isn't the cap;
 - the disk (`sdd`) is 6% busy on average, 13% at most, so it isn't the cap either;
 - 1,857 commits/s over ~61 flushes/s means ~30 commits share each flush: Postgres **group commit** is working.
 
-The cap is somewhere in the **database tier** (the commit path, locks, its own CPU). Say "database-bound", not "I/O
-saturated". The laws don't name the bottleneck for you; they rule candidates out.
+The cap is somewhere in the **database tier** (the commit path, locks, its own CPU). Say "database-bound", not "I/O saturated". The laws don't name the bottleneck for you; they rule candidates out.
 
 #### 6.6 What-ifs the laws answer in one line
 
@@ -709,24 +689,19 @@ saturated". The laws don't name the bottleneck for you; they rule candidates out
 
 ##### "At 1000 VUs, N / X = 89.4 ms, but measured R = 84.8 ms. Is Little's law wrong?"
 
-No. The ~4.6 ms gap is k6's own time between requests (the "think time" Z). The full closed-loop form is
-$R = N / X - Z$. N counts every VU, but only those not in their gap are inside the server.
+No. The ~4.6 ms gap is k6's own time between requests (the "think time" Z). The full closed-loop form is $R = N / X - Z$. N counts every VU, but only those not in their gap are inside the server.
 
 ##### "Open loop vs closed loop: why does it matter?"
 
-A closed loop slows its own load when the server slows, so a stall sends *fewer* requests and hides queueing. An open
-loop sends at a fixed rate whatever happens, which shows real queue growth and tail latency. k6 VUs are closed loop.
+A closed loop slows its own load when the server slows, so a stall sends *fewer* requests and hides queueing. An open loop sends at a fixed rate whatever happens, which shows real queue growth and tail latency. k6 VUs are closed loop.
 
 ##### "Why did the cost per request rise with concurrency?"
 
-At 100–175 VUs a hit cost only ~30–50 µs; at saturation ~90 µs. More threads mean more context switches (~60K/s in
-`cpu.log`) and more lock contention on the cache mutex. Treat it as a trend: the low-end CPU readings are coarse
-integers typed by hand.
+At 100–175 VUs a hit cost only ~30–50 µs; at saturation ~90 µs. More threads mean more context switches (~60K/s in `cpu.log`) and more lock contention on the cache mutex. Treat it as a trend: the low-end CPU readings are coarse integers typed by hand.
 
 ##### "Does Little's law need Poisson arrivals?"
 
-No. It needs only a stable system (arrivals = departures over the window). Queueing formulas like M/M/1 need
-distributions; the operational laws don't.
+No. It needs only a stable system (arrivals = departures over the window). Queueing formulas like M/M/1 need distributions; the operational laws don't.
 
 #### 6.8 Check your understanding
 
@@ -994,8 +969,7 @@ The same session as tables, for reference:
 ### Part 8. The design: two threads, a queue, one writer
 
 > [!important] The one sentence to hold on to
-> One thread only receives commands, one thread only matches, and a queue joins them; the matching thread is the
-> **only** thing that ever touches the book.
+> One thread only receives commands, one thread only matches, and a queue joins them; the matching thread is the **only** thing that ever touches the book.
 
 #### 8.1 What a thread is
 
@@ -1164,9 +1138,7 @@ When an interviewer asks "why did you do X?", the answer is nearly always one ro
 ### Part 9. The SPSC ring buffer and memory ordering
 
 > [!important] The one sentence to hold on to
-> One producer writes only `head`, one consumer writes only `tail`, so no lock is needed. The producer writes the slot
-> **then** publishes `head` with **release**; the consumer reads `head` with **acquire**, **then** the slot, so it always
-> sees a complete command.
+> One producer writes only `head`, one consumer writes only `tail`, so no lock is needed. The producer writes the slot **then** publishes `head` with **release**; the consumer reads `head` with **acquire**, **then** the slot, so it always sees a complete command.
 
 This is the hardest part of the project. It goes in small steps: a queue → a ring → why not a lock → the C++ words → the code line by line → the hardware underneath.
 
@@ -1183,9 +1155,7 @@ The simple way to store it is an array. But after popping A, slot 0 is free and 
 
 ![[d13-4-ring.svg]] [[d13-4-ring.html|▶ Step through it]]
 
-Because the counters never wrap back to 0, "full" and "empty" never look the same, and no slot is wasted. In the real
-ring, index 70,000 lands in slot 70,000 & 65,535 = **4,464**. A 64-bit counter at 10 M pushes per second overflows after
-about **58,000 years**.
+Because the counters never wrap back to 0, "full" and "empty" never look the same, and no slot is wasted. In the real ring, index 70,000 lands in slot 70,000 & 65,535 = **4,464**. A 64-bit counter at 10 M pushes per second overflows after about **58,000 years**.
 
 #### 9.2 Why not just protect a queue with a lock?
 
@@ -1550,8 +1520,7 @@ for (;;) {
 
 *Animated, 5 steps, loops. Top lane: what may happen with no ordering rule. Bottom lane: the same steps with release and acquire. The text of each step is in the bar at the bottom of the figure.*
 
-Your code says "write the slot, then write head". Neither the compiler nor the CPU promises others will **see** it in
-that order:
+Your code says "write the slot, then write head". Neither the compiler nor the CPU promises others will **see** it in that order:
 - the **compiler** may reorder two stores to different variables if this thread can't tell the difference;
 - the **CPU** has a store buffer and caches; another core can see writes in a different order (weakly ordered CPUs like ARM do this often).
 
@@ -1572,17 +1541,13 @@ The pair runs in **both** directions:
 | `head_` | producer | after writing the slot | consumer before reading it | reading a half-written slot |
 | `tail_` | consumer | after copying the slot out | producer before reusing it | overwriting a slot still being read |
 
-**Cost on x86:** x86 (TSO) never reorders store-store or load-load, so release and acquire compile to plain `mov`s;
-they only stop the *compiler* from reordering. `seq_cst` (the default) would make each store an `xchg` or
-`mov + mfence`: a full fence on every push. On ARM, release and acquire become `stlr`/`ldar`.
+**Cost on x86:** x86 (TSO) never reorders store-store or load-load, so release and acquire compile to plain `mov`s; they only stop the *compiler* from reordering. `seq_cst` (the default) would make each store an `xchg` or `mov + mfence`: a full fence on every push. On ARM, release and acquire become `stlr`/`ldar`.
 
 #### 9.8 Cached indices
 
-Reading the *other* side's index means pulling a cache line the other core keeps writing: slow. So each side keeps a
-private copy (`tail_cache_`, `head_cache_`) and reloads the real one only when its copy says "full" or "empty".
+Reading the *other* side's index means pulling a cache line the other core keeps writing: slow. So each side keeps a private copy (`tail_cache_`, `head_cache_`) and reloads the real one only when its copy says "full" or "empty".
 
-The catch: when the consumer keeps up, the queue looks empty on almost every `pop`, so the consumer reloads `head_`
-almost every time. The trick mostly helps the side that is rarely blocked.
+The catch: when the consumer keeps up, the queue looks empty on almost every `pop`, so the consumer reloads `head_` almost every time. The trick mostly helps the side that is rarely blocked.
 
 #### 9.9 Cache lines and false sharing
 
@@ -1600,13 +1565,9 @@ Now put `head_` and `tail_` (8 bytes each) next to each other. They land in the 
 
 *Animated, 4 steps, loops. Left: `head_` and `tail_` on one cache line. Right: one line each. The text of each step is in the bar at the bottom of the figure.*
 
-Cores move memory in **64-byte cache lines**. To write a line, a core must own it exclusively, which invalidates every
-other core's copy. If `head_` and `tail_` sat on one line, each push would steal the line from the consumer and each
-pop would steal it back, even though they write different variables. That is **false sharing**.
+Cores move memory in **64-byte cache lines**. To write a line, a core must own it exclusively, which invalidates every other core's copy. If `head_` and `tail_` sat on one line, each push would steal the line from the consumer and each pop would steal it back, even though they write different variables. That is **false sharing**.
 
-`alignas(64)` puts `head_` (with the producer's `tail_cache_`) and `tail_` (with the consumer's `head_cache_`) on
-separate lines, so each line has one writer. Not covered: the slots. A `Command` is 40 bytes, so neighbouring slots
-share lines, and a nearly empty queue has both cores touching the same slot lines.
+`alignas(64)` puts `head_` (with the producer's `tail_cache_`) and `tail_` (with the consumer's `head_cache_`) on separate lines, so each line has one writer. Not covered: the slots. A `Command` is 40 bytes, so neighbouring slots share lines, and a nearly empty queue has both cores touching the same slot lines.
 
 **The four declarations, line by line** (`ring_buffer.hpp:59–65`):
 
@@ -1628,22 +1589,17 @@ share lines, and a nearly empty queue has both cores touching the same slot line
 | book alone, one core | 18.1 M | ≈ 55 |
 | two-thread pipeline (ring + WAL + rdtsc + histogram) | 3.44 M | ≈ 291 |
 
-The extra ~235 ns per command is most likely the **cross-core handoff**: at least two cache-line transfers per
-command (the consumer reloads `head_`, then reads the freshly written slot). On a big server mesh such a transfer
-costs ~100 ns or more. This is a **hypothesis**: never profiled. Throughput stayed flat at 3.2–3.4 M while the book
-grew 20×, which says the book isn't the limit.
+The extra ~235 ns per command is most likely the **cross-core handoff**: at least two cache-line transfers per command (the consumer reloads `head_`, then reads the freshly written slot). On a big server mesh such a transfer costs ~100 ns or more. This is a **hypothesis**: never profiled. Throughput stayed flat at 3.2–3.4 M while the book grew 20×, which says the book isn't the limit.
 
 #### 9.11 Questions people usually ask next
 
 ##### "Why not just use `seq_cst` everywhere?"
 
-It would be correct, but each store becomes a full fence on x86. Release/acquire is exactly the ordering the handoff
-needs, and nothing more.
+It would be correct, but each store becomes a full fence on x86. Release/acquire is exactly the ordering the handoff needs, and nothing more.
 
 ##### "Is this lock-free or wait-free?"
 
-Each `push` and `pop` finishes in a bounded number of steps whatever the other thread does: **wait-free**. The program
-as a whole still waits, because a caller spins when the ring is full or empty.
+Each `push` and `pop` finishes in a bounded number of steps whatever the other thread does: **wait-free**. The program as a whole still waits, because a caller spins when the ring is full or empty.
 
 Three words to keep apart:
 
@@ -1656,13 +1612,11 @@ Three words to keep apart:
 
 ##### "Would it work with two producers?"
 
-No. Two producers could read the same `head`, both write slot `head & mask`, and one command would be lost. Several
-gateways need a ring each, or an MPSC queue with compare-and-swap.
+No. Two producers could read the same `head`, both write slot `head & mask`, and one command would be lost. Several gateways need a ring each, or an MPSC queue with compare-and-swap.
 
 ##### "How did you test the ordering?"
 
-Honestly: by reasoning. The fuzzer is single-threaded, and there's no TSan run in the repo. A test that "passes on x86"
-proves little, because x86 hides most reorderings that ARM would expose.
+Honestly: by reasoning. The fuzzer is single-threaded, and there's no TSan run in the repo. A test that "passes on x86" proves little, because x86 hides most reorderings that ARM would expose.
 
 #### 9.12 Check your understanding
 
@@ -1698,8 +1652,7 @@ proves little, because x86 hides most reorderings that ARM would expose.
 ### Part 10. The order book and matching
 
 > [!important] The one sentence to hold on to
-> A flat array indexed by price finds the level in one step; a linked list inside the orders keeps arrival order and
-> unlinks in one step; a hash table finds an order by id; a pre-allocated pool means no `new` while matching.
+> A flat array indexed by price finds the level in one step; a linked list inside the orders keeps arrival order and unlinks in one step; a hash table finds an order by id; a pre-allocated pool means no `new` while matching.
 
 #### 10.1 What the book has to do, and the four structures that do it
 
@@ -2219,14 +2172,11 @@ A, B, C, D sit in one unbroken **run** (slots 2–5). A lookup walks the run fro
 
 *Animated, 7 steps, loops. Step 3 shows the wrong way to erase; steps 4–7 show the backward shift that `IdTable::erase` does. The text of each step is in the bar at the bottom of the figure.*
 
-The table is one array of keys. An id's **home** slot is `mix(id) & mask`. If it's taken, try the next slot, and so
-on (**linear probing**). A lookup walks from the home slot until it finds the id or an **empty** slot.
+The table is one array of keys. An id's **home** slot is `mix(id) & mask`. If it's taken, try the next slot, and so on (**linear probing**). A lookup walks from the home slot until it finds the id or an **empty** slot.
 
 The capacity is 2 × max orders, rounded up to a power of two, so the table is at most half full and probe runs stay short.
 
-**The deletion problem.** If you just empty a slot, you may cut a probe run: a later key that probed past it would
-become unreachable. The first version used **tombstones** ("deleted, keep probing"). They are never reclaimed, so after
-enough distinct ids no empty slot is left, and a lookup of a missing id **never stops** (story S4).
+**The deletion problem.** If you just empty a slot, you may cut a probe run: a later key that probed past it would become unreachable. The first version used **tombstones** ("deleted, keep probing"). They are never reclaimed, so after enough distinct ids no empty slot is left, and a lookup of a missing id **never stops** (story S4).
 
 **Backward shift** closes the hole instead:
 
@@ -2291,8 +2241,7 @@ void release(T* p) { free_[top_++] = p; }
 | `top_ > 0 ? free_[--top_] : nullptr` | if any node is free: lower `top_` by one, then return the pointer at that position. Else return null. | `--top_` (minus **before** the name) lowers first, then uses the new value | without the `top_ > 0` test, `--top_` on 0 wraps to a huge number and reads far outside the array |
 | `free_[top_++] = p;` | store the pointer at position `top_`, then raise `top_` | `top_++` (plus **after**) uses the old value, then raises it | there is **no** check for releasing the same node twice. A double release would hand one node to two orders. The book never does this, because `erase_order` is the only caller. |
 
-Measured: **983,976 heap allocations** for the naive engine vs **3** for this one (the thread, the ring storage and the
-histogram), counted by replacing `operator new`.
+Measured: **983,976 heap allocations** for the naive engine vs **3** for this one (the thread, the ring storage and the histogram), counted by replacing `operator new`.
 
 **Is the pool thread-safe?** No, and it does not need to be. Only the matching thread uses it (the single-writer rule of Part 8).
 
@@ -2331,9 +2280,7 @@ void erase_from(Levels& levels, const OrderPtr& o) {
 | mutex + condvar queue | sleep / wake per handoff | SPSC ring, spinning |
 | `ofstream` + `flush` per log record | a syscall per record | mmap'd log |
 
-The naive engine already finds an order by id in O(1) (a hash map). Its O(n) is the **level walk**. So say "O(1)
-unlinking", not "O(1) id lookup". The ~10× at small books comes mostly from constant factors (queue, log, timing);
-the growth to larger speedups with book size is what the O(1) cancel and the flat layout bought.
+The naive engine already finds an order by id in O(1) (a hash map). Its O(n) is the **level walk**. So say "O(1) unlinking", not "O(1) id lookup". The ~10× at small books comes mostly from constant factors (queue, log, timing); the growth to larger speedups with book size is what the O(1) cancel and the flat layout bought.
 
 #### 10.13 The costs on one page
 
@@ -2351,24 +2298,19 @@ the growth to larger speedups with book size is what the O(1) cancel and the fla
 
 ##### "Why not `std::map` for the levels?"
 
-Each lookup walks a tree of pointers (cache misses), and a new price allocates a node. Prices are integer ticks in a
-known range, so an array is one index. The price: 3 MB per symbol whatever its use, and thousands of symbols would need
-a sparse structure.
+Each lookup walks a tree of pointers (cache misses), and a new price allocates a node. Prices are integer ticks in a known range, so an array is one index. The price: 3 MB per symbol whatever its use, and thousands of symbols would need a sparse structure.
 
 ##### "What's the worst case of `raise_best_ask`?"
 
-It scans one tick at a time. If the ask side empties, it walks up to 65,536 levels (~64k checks over 1.5 MB): a
-latency spike. A two-level bitmap of non-empty levels with find-first-set would bound it.
+It scans one tick at a time. If the ask side empties, it walks up to 65,536 levels (~64k checks over 1.5 MB): a latency spike. A two-level bitmap of non-empty levels with find-first-set would bound it.
 
 ##### "Market and IOC orders?"
 
-Market uses an extreme price and never rests; IOC trades up to its limit and the rest is cancelled. Both add leftovers
-to `expired_qty_`. One gap: the duplicate-id check runs only for Limit orders, so an IOC can reuse a resting id.
+Market uses an extreme price and never rests; IOC trades up to its limit and the rest is cancelled. Both add leftovers to `expired_qty_`. One gap: the duplicate-id check runs only for Limit orders, so an IOC can reuse a resting id.
 
 ##### "Why is `Order` 48 bytes and not 40?"
 
-id, price, qty (8 B each), side (1 B), prev and next (8 B each): 41 B of fields, padded to 48 for 8-byte alignment,
-with 7 bytes of padding after `side`.
+id, price, qty (8 B each), side (1 B), prev and next (8 B each): 41 B of fields, padded to 48 for 8-byte alignment, with 7 bytes of padding after `side`.
 
 #### 10.15 Check your understanding
 
@@ -2400,8 +2342,7 @@ with 7 bytes of padding after `side`.
 ### Part 11. The write-ahead log and crash recovery
 
 > [!important] The one sentence to hold on to
-> Write each command to the log **before** applying it; after a crash, load the last snapshot and replay every logged
-> command after it. The book is deterministic, so the replay rebuilds it exactly.
+> Write each command to the log **before** applying it; after a crash, load the last snapshot and replay every logged command after it. The book is deterministic, so the replay rebuilds it exactly.
 
 #### 11.1 The problem: the book lives in RAM
 
@@ -2491,11 +2432,9 @@ The process can die at any instruction. Check each point:
 | B: logged, not yet applied | yes | no | replay applies it ✓ |
 | C: after both | yes | yes | replay rebuilds the same book ✓ |
 
-With "apply, then log", a crash between the two would lose a command that already changed the book (and may already
-have been acknowledged).
+With "apply, then log", a crash between the two would lose a command that already changed the book (and may already have been acknowledged).
 
-Replay works because the book is a **deterministic state machine**: the same commands in the same order always give
-the same book. No clocks, no randomness inside `apply`.
+Replay works because the book is a **deterministic state machine**: the same commands in the same order always give the same book. No clocks, no randomness inside `apply`.
 
 #### 11.4 mmap: writing a file without system calls
 
@@ -2530,8 +2469,7 @@ The **page cache** is the kernel's own in-memory copy of file contents. A mapped
 | survives power loss | only with fsync | only after `msync`, which runs at the end of a run |
 | disk full | an error code | **SIGBUS** on a page write |
 
-So the honest claim is **crash recovery from process crashes**, not power-loss durability. `ftruncate` makes a sparse
-file, so the first touch of each page faults; `posix_fallocate` would reserve the blocks up front.
+So the honest claim is **crash recovery from process crashes**, not power-loss durability. `ftruncate` makes a sparse file, so the first touch of each page faults; `posix_fallocate` would reserve the blocks up front.
 
 #### 11.5 The code: append
 
@@ -2612,19 +2550,15 @@ How does the follower know a record is complete before it reads it? The same rel
 
 *Animated, 6 steps, loops. Two segments passing through Active, Sealed and Free, and which thread makes each change. The text of each step is in the bar at the bottom of the figure.*
 
-A log can't grow forever. Every so often a **snapshot** captures the whole book, and log records it covers can be
-dropped.
+A log can't grow forever. Every so often a **snapshot** captures the whole book, and log records it covers can be dropped.
 
 - **Two segments.** Matching appends to the Active one. When it fills, matching seals it and switches to the other.
 - **A follower thread** reads the log (acquire-load `count`, replay new records into its own replica book). It snapshots the *replica* and then frees sealed segments the snapshot covers.
 - Each segment state change has **one owner**: Active → Sealed (matching), Sealed → Free (follower), Free → Active (matching). An early draft let the follower free "any non-active segment" and could empty the one matching had just switched into (story S3).
 
-Why a replica? The first design copied the live books on the matching thread: a **1.6 ms** stall per snapshot at
-88,390 resting orders (story S2). Now matching copies nothing; snapshots every 100k commands cost about 1.02× in
-throughput.
+Why a replica? The first design copied the live books on the matching thread: a **1.6 ms** stall per snapshot at 88,390 resting orders (story S2). Now matching copies nothing; snapshots every 100k commands cost about 1.02× in throughput.
 
-The follower reads in **200 µs batches** (~800 records at 4 M commands/s): polling nonstop kept pulling the header's
-cache line, which holds `count`, away from the matching core on every append (story S6).
+The follower reads in **200 µs batches** (~800 records at 4 M commands/s): polling nonstop kept pulling the header's cache line, which holds `count`, away from the matching core on every append (story S6).
 
 #### 11.7 The code: recover
 
@@ -2694,8 +2628,7 @@ If B's base were 70,000 instead: 70,000 > 65,000, so commands 65,000–69,999 ar
 - The segments are sorted by `base_seq` first. Segment 0 has base 40,000 and 12,345 records: `end = 52,345 > 40,000`, `base ≤ seq`, so replay from index `40000 − 40000 = 0`: 12,345 commands. `r.seq = 52,345`.
 - A segment wholly before the snapshot is skipped. A segment starting **after** `r.seq` means a gap, and recovery refuses (`ok = false`) rather than build a wrong book.
 
-Tested on the branch: **SIGKILL at random points, 40/40 exact recoveries** (8/8 re-run), plus six injected bugs that
-each failed a test.
+Tested on the branch: **SIGKILL at random points, 40/40 exact recoveries** (8/8 re-run), plus six injected bugs that each failed a test.
 
 **Where the output goes.** `recover` leaves `ex` holding the rebuilt books and returns `r` (ok, seq, replayed). The engine then continues appending from sequence `r.seq`.
 
@@ -2713,24 +2646,19 @@ A crash can also happen **while the snapshot is being written**. A half-written 
 
 ##### "Why not fsync every record?"
 
-An fsync costs microseconds to milliseconds; at millions of commands a second that's impossible. Real systems
-**group-commit**: many records per fsync, and acknowledge a batch only after its fsync. Here acks (in the gateway) go out
-before anything is synced.
+An fsync costs microseconds to milliseconds; at millions of commands a second that's impossible. Real systems **group-commit**: many records per fsync, and acknowledge a batch only after its fsync. Here acks (in the gateway) go out before anything is synced.
 
 ##### "Does 40/40 SIGKILL recoveries prove durability?"
 
-It proves the log format, the ordering and the recovery logic. It can't prove power-loss durability: after a SIGKILL
-the kernel still holds the dirty pages and writes them out. Only a power cut (or a VM snapshot trick) tests that.
+It proves the log format, the ordering and the recovery logic. It can't prove power-loss durability: after a SIGKILL the kernel still holds the dirty pages and writes them out. Only a power cut (or a VM snapshot trick) tests that.
 
 ##### "What if a record is corrupted on disk?"
 
-There is no checksum, only a magic number and a record size. A torn or flipped record would replay silently. A CRC per
-record (or per batch) is the standard fix.
+There is no checksum, only a magic number and a record size. A torn or flipped record would replay silently. A CRC per record (or per batch) is the standard fix.
 
 ##### "Why log the command and not the resulting changes?"
 
-The command is 40 bytes and the book is deterministic, so replaying commands is enough (**logical** logging). Logging
-the changes (physical logging) costs more bytes but doesn't need a deterministic apply.
+The command is 40 bytes and the book is deterministic, so replaying commands is enough (**logical** logging). Logging the changes (physical logging) costs more bytes but doesn't need a deterministic apply.
 
 #### 11.10 Check your understanding
 
@@ -2762,8 +2690,7 @@ the changes (physical logging) costs more bytes but doesn't need a deterministic
 ### Part 12. Everything together: one command, the numbers, the tests
 
 > [!important] The one sentence to hold on to
-> The book alone does 18.1 M commands/s; the full two-thread pipeline does 3.44 M/s, because handing each command to
-> another core costs more than matching it.
+> The book alone does 18.1 M commands/s; the full two-thread pipeline does 3.44 M/s, because handing each command to another core costs more than matching it.
 
 #### 12.1 One command through every component
 

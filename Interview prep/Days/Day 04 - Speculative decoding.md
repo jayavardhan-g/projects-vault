@@ -77,8 +77,7 @@ Part of [[Interview plan (Nov 2026)]]. Repo `speculative_decoding` (branch `main
 One iteration, with draft distribution `q` and target distribution `p`:
 1. The draft model generates γ tokens autoregressively: `x₁ … x_γ`, each from `q(·|prefix)`.
 2. The target model scores **all γ+1 positions in one forward pass**, giving `p₁ … p_{γ+1}`.
-3. For i = 1 … γ: accept `x_i` with probability `min(1, p_i(x_i) / q_i(x_i))`. On the first rejection, sample a
-   replacement from the **residual** `norm(max(0, p_i − q_i))` and stop.
+3. For i = 1 … γ: accept `x_i` with probability `min(1, p_i(x_i) / q_i(x_i))`. On the first rejection, sample a replacement from the **residual** `norm(max(0, p_i − q_i))` and stop.
 4. If all γ are accepted, sample one **bonus** token from `p_{γ+1}`.
 
 So each iteration yields between 1 and γ+1 tokens, for one target forward pass.
@@ -113,17 +112,14 @@ So each iteration yields between 1 and γ+1 tokens, for one target forward pass.
 - **Eager:** draft 24 layers × 0.82 ms = 19.7 ms; target 48 × 0.81 = 39 ms; c ≈ 0.5. Speedup = 3.36 / (4·0.5 + 1) = **1.12×**.
   With your first 7B target (28 layers) and 1.5B draft (28 layers), c ≈ 1, so speedup = 3.36 / 5 ≈ **0.67×**. That is your 0.88× story.
 - **Compiled:** draft 24 × 0.098 = 2.35 ms; target 48 × 0.223 = 10.7 ms; c ≈ 0.22. Speedup = 3.36 / 1.88 ≈ **1.79×**.
-- You measured **2.25×**, above the formula (1.89× with your real α). Acceptance is **bursty**, not independent: easy
-  stretches (code) accept long runs (RESULTS.md).
-- **Best γ:** maximise `E(γ)/(γc + 1)`. A higher α (code) favours a larger γ (8 → 2.60×). A lower α (chat) favours a
-  small γ; at γ = 16, chat runs at 0.82×.
+- You measured **2.25×**, above the formula (1.89× with your real α). Acceptance is **bursty**, not independent: easy stretches (code) accept long runs (RESULTS.md).
+- **Best γ:** maximise `E(γ)/(γc + 1)`. A higher α (code) favours a larger γ (8 → 2.60×). A lower α (chat) favours a small γ; at γ = 16, chat runs at 0.82×.
 
 > [!tip] Explained from scratch: [[#6. Deep dive: the speedup maths from scratch|§6 the speedup maths]], [[#5. Deep dive: speculative sampling from scratch|§5 the correctness proof]]
 
 ### A3. Why decode was launch-bound (block 6, 30 min)
 
-**Read:** the PyTorch blog *"Accelerating Generative AI with PyTorch II: GPT, Fast"* (gpt-fast). It covers the static KV cache,
-`torch.compile(mode="reduce-overhead")` and speculative decoding, the same three ideas as your fix.
+**Read:** the PyTorch blog *"Accelerating Generative AI with PyTorch II: GPT, Fast"* (gpt-fast). It covers the static KV cache, `torch.compile(mode="reduce-overhead")` and speculative decoding, the same three ideas as your fix.
 
 > [!abstract] What it says: PyTorch blog, *Accelerating Generative AI with PyTorch II: GPT, Fast* (gpt-fast, 2023)
 > **Key idea:** plain PyTorch, under 1,000 lines, can decode fast if you remove CPU overhead first.
@@ -166,9 +162,7 @@ Read the abstract and first figure of each:
 > **Claims to know:** a tree raises the chance that *some* branch matches, so more tokens are accepted per target call.
 > They report gains for both distributed and CPU-offloading serving. The main cost is engine work: tree masks and branch-aware KV handling.
 
-**Your honest answer:** these need training, or bigger engine changes for tree masks. A separate off-the-shelf draft
-from the same family (shared tokenizer) needs neither, and it isolates the systems question. Tree drafting is the
-listed next step (PROGRESS §7).
+**Your honest answer:** these need training, or bigger engine changes for tree masks. A separate off-the-shelf draft from the same family (shared tokenizer) needs neither, and it isolates the systems question. Tree drafting is the listed next step (PROGRESS §7).
 
 **Concepts:**
 - **Trained drafters** (Medusa heads, the EAGLE head) live inside the target and guess better, but need training for each target.
@@ -198,8 +192,7 @@ listed next step (PROGRESS §7).
 - 204 `compile`;
 - **246 `generate`**: the draft loop, the single verify pass over γ+1 positions, how many tokens are emitted, and the bonus token.
 
-Tests to read alongside: `tests/test_engine_correctness.py` and `tests/test_sampling.py`. They show how "preserves the
-distribution" is *tested* despite bf16 noise (the noise-floor method; see the prep pack).
+Tests to read alongside: `tests/test_engine_correctness.py` and `tests/test_sampling.py`. They show how "preserves the distribution" is *tested* despite bf16 noise (the noise-floor method; see the prep pack).
 
 ### B3. Cache and compile (block 7, 40 min, deep)
 
@@ -216,8 +209,7 @@ Read this **with the files open**. It starts with a picture of the whole day and
 Repo `speculative_decoding`, branch `main` (`99ed1c2`), package
 `src/specdec/`.
 
-**One iteration in one picture:** the draft guesses γ tokens one at a time; the target checks all of them in one
-pass; the accept/reject rule keeps a prefix and adds one token; both caches are cut back to what was kept.
+**One iteration in one picture:** the draft guesses γ tokens one at a time; the target checks all of them in one pass; the accept/reject rule keeps a prefix and adds one token; both caches are cut back to what was kept.
 
 ```mermaid
 flowchart TB
@@ -601,28 +593,21 @@ torch.cuda.synchronize()
 
 ### 5. Deep dive: speculative sampling from scratch
 
-Section 3 above reads `verify_and_correct`. This section builds the algorithm and its proof from zero, on a
-vocabulary of 3 tokens. Order: why one target pass can check many tokens → the accept rule → the residual → the proof
-with numbers → what goes wrong with a simpler rule → greedy as a special case → several positions in a row → the code
-with real tensors → questions → check.
+Section 3 above reads `verify_and_correct`. This section builds the algorithm and its proof from zero, on a vocabulary of 3 tokens. Order: why one target pass can check many tokens → the accept rule → the residual → the proof with numbers → what goes wrong with a simpler rule → greedy as a special case → several positions in a row → the code with real tensors → questions → check.
 
 > [!important] The one sentence to hold on to
-> Let a small model **guess** γ tokens; let the big model **check** all of them in one pass; keep each guess with
-> probability $\min(1, p/q)$, and on the first rejection draw from the **residual** $\max(0, p - q)$. The output is
-> then distributed **exactly** as the big model alone would produce it.
+> Let a small model **guess** γ tokens; let the big model **check** all of them in one pass; keep each guess with probability $\min(1, p/q)$, and on the first rejection draw from the **residual** $\max(0, p - q)$. The output is then distributed **exactly** as the big model alone would produce it.
 
 #### 5.1 Why one target pass can check γ tokens
 
 A causal language model, fed a sequence, gives a next-token distribution at **every** position in one forward pass.
-That's how training works too. Feed the target `[t99, x₁, x₂, x₃, x₄]` (the last committed token plus 4 guesses) and
-it returns **5 rows**:
+That's how training works too. Feed the target `[t99, x₁, x₂, x₃, x₄]` (the last committed token plus 4 guesses) and it returns **5 rows**:
 - row 0 = $p$(next | …t99), the target's opinion about x₁;
 - row 1 = $p$(next | …t99, x₁), about x₂;
 - …
 - row 4 = $p$(next | …x₄): a **bonus** row, used if all 4 guesses survive.
 
-At batch 1, a 5-token forward costs about the same as a 1-token forward (it's launch- or memory-bound, Day 4 §7). So
-if most guesses are right, you get several tokens for the price of one target pass.
+At batch 1, a 5-token forward costs about the same as a 1-token forward (it's launch- or memory-bound, Day 4 §7). So if most guesses are right, you get several tokens for the price of one target pass.
 
 #### 5.2 The setup on 3 tokens
 
@@ -655,8 +640,7 @@ Probability that the draft proposes x **and** it is kept: $q(x) \cdot a(x) = \mi
 Each token is now short of p by exactly $p(x) - \min(p(x), q(x)) = \max(0, p(x) - q(x))$:
 - A: 0.6 − 0.3 = **0.3**; B: 0; C: 0.
 
-That shortfall is the **residual**. It sums to 0.3, the rejection probability. On a rejection, draw from the residual
-normalised: here [0.3, 0, 0] / 0.3 = [1, 0, 0], so always A.
+That shortfall is the **residual**. It sums to 0.3, the rejection probability. On a rejection, draw from the residual normalised: here [0.3, 0, 0] / 0.3 = [1, 0, 0], so always A.
 
 #### 5.5 The proof, with numbers and then in general
 
@@ -669,22 +653,18 @@ That's exactly p. In general:
 
 $$P(x) = \min(p, q)(x) + (1 - \beta) \cdot \frac{\max(0, p(x) - q(x))}{\sum_y \max(0, p(y) - q(y))}$$
 
-The key identity: $\sum_y \max(0, p - q) = \sum_y (p - \min(p, q)) = 1 - \beta$. So the fraction's denominator
-cancels $(1 - \beta)$, leaving
+The key identity: $\sum_y \max(0, p - q) = \sum_y (p - \min(p, q)) = 1 - \beta$. So the fraction's denominator cancels $(1 - \beta)$, leaving
 
 $$P(x) = \min(p(x), q(x)) + \max(0, p(x) - q(x)) = p(x). \quad \blacksquare$$
 
-It holds for **any** q. A bad draft only lowers β (more rejections, less speed), never correctness. Also
-$1 - \beta = \text{TV}(p, q)$, the total-variation distance: here $\tfrac12(0.3 + 0.2 + 0.1) = 0.3$.
+It holds for **any** q. A bad draft only lowers β (more rejections, less speed), never correctness. Also $1 - \beta = \text{TV}(p, q)$, the total-variation distance: here $\tfrac12(0.3 + 0.2 + 0.1) = 0.3$.
 
 #### 5.6 Break it: the "obvious" rule is wrong
 
 Suppose that on a rejection you simply sampled from **p** instead of the residual:
 - A: 0.3 + 0.3 · 0.6 = **0.48**; B: 0.3 + 0.3 · 0.3 = **0.39**; C: 0.1 + 0.3 · 0.1 = **0.13**.
 
-Not p. The kept proposals have already supplied B and C in full, and resampling from p adds more of them. A Monte-Carlo
-run (200,000 rounds, plain Python) agrees: the correct rule gives [0.600, 0.301, 0.099], the wrong one
-[0.480, 0.391, 0.129].
+Not p. The kept proposals have already supplied B and C in full, and resampling from p adds more of them. A Monte-Carlo run (200,000 rounds, plain Python) agrees: the correct rule gives [0.600, 0.301, 0.099], the wrong one [0.480, 0.391, 0.129].
 
 #### 5.7 Greedy is a special case
 
@@ -692,8 +672,7 @@ Greedy decoding uses a **point mass**: p(argmax) = 1, everything else 0. Then:
 - if x = argmax: $a = \min(1, 1/q(x)) = 1$, always keep;
 - otherwise p(x) = 0, so $a = 0$, always reject, and the residual is $\max(0, p - q)$ = a point mass at the argmax.
 
-So greedy collapses to "**keep iff the draft guessed the target's argmax; else emit the argmax**". That's the
-`cfg.is_greedy` branch, which skips the coin flip.
+So greedy collapses to "**keep iff the draft guessed the target's argmax; else emit the argmax**". That's the `cfg.is_greedy` branch, which skips the coin flip.
 
 #### 5.8 Several positions in a row
 
@@ -716,32 +695,26 @@ Walking `verify_and_correct` (section 3's code):
   - if it returns 0.75 → `residual = torch.clamp(p_i - q_i, min=0.0)` = clamp([0.3, −0.2, −0.1]) = **[0.3, 0, 0]**; `total = 0.3`; return `(0, sample_from_probs([1, 0, 0]))` = **(0, A)**: 0 proposals kept, plus A;
 - if both are kept, the loop ends and it returns `(2, sample_from_probs(p_probs[2]))`: 2 proposals plus the bonus.
 
-The `total <= 0` branch handles float noise only: a zero residual means p = q, which would have been kept with
-probability 1.
+The `total <= 0` branch handles float noise only: a zero residual means p = q, which would have been kept with probability 1.
 
 #### 5.10 Questions people usually ask next
 
 ##### "Does the draft have to be a smaller version of the same model?"
 
-It must share the **tokenizer**, so that p(x) and q(x) refer to the same token. Here the 0.5B and 14B Qwen2.5 models
-share it, but their logits have different widths (151,936 vs 152,064). `align_vocab` cuts both to the narrower one.
+It must share the **tokenizer**, so that p(x) and q(x) refer to the same token. Here the 0.5B and 14B Qwen2.5 models share it, but their logits have different widths (151,936 vs 152,064). `align_vocab` cuts both to the narrower one.
 Being from the same family also makes q close to p, so β is high.
 
 ##### "Is it still exact with temperature and top-p?"
 
-Yes, if **p and q are the processed distributions** (after temperature, top-k, top-p). The proof works for any two
-distributions. That's why `logits_to_probs` is applied to both models' logits.
+Yes, if **p and q are the processed distributions** (after temperature, top-k, top-p). The proof works for any two distributions. That's why `logits_to_probs` is applied to both models' logits.
 
 ##### "Then why aren't greedy outputs bit-identical to the target alone?"
 
-Running the 14B at batch width 5 instead of 1 changes its logits by exactly 0.25 in bf16 (different GEMM tiling and
-summation order). Near-ties then flip the argmax. The target-only baseline even disagrees with **itself** across
-three identical runs. The tests measure this noise floor and fail only on a confident disagreement.
+Running the 14B at batch width 5 instead of 1 changes its logits by exactly 0.25 in bf16 (different GEMM tiling and summation order). Near-ties then flip the argmax. The target-only baseline even disagrees with **itself** across three identical runs. The tests measure this noise floor and fail only on a confident disagreement.
 
 ##### "What did the project verify?"
 
-The accept/reject kernel against synthetic distributions over 60,000 samples, plus **self-drafting**: the target drafts
-for itself, so every disagreement isolates the verification logic.
+The accept/reject kernel against synthetic distributions over 60,000 samples, plus **self-drafting**: the target drafts for itself, so every disagreement isolates the verification logic.
 
 #### 5.11 Check your understanding
 
@@ -772,20 +745,14 @@ for itself, so every disagreement isolates the verification logic.
 
 ### 6. Deep dive: the speedup maths from scratch
 
-The prep note's A2 gives the formulas. This section derives them on numbers, then checks them against the measured
-results, including one trap in how "acceptance rate" is defined. Order: what an iteration costs → tokens per
-iteration → the speedup formula → the 0.88× story in numbers → **two different acceptance rates** → choosing γ →
-questions → check.
+The prep note's A2 gives the formulas. This section derives them on numbers, then checks them against the measured results, including one trap in how "acceptance rate" is defined. Order: what an iteration costs → tokens per iteration → the speedup formula → the 0.88× story in numbers → **two different acceptance rates** → choosing γ → questions → check.
 
 > [!important] The one sentence to hold on to
-> One iteration costs **γ draft passes + 1 target pass** and yields $E = (1 - \alpha^{\gamma+1}) / (1 - \alpha)$ tokens,
-> so the speedup is $E / (\gamma c + 1)$, where $c$ = draft cost ÷ target cost. Speculation pays only when $c$ is
-> small **and** α (the per-position acceptance) is high.
+> One iteration costs **γ draft passes + 1 target pass** and yields $E = (1 - \alpha^{\gamma+1}) / (1 - \alpha)$ tokens, so the speedup is $E / (\gamma c + 1)$, where $c$ = draft cost ÷ target cost. Speculation pays only when $c$ is small **and** α (the per-position acceptance) is high.
 
 #### 6.1 What one iteration costs
 
-Let one target forward take $T$ and one draft forward take $cT$. One iteration does γ draft forwards and one target
-forward (the γ + 1-token verify, which at batch 1 costs about one target forward):
+Let one target forward take $T$ and one draft forward take $cT$. One iteration does γ draft forwards and one target forward (the γ + 1-token verify, which at batch 1 costs about one target forward):
 
 $$\text{cost per iteration} \approx \gamma c T + T = (\gamma c + 1)\, T$$
 
@@ -793,8 +760,7 @@ Without speculation, each token costs $T$. So the speedup is "tokens per iterati
 
 #### 6.2 Tokens per iteration, on numbers
 
-Assume each proposal is accepted with the same probability α, independently, given that all earlier ones were. With
-α = 0.8 and γ = 4, the number of accepted proposals n:
+Assume each proposal is accepted with the same probability α, independently, given that all earlier ones were. With α = 0.8 and γ = 4, the number of accepted proposals n:
 
 | n accepted | how | probability | tokens emitted (n + 1) |
 |---|---|---|---|
@@ -810,8 +776,7 @@ In general, the (k+1)-th token appears exactly when the first k proposals are al
 
 $$E(\gamma) = 1 + \alpha + \alpha^2 + \dots + \alpha^\gamma = \frac{1 - \alpha^{\gamma+1}}{1 - \alpha}$$
 
-Check: $(1 - 0.8^5)/0.2 = (1 - 0.328)/0.2 = 3.36$. As γ grows, E approaches $1/(1 - \alpha)$: 5 for α = 0.8. Extra
-depth buys less and less.
+Check: $(1 - 0.8^5)/0.2 = (1 - 0.328)/0.2 = 3.36$. As γ grows, E approaches $1/(1 - \alpha)$: 5 for α = 0.8. Extra depth buys less and less.
 
 #### 6.3 The speedup formula, with the project's numbers
 
@@ -834,15 +799,11 @@ Compiled forward costs from the README: 14B target **10.72 ms**, 0.5B draft **1.
 
 #### 6.4 The 0.88× story, in numbers
 
-The first correct version used a 7B target and a 1.5B draft, both **28 layers**, in eager mode. Eager decode at batch 1
-costs about **0.81 ms per layer whatever the model size** (§7), so both cost ≈ 28 × 0.81 = 22.6 ms: **c ≈ 1**.
+The first correct version used a 7B target and a 1.5B draft, both **28 layers**, in eager mode. Eager decode at batch 1 costs about **0.81 ms per layer whatever the model size** (§7), so both cost ≈ 28 × 0.81 = 22.6 ms: **c ≈ 1**.
 
-It was working: acceptance was 0.84–0.92, and target forward passes dropped **4.3×** (so ≈ 4.3 tokens per target
-pass). But the cost per iteration was about γ + 1 = 5 forwards of equal cost. Speedup ≈ 4.3 / 5 = **0.86×**, close to
-the measured **0.88×**. The algorithm was fine; the cost model was wrong.
+It was working: acceptance was 0.84–0.92, and target forward passes dropped **4.3×** (so ≈ 4.3 tokens per target pass). But the cost per iteration was about γ + 1 = 5 forwards of equal cost. Speedup ≈ 4.3 / 5 = **0.86×**, close to the measured **0.88×**. The algorithm was fine; the cost model was wrong.
 
-The fix had two parts: make $c$ small (compile, so cost tracks model size; and pick a 48-layer target against a
-24-layer draft), giving 0.88× → **2.25×**.
+The fix had two parts: make $c$ small (compile, so cost tracks model size; and pick a 48-layer target against a 24-layer draft), giving 0.88× → **2.25×**.
 
 #### 6.5 The trap: two different "acceptance rates"
 
@@ -850,8 +811,7 @@ The repo's `acceptance_rate` is
 
 $$f = \frac{\text{proposals accepted}}{\text{proposals drafted}} = \frac{\text{mean accepted per iteration}}{\gamma}$$
 
-Proposals after a rejection count as drafted but not accepted. The formula's α is something else: the probability of
-keeping **one** proposal, given that all the earlier ones were kept. They are not the same number:
+Proposals after a rejection count as drafted but not accepted. The formula's α is something else: the probability of keeping **one** proposal, given that all the earlier ones were kept. They are not the same number:
 
 $$f = \frac{\alpha + \alpha^2 + \dots + \alpha^\gamma}{\gamma}$$
 
@@ -870,9 +830,7 @@ What this shows:
 - The fitted α is almost **the same at γ = 2, 4 and 8** (0.94, 0.91, 0.91). That is what independent acceptance predicts. So these numbers don't show burstiness. The gap is mostly a definition mismatch.
 - With α = 0.912 and c = 0.158, the formula predicts about 2.57× at γ = 4. The measured 2.25× is lower, which is expected: a 5-token verify costs more than a 1-token forward, and non-forward work adds 1.4%.
 
-**How to say it in an interview:** "The textbook formula needs the per-position acceptance probability. Our logged
-rate counts wasted draft work, so it's lower. Converted properly, the formula matches the measured tokens per
-iteration." (The project's own PROGRESS §4f found the same denominator issue in a test.)
+**How to say it in an interview:** "The textbook formula needs the per-position acceptance probability. Our logged rate counts wasted draft work, so it's lower. Converted properly, the formula matches the measured tokens per iteration." (The project's own PROGRESS §4f found the same denominator issue in a test.)
 
 #### 6.6 Choosing γ
 
@@ -885,8 +843,7 @@ The best γ maximises $E(\gamma) / (\gamma c + 1)$. It rises with α. With $c = 
 | 0.8 | 5 | 2.06× |
 | 0.912 | 8 | 2.83× |
 
-The measured domains agree with this shape. Converting their measured f to α (same method): code ≈ **0.88**, chat
-≈ **0.67**, summarisation ≈ **0.61**.
+The measured domains agree with this shape. Converting their measured f to α (same method): code ≈ **0.88**, chat ≈ **0.67**, summarisation ≈ **0.61**.
 - **Code** is predictable (brackets, repeated names): best measured γ = 8 (**2.60×**).
 - **Chat, summarisation:** best γ = 4 (1.42×, 1.41×). At γ = 16 they fall to **0.82×** and **0.66×**: slower than no speculation.
 - Across all three domains, γ = 4 had the best mean (1.69×), so it is the default.
@@ -895,23 +852,19 @@ The measured domains agree with this shape. Converting their measured f to α (s
 
 ##### "Why a 14B target and not 7B?"
 
-Speedup needs a small $c$. After compiling, cost tracks model size, and 0.5B vs 14B gives c ≈ 0.16. The 48-vs-24 layer
-ratio also helps whenever launches still matter.
+Speedup needs a small $c$. After compiling, cost tracks model size, and 0.5B vs 14B gives c ≈ 0.16. The 48-vs-24 layer ratio also helps whenever launches still matter.
 
 ##### "Why the 0.5B draft and not the 1.5B, which accepts more?"
 
-The 1.5B had higher acceptance in every domain, but its cost (2.74 ms vs 1.69 ms) ate the gain. The 0.5B had the best
-**throughput** in every domain (2.25× vs 2.03× at γ = 4).
+The 1.5B had higher acceptance in every domain, but its cost (2.74 ms vs 1.69 ms) ate the gain. The 0.5B had the best **throughput** in every domain (2.25× vs 2.03× at γ = 4).
 
 ##### "What happens at large batch?"
 
-At large batch, decode becomes compute-bound: the verify of γ + 1 tokens per request is no longer nearly free. The
-spare compute that speculation uses disappears, so the gain shrinks.
+At large batch, decode becomes compute-bound: the verify of γ + 1 tokens per request is no longer nearly free. The spare compute that speculation uses disappears, so the gain shrinks.
 
 ##### "Why measure acceptance instead of trusting the formula?"
 
-The formula assumes a constant α. Real α varies by domain and position. Measure tokens per iteration directly; it maps
-linearly to throughput.
+The formula assumes a constant α. Real α varies by domain and position. Measure tokens per iteration directly; it maps linearly to throughput.
 
 #### 6.8 Check your understanding
 
@@ -943,14 +896,10 @@ linearly to throughput.
 ### 7. Deep dive: launch-bound decode and CUDA graphs from scratch
 
 Section 4 above reads `cache_utils.py` and `compile_utils.py`. This section explains why they exist, from zero. Order:
-how fast batch-1 decode *should* be → how fast eager mode actually was → what a CUDA graph is → the two rules a graph
-imposes → how the repo meets them (fixed shapes, static cache, rollback in place) → the rollback on numbers →
-questions → check.
+how fast batch-1 decode *should* be → how fast eager mode actually was → what a CUDA graph is → the two rules a graph imposes → how the repo meets them (fixed shapes, static cache, rollback in place) → the rollback on numbers → questions → check.
 
 > [!important] The one sentence to hold on to
-> At batch 1, eager PyTorch spends its time **launching** hundreds of tiny kernels, so every model costs about
-> layers × 0.81 ms whatever its size. Recording the step once as a **CUDA graph** and replaying it with one launch
-> makes cost track model size again, which is what speculation needs.
+> At batch 1, eager PyTorch spends its time **launching** hundreds of tiny kernels, so every model costs about layers × 0.81 ms whatever its size. Recording the step once as a **CUDA graph** and replaying it with one launch makes cost track model size again, which is what speculation needs.
 
 #### 7.1 How fast should one decode step be?
 
@@ -958,8 +907,7 @@ One token through the 14B target (about 14.7B parameters, bf16) needs:
 - **arithmetic:** about 2 FLOPs per parameter = 29 GFLOP. At nearly 1,000 TFLOPS that's **≈ 0.03 ms**;
 - **memory:** every weight read once = 29.4 GB. At 4.8 TB/s that's **≈ 6.1 ms**.
 
-So the floor is about 6 ms: decode at batch 1 is **memory-bound** in principle. For the 0.5B (about 1 GB of weights),
-the floor is **≈ 0.2 ms**.
+So the floor is about 6 ms: decode at batch 1 is **memory-bound** in principle. For the 0.5B (about 1 GB of weights), the floor is **≈ 0.2 ms**.
 
 #### 7.2 How fast eager mode actually was
 
@@ -969,18 +917,14 @@ the floor is **≈ 0.2 ms**.
 | Qwen2.5-1.5B | 28 | 22.61 ms | **0.808** ms | 2.74 ms | 0.098 ms |
 | Qwen2.5-0.5B | 24 | 19.68 ms | **0.820** ms | 1.69 ms | 0.071 ms |
 
-Read the eager per-layer column: **0.813, 0.808, 0.820**, flat across a 28× range in parameters. The 0.5B took
-19.7 ms against a 0.2 ms floor: **100× slower than its memory floor**. The GPU was idle most of the time.
+Read the eager per-layer column: **0.813, 0.808, 0.820**, flat across a 28× range in parameters. The 0.5B took 19.7 ms against a 0.2 ms floor: **100× slower than its memory floor**. The GPU was idle most of the time.
 
 ![[d4-7-launch.svg]] [[d4-7-launch.html|▶ Step through it]]
 
-Why? Each layer is a handful of small kernels (norms, matmuls, RoPE, attention, activation). In eager mode Python
-launches them **one by one**. At batch 1 each kernel finishes in microseconds, before the CPU has launched the next.
-So step time ≈ (number of kernels) × (launch cost), and the number of kernels is set by the **number of layers**, not
-their width.
+Why? Each layer is a handful of small kernels (norms, matmuls, RoPE, attention, activation). In eager mode Python launches them **one by one**. At batch 1 each kernel finishes in microseconds, before the CPU has launched the next.
+So step time ≈ (number of kernels) × (launch cost), and the number of kernels is set by the **number of layers**, not their width.
 
-That's why the draft wasn't cheap: c ≈ 1 for 28 vs 28 layers, and even the 0.5B (24 layers) vs the 14B (48) only
-reached c = 19.68/39.02 ≈ 0.5.
+That's why the draft wasn't cheap: c ≈ 1 for 28 vs 28 layers, and even the 0.5B (24 layers) vs the 14B (48) only reached c = 19.68/39.02 ≈ 0.5.
 
 #### 7.3 What a CUDA graph is
 
@@ -988,15 +932,13 @@ reached c = 19.68/39.02 ≈ 0.5.
 
 ![[d04s-timeline.svg]] [[d04s-timeline.html|▶ Step through it]]
 
-A CUDA graph is a **recording** of a sequence of GPU kernels, with their arguments and memory addresses. Record once;
-then **replay** the whole sequence with a single launch. The CPU work per step drops from hundreds of launches to one.
+A CUDA graph is a **recording** of a sequence of GPU kernels, with their arguments and memory addresses. Record once; then **replay** the whole sequence with a single launch. The CPU work per step drops from hundreds of launches to one.
 
 `torch.compile(mode="reduce-overhead")` does two things:
 1. **inductor** fuses small operations into fewer kernels;
 2. it captures the step as a CUDA graph and replays it.
 
-After compiling: 14B 39.02 → **10.72 ms** (close to its 6 ms memory floor), 0.5B 19.68 → **1.69 ms**. Now c = 1.69/10.72
-= **0.158**. The baseline compiles too (43.5 → 86.2 tok/s), so the 2.25× is speculation's gain, not the compiler's.
+After compiling: 14B 39.02 → **10.72 ms** (close to its 6 ms memory floor), 0.5B 19.68 → **1.69 ms**. Now c = 1.69/10.72 = **0.158**. The baseline compiles too (43.5 → 86.2 tok/s), so the 2.25× is speculation's gain, not the compiler's.
 
 #### 7.4 The two rules a graph imposes
 
@@ -1038,18 +980,15 @@ for layer in backend.layers:
 - Why is that safe? The next forward writes position 102 (the new token c) and 103 **before** attention reads them. Anything above the query's position is hidden by the causal mask.
 - Why 102 and not 103? Position 102 is c, which no model has computed K, V for yet. It's fed first in the next iteration, keeping the verify at 5 tokens.
 
-Cost: `crop_cache` took **0.169 ms** for the 14B (48 counter writes) and 0.099 ms for a 28-layer draft. All
-non-forward work was **0.33 ms of a 23.6 ms iteration (1.4%)**.
+Cost: `crop_cache` took **0.169 ms** for the 14B (48 counter writes) and 0.099 ms for a 28-layer draft. All non-forward work was **0.33 ms of a 23.6 ms iteration (1.4%)**.
 
-The project checked rollback by **poisoning**: it filled the cache with values ±100 (far outside normal activations),
-rolled back, and confirmed bit-identical results.
+The project checked rollback by **poisoning**: it filled the cache with values ±100 (far outside normal activations), rolled back, and confirmed bit-identical results.
 
 #### 7.7 Questions people usually ask next
 
 ##### "Why not capture prefill as a graph too?"
 
-Prompt lengths vary, and each length would need its own graph. Prefill also runs once per request, not once per token,
-so its launch overhead matters much less.
+Prompt lengths vary, and each length would need its own graph. Prefill also runs once per request, not once per token, so its launch overhead matters much less.
 
 ##### "Does compiling change the results?"
 
@@ -1058,13 +997,11 @@ The compiled path's measured noise floor is 0.281 against eager's 0.250, and the
 
 ##### "Is this the same trick vLLM uses?"
 
-Yes for decode: vLLM captures CUDA graphs for a set of batch sizes. It's one of the reasons it is 6.2× faster than
-mini-vLLM (Day 3 §7.7), which re-enters Python every step.
+Yes for decode: vLLM captures CUDA graphs for a set of batch sizes. It's one of the reasons it is 6.2× faster than mini-vLLM (Day 3 §7.7), which re-enters Python every step.
 
 ##### "What breaks a graph silently?"
 
-A new tensor (new address), a new input length, or a CPU–GPU sync inside the step. The first two make the step fall
-back to eager (slow, but correct); the guard in `forward_with_cache` catches the cache and sequence drifting apart.
+A new tensor (new address), a new input length, or a CPU–GPU sync inside the step. The first two make the step fall back to eager (slow, but correct); the guard in `forward_with_cache` catches the cache and sequence drifting apart.
 
 #### 7.8 Check your understanding
 
@@ -1098,10 +1035,8 @@ back to eager (slow, but correct); the guard in `forward_with_cache` catches the
 In NumPy, about 60 lines:
 1. Make a random target distribution `p` and draft `q` over a vocab of 50 (for example, softmaxes of correlated logits).
 2. Implement `verify(p, q, x)` exactly as in A1, with the residual.
-3. **Monte-Carlo proof:** run 10⁶ single-token rounds (draft x ~ q, then verify). Show the histogram of outputs matches `p`
-   (TV distance < 0.005). Then break it: use `max(p, q)` instead of the residual, and watch the TV grow.
-4. Simulate full iterations with γ = 1…16 and a fixed per-position α. Plot the empirical tokens per iteration against
-   `(1 − α^{γ+1})/(1 − α)`.
+3. **Monte-Carlo proof:** run 10⁶ single-token rounds (draft x ~ q, then verify). Show the histogram of outputs matches `p` (TV distance < 0.005). Then break it: use `max(p, q)` instead of the residual, and watch the TV grow.
+4. Simulate full iterations with γ = 1…16 and a fixed per-position α. Plot the empirical tokens per iteration against `(1 − α^{γ+1})/(1 − α)`.
 5. Plug in c = 0.22 and c = 0.5 and plot speedup against γ. Find the best γ for α = 0.6 and for α = 0.85.
 
 ## D. Trace (block 10, 20 min)

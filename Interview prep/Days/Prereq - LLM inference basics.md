@@ -51,8 +51,7 @@ flowchart LR
 
 ## 1. One token's forward pass
 
-**The idea.** A decoder-only model turns each token into a vector, pushes it through L identical layers (attention, then an MLP), and turns the final vector into a score for every word in the vocabulary. A forward pass costs about
-**2·P FLOPs per token** (P = parameter count), because each weight does one multiply and one add.
+**The idea.** A decoder-only model turns each token into a vector, pushes it through L identical layers (attention, then an MLP), and turns the final vector into a score for every word in the vocabulary. A forward pass costs about **2·P FLOPs per token** (P = parameter count), because each weight does one multiply and one add.
 
 ![[p1-one-token-one-layer.svg]]
 
@@ -78,9 +77,7 @@ Without a cache you recompute them at every step, so the work per step grows wit
 
 `KV bytes per token = 2 (K and V) × layers × kv_heads × head_dim × bytes per value`
 
-For Llama-3.2-1B: 2 × 16 × 8 × 64 × 2 B = **32 KiB per token**, so a 4k-token sequence holds 128 MiB. GQA cuts this
-4× compared with having 32 KV heads. **KV memory, not compute, limits how many requests you can batch.** That is the
-problem mini-vLLM's paging solves.
+For Llama-3.2-1B: 2 × 16 × 8 × 64 × 2 B = **32 KiB per token**, so a 4k-token sequence holds 128 MiB. GQA cuts this 4× compared with having 32 KV heads. **KV memory, not compute, limits how many requests you can batch.** That is the problem mini-vLLM's paging solves.
 
 > [!example] Feel the size
 > An H200 has 141 GB. Take away 2.5 GB of weights and runtime overhead, and say 40 GB is left for KV.
@@ -105,10 +102,8 @@ problem mini-vLLM's paging solves.
 
 ![[p4-roofline.svg]]
 
-Arithmetic intensity is FLOPs per byte moved. An H200 does about 989 TFLOP/s in bf16 and moves 4.8 TB/s. The ridge point is about
-989/4.8 ≈ **206 FLOP/byte**; below it you are memory-bound.
-- Decode at batch B does about 2·P·B FLOPs while reading 2·P bytes of weights, so its intensity is about **B**. Decode stays
-  memory-bound until B is about 200. **Batching is nearly free throughput**, which is why schedulers and KV memory management matter.
+Arithmetic intensity is FLOPs per byte moved. An H200 does about 989 TFLOP/s in bf16 and moves 4.8 TB/s. The ridge point is about 989/4.8 ≈ **206 FLOP/byte**; below it you are memory-bound.
+- Decode at batch B does about 2·P·B FLOPs while reading 2·P bytes of weights, so its intensity is about **B**. Decode stays memory-bound until B is about 200. **Batching is nearly free throughput**, which is why schedulers and KV memory management matter.
 - At batch 1 the floor is the weight read: 2.5 GB ÷ 4.8 TB/s ≈ **0.5 ms per token** for Llama-3.2-1B.
 
 > [!example] Worked example: decode at batch 1 vs batch 64 (weights only)
@@ -131,8 +126,7 @@ Arithmetic intensity is FLOPs per byte moved. An H200 does about 989 TFLOP/s in 
 **The idea.** Sometimes neither memory nor compute is the limit: the GPU finishes each small kernel so fast that it sits idle waiting for Python and the CPU to launch the next one. Then time depends on *how many kernels* you launch, not on how big they are.
 
 Small kernels at batch 1 can be limited by Python and the CPU launching kernels, not by the GPU.
-- **Speculative decoding:** eager per-layer cost was **0.81 ms for the 0.5B, 1.5B and 14B models alike**, a 28× range of
-  model sizes (`speculative_decoding/RESULTS.md`, about lines 88–104). `torch.compile` plus a StaticCache brought it to 0.10–0.22 ms.
+- **Speculative decoding:** eager per-layer cost was **0.81 ms for the 0.5B, 1.5B and 14B models alike**, a 28× range of model sizes (`speculative_decoding/RESULTS.md`, about lines 88–104). `torch.compile` plus a StaticCache brought it to 0.10–0.22 ms.
 - **mini-vLLM:** the prefix cache saves **0% of the time below about 2k tokens**. Short prefill is overhead-bound, so skipping it saves almost nothing.
 
 ![[p5-overhead-bound-prefill.svg]]
@@ -159,8 +153,7 @@ Small kernels at batch 1 can be limited by Python and the CPU launching kernels,
 ![[p6-static-vs-continuous-batching.svg]]
 
 **Links to the next days:** paging frees KV memory, so batches get bigger and decode climbs the roofline (Days 2–3).
-Speculative decoding (Day 4) spends idle compute in memory-bound decode to verify γ draft tokens in one pass. Day 5
-applies the roofline to single matmul kernels.
+Speculative decoding (Day 4) spends idle compute in memory-bound decode to verify γ draft tokens in one pass. Day 5 applies the roofline to single matmul kernels.
 
 ## Cheat sheet (for revision)
 

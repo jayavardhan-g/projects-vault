@@ -6,9 +6,7 @@ tags: [interview, day, bountybrain, rag, knowledge-graph]
 ---
 # Day 12 (Thu Nov 19): BountyBrain (full day)
 
-Part of [[Interview plan (Nov 2026)]]. Repo `bountybrain`, **branch `upgrade-2026-10`** (HEAD `4267980`). Read it with
-`git show upgrade-2026-10:<path>`; don't switch branches. About 7 h. Prep pack: [[BountyBrain - prep]] (architecture §2,
-23 design decisions §3, 10 stories §4, numbers §5).
+Part of [[Interview plan (Nov 2026)]]. Repo `bountybrain`, **branch `upgrade-2026-10`** (HEAD `4267980`). Read it with `git show upgrade-2026-10:<path>`; don't switch branches. About 7 h. Prep pack: [[BountyBrain - prep]] (architecture §2, 23 design decisions §3, 10 stories §4, numbers §5).
 
 **Code, explained:** the figures, the code to read and what each snippet does are in [[#Code, explained]], right after section B.
 
@@ -442,18 +440,14 @@ max_conditional = max(conditional.values(), default=0.0) or 1.0
 
 ### 5. Deep dive: BM25 from scratch
 
-Section 2 above walks `_bm25_search`. This section builds BM25 from zero, on eight tiny documents you can score by
-hand. Order: the problem → three ideas → the toy corpus → IDF → term-frequency saturation → length normalisation →
-the full score → the code, line by line → questions → check.
+Section 2 above walks `_bm25_search`. This section builds BM25 from zero, on eight tiny documents you can score by hand. Order: the problem → three ideas → the toy corpus → IDF → term-frequency saturation → length normalisation → the full score → the code, line by line → questions → check.
 
 > [!important] The one sentence to hold on to
-> BM25 scores a chunk by adding, for each query word it contains, **how rare that word is** (IDF) times **how often it
-> appears**, with repeats giving diminishing returns and long chunks getting a little less credit.
+> BM25 scores a chunk by adding, for each query word it contains, **how rare that word is** (IDF) times **how often it appears**, with repeats giving diminishing returns and long chunks getting a little less credit.
 
 #### 5.1 The problem
 
-A user types "SSRF server metadata". There are 11,355 chunks. You want the chunks that **share the query's words**,
-with the important words counting most. No model, no training: just counting.
+A user types "SSRF server metadata". There are 11,355 chunks. You want the chunks that **share the query's words**, with the important words counting most. No model, no training: just counting.
 
 #### 5.2 Three ideas
 
@@ -507,9 +501,7 @@ $$\frac{f\,(k_1 + 1)}{f + k_1}, \qquad k_1 = 1.5$$
 |---|---|---|---|---|---|---|---|
 | factor | 0 | **1.000** | 1.429 | 1.667 | 1.923 | 2.174 | 2.463 |
 
-The factor can never exceed $k_1 + 1 = 2.5$. The first occurrence is worth 1.0, the second adds 0.43, the tenth
-almost nothing. $k_1$ sets how fast it saturates: a small $k_1$ means "present or not", a large one is closer to a raw
-count.
+The factor can never exceed $k_1 + 1 = 2.5$. The first occurrence is worth 1.0, the second adds 0.43, the tenth almost nothing. $k_1$ sets how fast it saturates: a small $k_1$ means "present or not", a large one is closer to a raw count.
 
 ![[d12-1-bm25.svg]] [[d12-1-bm25.html|▶ Step through it]]
 
@@ -519,8 +511,7 @@ Replace $k_1$ in the denominator by a length-adjusted $K$:
 
 $$K = k_1 \left(1 - b + b\,\frac{L}{\text{avgdl}}\right), \qquad b = 0.75$$
 
-For a 10-word document: $K = 1.5\,(0.25 + 0.75 \times 10/9) = 1.625$. One occurrence then gives
-$2.5 / (1 + 1.625) = 0.952$.
+For a 10-word document: $K = 1.5\,(0.25 + 0.75 \times 10/9) = 1.625$. One occurrence then gives $2.5 / (1 + 1.625) = 0.952$.
 
 | length $L$ | $K$ | factor for $f = 1$ |
 |---|---|---|
@@ -554,8 +545,7 @@ The ranking:
 | 3 | 1 | 0.430 | ssrf only |
 | — | 2–6 | 0 | no query word at all |
 
-Notice doc 1 says "fetches the URL", which is exactly what SSRF does, yet it ranks last among the hits. BM25 has no
-idea that words mean things. That gap is what the dense arm (§6) fills.
+Notice doc 1 says "fetches the URL", which is exactly what SSRF does, yet it ranks last among the hits. BM25 has no idea that words mean things. That gap is what the dense arm (§6) fills.
 
 #### 5.8 The code, line by line
 
@@ -633,24 +623,19 @@ The whole thing is a brute-force scan, and it's fast: **16 ms median** per query
 
 ##### "Why keep BM25 if you have embeddings?"
 
-Exact strings. A query with `CVE-2021-44228`, `CWE-918` or a product name needs those exact tokens. An embedder can
-blur a rare identifier into "something about vulnerabilities". In the ablation BM25 alone reached R@5 0.850 vs dense
-0.885: close, and each arm finds things the other misses.
+Exact strings. A query with `CVE-2021-44228`, `CWE-918` or a product name needs those exact tokens. An embedder can blur a rare identifier into "something about vulnerabilities". In the ablation BM25 alone reached R@5 0.850 vs dense 0.885: close, and each arm finds things the other misses.
 
 ##### "What do $k_1$ and $b$ default to, and did you tune them?"
 
-$k_1 = 1.5$, $b = 0.75$, $\varepsilon = 0.25$: the `rank_bm25` defaults. They weren't tuned. Typical values in the
-literature are $k_1 \in [1.2, 2.0]$ and $b = 0.75$.
+$k_1 = 1.5$, $b = 0.75$, $\varepsilon = 0.25$: the `rank_bm25` defaults. They weren't tuned. Typical values in the literature are $k_1 \in [1.2, 2.0]$ and $b = 0.75$.
 
 ##### "Why does the IDF floor exist?"
 
-With this IDF form, a word in more than half the chunks would **subtract** from a chunk's score, so containing "the"
-would hurt. The floor keeps every match non-negative.
+With this IDF form, a word in more than half the chunks would **subtract** from a chunk's score, so containing "the" would hurt. The floor keeps every match non-negative.
 
 ##### "What would you improve?"
 
-Stemming or lemmatising ("fetches" → "fetch"), and an inverted index so you only touch chunks that contain a query
-word, instead of scanning all 11,355. At this corpus size the scan is already fast enough.
+Stemming or lemmatising ("fetches" → "fetch"), and an inverted index so you only touch chunks that contain a query word, instead of scanning all 11,355. At this corpus size the scan is already fast enough.
 
 #### 5.10 Check your understanding
 
@@ -681,22 +666,16 @@ word, instead of scanning all 11,355. At this corpus size the scan is already fa
 
 ### 6. Deep dive: dense retrieval from scratch
 
-BM25 (§5) matches words. This section explains the other arm, which matches **meaning**. Order: the idea → a toy in
-two dimensions → cosine similarity → the bi-encoder and its costs → the query prefix → the code, line by line →
-questions → check.
+BM25 (§5) matches words. This section explains the other arm, which matches **meaning**. Order: the idea → a toy in two dimensions → cosine similarity → the bi-encoder and its costs → the query prefix → the code, line by line → questions → check.
 
 > [!important] The one sentence to hold on to
-> An embedding model turns every text into a vector so that texts with similar meaning point in similar directions;
-> retrieval then means "find the chunk vectors with the largest cosine to the query vector".
+> An embedding model turns every text into a vector so that texts with similar meaning point in similar directions; retrieval then means "find the chunk vectors with the largest cosine to the query vector".
 
 #### 6.1 The idea
 
-The query "make the backend request an internal address" shares **no** words with "SSRF: the server fetches a URL
-chosen by the attacker". BM25 scores that pair 0. Yet they mean nearly the same thing.
+The query "make the backend request an internal address" shares **no** words with "SSRF: the server fetches a URL chosen by the attacker". BM25 scores that pair 0. Yet they mean nearly the same thing.
 
-An embedding model (here `BAAI/bge-small-en-v1.5`) reads a text and outputs a list of 384 numbers. It was trained so
-that a question and a passage answering it get **similar vectors**. Then "similar meaning" becomes "small angle
-between vectors", which is cheap to compute.
+An embedding model (here `BAAI/bge-small-en-v1.5`) reads a text and outputs a list of 384 numbers. It was trained so that a question and a passage answering it get **similar vectors**. Then "similar meaning" becomes "small angle between vectors", which is cheap to compute.
 
 #### 6.2 A toy in two dimensions
 
@@ -742,8 +721,7 @@ The model encodes the query and each chunk **separately** (hence *bi*-encoder). 
 | per query | compare | 11,355 dot products of 384 numbers ≈ 4.4 million multiply-adds |
 
 The price: the query and the chunk never "see" each other inside the model. Each is squeezed into one vector first.
-Fine distinctions ("SSRF via DNS rebinding" vs "SSRF via redirects") can be lost. The cross-encoder (§7) pays to fix
-exactly that.
+Fine distinctions ("SSRF via DNS rebinding" vs "SSRF via redirects") can be lost. The cross-encoder (§7) pays to fix exactly that.
 
 #### 6.5 The query prefix
 
@@ -751,9 +729,7 @@ BGE v1.5 was trained with an instruction in front of **queries only**:
 
 > `Represent this sentence for searching relevant passages: ` + query
 
-Queries are short questions; passages are long statements. The prefix tells the model "this is the question side",
-and the code docstring says skipping it measurably hurts recall. Passages are embedded **without** it. So the project
-has two functions, not one.
+Queries are short questions; passages are long statements. The prefix tells the model "this is the question side", and the code docstring says skipping it measurably hurts recall. Passages are embedded **without** it. So the project has two functions, not one.
 
 #### 6.6 The code, line by line
 
@@ -869,24 +845,19 @@ Median latency for the dense arm: **39 ms** per query (RESULTS §2).
 
 ##### "Why bge-small and not a bigger model?"
 
-There's no recorded reason; it was in the first commit (the Day 12 risks above). What the code shows: 384 dimensions,
-small and fast enough to embed ~11k chunks in minutes. What you'd test: a larger embedder on the same 200 queries,
-comparing R@5 and latency.
+There's no recorded reason; it was in the first commit (the Day 12 risks above). What the code shows: 384 dimensions, small and fast enough to embed ~11k chunks in minutes. What you'd test: a larger embedder on the same 200 queries, comparing R@5 and latency.
 
 ##### "When does dense lose to BM25?"
 
-On rare exact strings: CVE ids, CWE numbers, product versions. Those tokens are rare in training data, so the
-embedder maps them to something vague. BM25 gives them a huge IDF instead.
+On rare exact strings: CVE ids, CWE numbers, product versions. Those tokens are rare in training data, so the embedder maps them to something vague. BM25 gives them a huge IDF instead.
 
 ##### "Isn't comparing against all 11,355 vectors slow?"
 
-No: 4.4 million multiply-adds is about a millisecond of arithmetic or less. At millions of chunks you'd switch to an
-approximate index (HNSW, IVF; Day 10 covers FAISS), trading a little recall for a lot of speed.
+No: 4.4 million multiply-adds is about a millisecond of arithmetic or less. At millions of chunks you'd switch to an approximate index (HNSW, IVF; Day 10 covers FAISS), trading a little recall for a lot of speed.
 
 ##### "Why chunk the documents at all?"
 
-One vector per whole article would average many topics into one blurred direction. Chunks of ~400 tokens
-(`ingestion/chunker.py:19`) keep each vector about one thing, and give the generator passages short enough to cite.
+One vector per whole article would average many topics into one blurred direction. Chunks of ~400 tokens (`ingestion/chunker.py:19`) keep each vector about one thing, and give the generator passages short enough to cite.
 
 #### 6.8 Check your understanding
 
@@ -917,13 +888,10 @@ One vector per whole article would average many topics into one blurred directio
 
 ### 7. Deep dive: fusion (RRF) and cross-encoder reranking from scratch
 
-You now have two ranked lists of 40, one from BM25 (§5) and one from dense (§6). This section explains how they become
-the 6 passages the tutorial cites. Order: why you can't just add scores → RRF with numbers → what $k$ does → the RRF
-code → the cross-encoder → the funnel → the rerank code → what each stage bought → questions → check.
+You now have two ranked lists of 40, one from BM25 (§5) and one from dense (§6). This section explains how they become the 6 passages the tutorial cites. Order: why you can't just add scores → RRF with numbers → what $k$ does → the RRF code → the cross-encoder → the funnel → the rerank code → what each stage bought → questions → check.
 
 > [!important] The one sentence to hold on to
-> RRF merges ranked lists using **ranks only** ($\sum 1/(60 + \text{rank})$), so chunks that both arms like rise to the
-> top; then a cross-encoder, which reads the query and each chunk **together**, re-orders the best 40 and keeps 6.
+> RRF merges ranked lists using **ranks only** ($\sum 1/(60 + \text{rank})$), so chunks that both arms like rise to the top; then a cross-encoder, which reads the query and each chunk **together**, re-orders the best 40 and keeps 6.
 
 #### 7.1 Why not just add the scores?
 
@@ -938,9 +906,7 @@ Take two runs over the same chunks A–F:
 | E | 0.65 (rank 5) | — |
 | F | — | 9.8 (rank 2) |
 
-Adding them gives C 13.19, F 9.80, A 3.93, B 0.81, D 0.70, E 0.65. **BM25 decides everything**: its scores run to
-12, cosines stay below 1. F comes second although dense never found it. And BM25's scale changes with every query (a
-query of rare words gives big scores), so no fixed weight fixes this.
+Adding them gives C 13.19, F 9.80, A 3.93, B 0.81, D 0.70, E 0.65. **BM25 decides everything**: its scores run to 12, cosines stay below 1. F comes second although dense never found it. And BM25's scale changes with every query (a query of rare words gives big scores), so no fixed weight fixes this.
 
 #### 7.2 Reciprocal rank fusion, with numbers
 
@@ -992,13 +958,11 @@ Up to 80 chunks come out (40 + 40, minus the overlap).
 
 #### 7.5 The cross-encoder
 
-A **cross-encoder** (here `BAAI/bge-reranker-base`) takes the query and one chunk **as one input**. The tokenizer
-joins them with special separator tokens (written generically as `[SEP]` here):
+A **cross-encoder** (here `BAAI/bge-reranker-base`) takes the query and one chunk **as one input**. The tokenizer joins them with special separator tokens (written generically as `[SEP]` here):
 
 > `make the backend request an internal address [SEP] SSRF: the server fetches a URL …`
 
-Inside the transformer, attention lets every query word look at every chunk word, in every layer. The output is one
-number: how relevant this chunk is to this query.
+Inside the transformer, attention lets every query word look at every chunk word, in every layer. The output is one number: how relevant this chunk is to this query.
 
 | | bi-encoder (dense, §6) | cross-encoder (rerank) |
 |---|---|---|
@@ -1007,8 +971,7 @@ number: how relevant this chunk is to this query.
 | comparisons possible | one vector vs one vector | word vs word, every layer |
 | per query here | 1 model call | 40 model calls (batched) |
 
-It's more accurate because it sees both texts at once. It's too slow to run on everything: scoring all 11,355 chunks
-would be 284× the 40 pairs it scores now. Hence the funnel.
+It's more accurate because it sees both texts at once. It's too slow to run on everything: scoring all 11,355 chunks would be 284× the 40 pairs it scores now. Hence the funnel.
 
 #### 7.6 The funnel
 
@@ -1054,8 +1017,7 @@ def rerank(query: str, hits: list, top_n: int = 5) -> list:
 - `sorted(zip(hits, scores, strict=True), key=lambda x: -x[1])`: `zip` pairs each hit with its score; `strict=True` raises if the lengths differ. Sorted by score, highest first.
 - `h.score = float(s)` replaces the RRF score by the reranker's; `ranked[:top_n]` keeps 6 for the tutorial (5 by default).
 
-A toy run, with made-up reranker scores on the fused list [C, B, A, F]: C 2.1, B 7.4, A 5.0, F −3.2 → returned order
-**B, A, C, F**. Only the order of the scores matters, not their scale.
+A toy run, with made-up reranker scores on the fused list [C, B, A, F]: C 2.1, B 7.4, A 5.0, F −3.2 → returned order **B, A, C, F**. Only the order of the scores matters, not their scale.
 
 #### 7.8 What each stage bought (200 queries, RESULTS §2)
 
@@ -1073,23 +1035,19 @@ A toy run, with made-up reranker scores on the fused list [C, B, A, F]: C 2.1, B
 
 ##### "Why RRF and not a weighted sum?"
 
-Cosine lives in [−1, 1]; BM25 is unbounded and its scale moves with the query and the corpus. A weighted sum needs
-per-query normalisation; RRF needs nothing and has no weight to tune.
+Cosine lives in [−1, 1]; BM25 is unbounded and its scale moves with the query and the corpus. A weighted sum needs per-query normalisation; RRF needs nothing and has no weight to tune.
 
 ##### "Did you tune $k = 60$?"
 
-No. It's the paper's standard value, and it was in the first commit. The code comment says results are insensitive to
-it; that was never tested. With a reranker on top, you'd expect little effect, since the reranker re-orders anyway.
+No. It's the paper's standard value, and it was in the first commit. The code comment says results are insensitive to it; that was never tested. With a reranker on top, you'd expect little effect, since the reranker re-orders anyway.
 
 ##### "Why rerank 40 and not 100?"
 
-Cost grows linearly with candidates: one pass per pair. R@10 of fusion is already 0.955, so 40 covers almost every
-query's gold chunk. To choose properly, you'd plot R@5 after reranking against candidates (20, 40, 80, 160).
+Cost grows linearly with candidates: one pass per pair. R@10 of fusion is already 0.955, so 40 covers almost every query's gold chunk. To choose properly, you'd plot R@5 after reranking against candidates (20, 40, 80, 160).
 
 ##### "Doesn't overwriting `hit.score` lose information?"
 
-Yes: after reranking, you can't see the cosine or BM25 score any more. It keeps the API simple (one score per hit). For
-debugging you'd keep each stage's score in the payload.
+Yes: after reranking, you can't see the cosine or BM25 score any more. It keeps the API simple (one score per hit). For debugging you'd keep each stage's score in the payload.
 
 #### 7.10 Check your understanding
 
@@ -1122,13 +1080,10 @@ debugging you'd keep each stage's score in the payload.
 
 ### 8. Deep dive: retrieval metrics from scratch (R@k, MRR, nDCG)
 
-The ablation in §7.8 is a table of R@1, R@5, MRR and nDCG. This section builds each metric by hand on five queries,
-then reads the project's evaluation code and its one famous bug. Order: what's being measured → R@k → MRR → nDCG →
-the 1.113 bug → the code → the caveats → questions → check.
+The ablation in §7.8 is a table of R@1, R@5, MRR and nDCG. This section builds each metric by hand on five queries, then reads the project's evaluation code and its one famous bug. Order: what's being measured → R@k → MRR → nDCG → the 1.113 bug → the code → the caveats → questions → check.
 
 > [!important] The one sentence to hold on to
-> For each query, find **where** the right answer landed in the ranked list; R@k asks "in the top k?", MRR averages
-> 1/position, and nDCG gives credit to every relevant hit, discounted by $\log_2$ of its position.
+> For each query, find **where** the right answer landed in the ranked list; R@k asks "in the top k?", MRR averages 1/position, and nDCG gives credit to every relevant hit, discounted by $\log_2$ of its position.
 
 #### 8.1 What is being measured
 
@@ -1137,8 +1092,7 @@ The project's evaluation is **known-item retrieval**:
 2. an LLM writes one realistic search query per chunk, told not to copy its rare words;
 3. run each query through a retrieval mode; a hit is **relevant** if it comes from the **same document** as the source chunk.
 
-Relevance is per document, not per chunk (`hit.document_id == q.document_id`). So a long document's several chunks can
-all count. That detail matters for nDCG (§8.5).
+Relevance is per document, not per chunk (`hit.document_id == q.document_id`). So a long document's several chunks can all count. That detail matters for nDCG (§8.5).
 
 #### 8.2 Five toy queries
 
@@ -1170,13 +1124,11 @@ $$\text{MRR} = \frac{1}{|Q|} \sum_{q} \frac{1}{\text{rank of the first relevant 
 
 $$\text{MRR} = \frac{1 + 1/3 + 0 + 1/2 + 1}{5} = \frac{2.833}{5} = \mathbf{0.567}$$
 
-MRR rewards being **first**: rank 1 gives 1, rank 2 only 0.5. The project's 0.861 for hybrid + rerank means the first
-relevant hit is, on average, very near the top.
+MRR rewards being **first**: rank 1 gives 1, rank 2 only 0.5. The project's 0.861 for hybrid + rerank means the first relevant hit is, on average, very near the top.
 
 #### 8.5 nDCG: credit for every relevant hit
 
-When several hits can be relevant (several chunks of the gold document), **DCG** adds them all, each discounted by
-its position:
+When several hits can be relevant (several chunks of the gold document), **DCG** adds them all, each discounted by its position:
 
 $$\text{DCG} = \sum_{i=1}^{k} \frac{\text{rel}_i}{\log_2(i + 1)}$$
 
@@ -1197,15 +1149,11 @@ So nDCG lies in [0, 1]: 1 means "all the relevant hits, in the best order".
 #### 8.6 The 1.113 bug (story 4.3)
 
 The first run reported **nDCG@10 = 1.113**, which is impossible. The ideal DCG had assumed **one** relevant item:
-$\text{IDCG} = 1$. With the toy query above, that gives $1.131 / 1 = 1.131 > 1$. Two gold chunks in the list were
-being compared with an ideal that had room for only one.
+$\text{IDCG} = 1$. With the toy query above, that gives $1.131 / 1 = 1.131 > 1$. Two gold chunks in the list were being compared with an ideal that had room for only one.
 
-The fix: build the ideal from **all relevant hits found**. Then the best arm scored 0.873. The impossible value is what
-exposed the bug: always sanity-check metrics against their range.
+The fix: build the ideal from **all relevant hits found**. Then the best arm scored 0.873. The impossible value is what exposed the bug: always sanity-check metrics against their range.
 
-A follow-up to expect: "is the fix fully right?" Not quite. The textbook ideal uses **every** relevant item in the
-collection, found or not. This one only counts those that were retrieved, so it can't penalise missing chunks of the
-gold document. It's bounded by 1, but optimistic.
+A follow-up to expect: "is the fix fully right?" Not quite. The textbook ideal uses **every** relevant item in the collection, found or not. This one only counts those that were retrieved, so it can't penalise missing chunks of the gold document. It's bounded by 1, but optimistic.
 
 #### 8.7 The code, line by line
 
@@ -1276,18 +1224,15 @@ The real numbers, decoded (200 queries, hybrid + rerank):
 
 ##### "Why both R@k and MRR?"
 
-R@5 asks "will the generator see the right passage?" (it gets the top 6). MRR asks "is it near the top?", which
-matters when only the first few are read. The reranker barely moved R@10 but lifted MRR 0.773 → 0.861.
+R@5 asks "will the generator see the right passage?" (it gets the top 6). MRR asks "is it near the top?", which matters when only the first few are read. The reranker barely moved R@10 but lifted MRR 0.773 → 0.861.
 
 ##### "Is 0.965 R@5 good?"
 
-On this easy known-item set, yes; it's not a claim about real user questions. You'd want a hand-labelled set of real
-queries with graded relevance to say more.
+On this easy known-item set, yes; it's not a claim about real user questions. You'd want a hand-labelled set of real queries with graded relevance to say more.
 
 ##### "How would you get error bars?"
 
-Bootstrap: resample the 200 queries with replacement 1,000 times, recompute each metric, and report the 2.5th and
-97.5th percentiles. Paired by query, since all arms ran the same queries.
+Bootstrap: resample the 200 queries with replacement 1,000 times, recompute each metric, and report the 2.5th and 97.5th percentiles. Paired by query, since all arms ran the same queries.
 
 #### 8.10 Check your understanding
 
@@ -1316,14 +1261,10 @@ Bootstrap: resample the 200 queries with replacement 1,000 times, recompute each
 
 ### 9. Deep dive: measuring faithfulness, and Cohen's κ, from scratch
 
-The resume says "cited explanations". This section shows how that claim was measured, why the judge had to be checked
-against hand labels, and how the headline **32.6%** comes out of the numbers. Order: the two questions → splitting a
-tutorial into claims → the judge → why calibrate → Cohen's κ on the real confusion matrix → reweighting a stratified
-sample → the code → questions → check.
+The resume says "cited explanations". This section shows how that claim was measured, why the judge had to be checked against hand labels, and how the headline **32.6%** comes out of the numbers. Order: the two questions → splitting a tutorial into claims → the judge → why calibrate → Cohen's κ on the real confusion matrix → reweighting a stratified sample → the code → questions → check.
 
 > [!important] The one sentence to hold on to
-> Split each tutorial into sentences, check which ones cite a source, let an LLM judge whether the cited text supports
-> them, then **measure the judge** against hand labels (agreement and κ) and use those labels to correct its rates.
+> Split each tutorial into sentences, check which ones cite a source, let an LLM judge whether the cited text supports them, then **measure the judge** against hand labels (agreement and κ) and use those labels to correct its rates.
 
 #### 9.1 Two questions
 
@@ -1356,8 +1297,7 @@ Always test only systems you are allowed to test [7].
 - The `[2]` sat **after** the full stop, so the splitter first cut it off as its own piece. The "leading citations" rule moves it back to the sentence before.
 - `[2, 4–5]` would expand to `[2, 4, 5]`.
 
-The third claim is a safety reminder tagged with a source number. In the real run, 4 of the 8 hand-unsupported
-sentences were exactly this kind.
+The third claim is a safety reminder tagged with a source number. In the real run, 4 of the 8 hand-unsupported sentences were exactly this kind.
 
 #### 9.3 The rates, on the real run (30 topics)
 
@@ -1368,17 +1308,13 @@ sentences were exactly this kind.
 | citation numbers pointing at no source | 0 of 318 | 0% |
 | judge: supported / partial / unsupported (of 231) | 98 / 112 / 21 | 42.4% / 48.5% / 9.1% |
 
-The judge reads only the cited excerpts, **truncated exactly as the generator saw them**, and answers in JSON with one
-of three labels.
+The judge reads only the cited excerpts, **truncated exactly as the generator saw them**, and answers in JSON with one of three labels.
 
 #### 9.4 Why the judge can't just be trusted
 
-The judge is **the same Qwen2.5-14B** that wrote the tutorials. It might be lenient towards its own style, or strict in
-odd ways. So 40 judged claims were labelled by hand, **blind** to the judge's verdicts. The labeller was Claude, not
-the project owner (say this if asked).
+The judge is **the same Qwen2.5-14B** that wrote the tutorials. It might be lenient towards its own style, or strict in odd ways. So 40 judged claims were labelled by hand, **blind** to the judge's verdicts. The labeller was Claude, not the project owner (say this if asked).
 
-The sample was **stratified**: 20 claims the judge called supported and 20 it didn't. Otherwise, with mostly
-"supported" verdicts, the disagreements you care about would be rare in the sample.
+The sample was **stratified**: 20 claims the judge called supported and 20 it didn't. Otherwise, with mostly "supported" verdicts, the disagreements you care about would be rare in the sample.
 
 #### 9.5 Cohen's κ on the real confusion matrix
 
@@ -1397,8 +1333,7 @@ Judge (rows) vs hand label (columns), n = 40:
 
 $$p_o = \frac{20 + 7 + 6}{40} = \frac{33}{40} = 0.825$$
 
-But two raters who guess can agree by luck. **Chance agreement** $p_e$: if the judge and the hand labeller picked
-labels independently, at their own rates, how often would they match?
+But two raters who guess can agree by luck. **Chance agreement** $p_e$: if the judge and the hand labeller picked labels independently, at their own rates, how often would they match?
 
 $$p_e = \frac{20 \cdot 25 + 14 \cdot 7 + 6 \cdot 8}{40^2} = \frac{500 + 98 + 48}{1600} = \frac{646}{1600} = 0.404$$
 
@@ -1410,14 +1345,11 @@ $$\kappa = \frac{p_o - p_e}{1 - p_e} = \frac{0.825 - 0.404}{1 - 0.404} = \mathbf
 - Collapsed to "supported or not": $p_o = 35/40 = 0.875$, $p_e = (20 \cdot 25 + 20 \cdot 15)/1600 = 0.5$, κ = **0.75**.
 - A common reading (Landis and Koch) calls 0.61–0.80 "substantial".
 
-What the matrix says in words: when the judge says **supported** or **unsupported**, the hand label agreed every time
-(20/20, 6/6). Its **partial** is a catch-all: 5 of those 14 were really supported.
+What the matrix says in words: when the judge says **supported** or **unsupported**, the hand label agreed every time (20/20, 6/6). Its **partial** is a catch-all: 5 of those 14 were really supported.
 
 #### 9.6 Reweighting the stratified sample
 
-The 40 aren't a random sample of the 231 cited claims (half were drawn from "supported"). So you can't just count hand
-"supported" labels. Instead, for each judge bucket, take the share a careful reader calls supported, and scale it by
-the bucket's real size:
+The 40 aren't a random sample of the 231 cited claims (half were drawn from "supported"). So you can't just count hand "supported" labels. Instead, for each judge bucket, take the share a careful reader calls supported, and scale it by the bucket's real size:
 
 | judge bucket | size | hand-supported share in the sample | estimated supported |
 |---|---|---|---|
@@ -1512,25 +1444,19 @@ def _calibrated_of_all(result: dict) -> float:
 
 ##### "So is 'every claim is cited' true?"
 
-No. 54.5% of sentences carry a citation, and about 32.6% are cited and supported. The UI caption "Every claim is
-cited" (`ui/pages/1_Learn.py:16`) is false. Say the numbers.
+No. 54.5% of sentences carry a citation, and about 32.6% are cited and supported. The UI caption "Every claim is cited" (`ui/pages/1_Learn.py:16`) is false. Say the numbers.
 
 ##### "Why not use a stronger, different judge?"
 
-You should; using the generator as its own judge is a known bias. The hand check measures how much that bias matters
-here: the confident labels held, and "partial" was too harsh. A different model family as judge would be the next
-step.
+You should; using the generator as its own judge is a known bias. The hand check measures how much that bias matters here: the confident labels held, and "partial" was too harsh. A different model family as judge would be the next step.
 
 ##### "What changed to get from 13.2% to 54.5% cited?"
 
-Two prompt changes, tried on 10 separate dev topics, then run once on the 30 test topics: the graph facts became the
-**last numbered source** (they used to be an unnumbered "context" block, which the model used without citing), and the
-citation rules moved **after** the sources, with an example.
+Two prompt changes, tried on 10 separate dev topics, then run once on the 30 test topics: the graph facts became the **last numbered source** (they used to be an unnumbered "context" block, which the model used without citing), and the citation rules moved **after** the sources, with an example.
 
 ##### "Is it reproducible?"
 
-Partly. Each topic is one sample at temperature 0, but vLLM output isn't bit-stable under batching, and re-judging the
-same claims isn't perfectly repeatable either.
+Partly. Each topic is one sample at temperature 0, but vLLM output isn't bit-stable under batching, and re-judging the same claims isn't perfectly repeatable either.
 
 #### 9.9 Check your understanding
 
@@ -1559,19 +1485,14 @@ same claims isn't perfectly repeatable either.
 
 ### 10. Deep dive: smoothing toward a prior (the planner fix) from scratch
 
-Section 4 above shows the five lines that rescued the recon planner. This section explains why they work. Order: the
-question the planner asks → why a raw share is noisy → why the old log-count failed → pseudo-counts with numbers → the
-same thing as a weighted average → the code → the result → questions → check.
+Section 4 above shows the five lines that rescued the recon planner. This section explains why they work. Order: the question the planner asks → why a raw share is noisy → why the old log-count failed → pseudo-counts with numbers → the same thing as a weighted average → the code → the result → questions → check.
 
 > [!important] The one sentence to hold on to
-> Estimate "how much of this product's weakness surface is class c" as $(n_c + \alpha\,p_c)/(N + \alpha)$: pretend you
-> saw $\alpha = 25$ extra signatures spread like the global average, so a product with little data falls back to the
-> average and one with lots of data speaks for itself.
+> Estimate "how much of this product's weakness surface is class c" as $(n_c + \alpha\,p_c)/(N + \alpha)$: pretend you saw $\alpha = 25$ extra signatures spread like the global average, so a product with little data falls back to the average and one with lots of data speaks for itself.
 
 #### 10.1 The question
 
-Given a target's technology stack, which weakness class should a tester try first? One ingredient is
-**applicability**: of the detection signatures known for these products, what share belong to class $c$?
+Given a target's technology stack, which weakness class should a tester try first? One ingredient is **applicability**: of the detection signatures known for these products, what share belong to class $c$?
 
 - $n_c$: signatures on this stack for class $c$;
 - $N$: all signatures on this stack;
@@ -1586,8 +1507,7 @@ The raw estimate is $n_c / N$. Two stacks, with the same shares but very differe
 | A | 3 | 1 | 4 | 0.75 | 0.25 |
 | B | 300 | 100 | 400 | 0.75 | 0.25 |
 
-Stack A's 0.75 rests on **three** signatures. One more XSS signature would move it to 0.60. Trusting it as much as
-stack B's is overconfident.
+Stack A's 0.75 rests on **three** signatures. One more XSS signature would move it to 0.60. Trusting it as much as stack B's is overconfident.
 
 #### 10.3 Why the old log-count failed (story 4.2)
 
@@ -1595,10 +1515,7 @@ The first planner used a log-scaled **count**, capped at 1.0, like `_log_scale` 
 
 $$\min\!\left(1, \frac{\ln(1 + n)}{\ln(1 + S)}\right)$$
 
-With a saturation of $S = 25$ (illustrative; the old value isn't in git), $n$ = 3 gives 0.425, but 25, 100 and 300
-**all give 1.0**. Every popular product has many signatures for several classes, so they all tied at 1.0. Then the
-ranking was decided by the **stack-independent** terms (bounty size, exploitability), the same for every target. So it
-lost to "rank by global frequency": P@1 **0.280 vs 0.325**.
+With a saturation of $S = 25$ (illustrative; the old value isn't in git), $n$ = 3 gives 0.425, but 25, 100 and 300 **all give 1.0**. Every popular product has many signatures for several classes, so they all tied at 1.0. Then the ranking was decided by the **stack-independent** terms (bounty size, exploitability), the same for every target. So it lost to "rank by global frequency": P@1 **0.280 vs 0.325**.
 
 #### 10.4 Pseudo-counts, with numbers
 
@@ -1629,9 +1546,7 @@ $$\hat p = \underbrace{\frac{N}{N + \alpha}}_{w}\cdot\frac{n_c}{N} + \left(1 - w
 | A | 4/29 = 0.138 | 0.103 + 0.043 = 0.147 |
 | B | 400/425 = 0.941 | 0.706 + 0.003 = 0.709 |
 
-So $\alpha$ is literally "how many signatures until the data counts as much as the prior": at $N = \alpha = 25$, $w =
-0.5$. This is **shrinkage**: noisy estimates are pulled toward a sensible average, more strongly when they rest on
-less data. (In Bayesian terms, it's the posterior mean under a Dirichlet prior with pseudo-counts $\alpha\,p_c$.)
+So $\alpha$ is literally "how many signatures until the data counts as much as the prior": at $N = \alpha = 25$, $w = 0.5$. This is **shrinkage**: noisy estimates are pulled toward a sensible average, more strongly when they rest on less data. (In Bayesian terms, it's the posterior mean under a Dirichlet prior with pseudo-counts $\alpha\,p_c$.)
 
 #### 10.6 The code, line by line
 
@@ -1654,8 +1569,7 @@ max_conditional = max(conditional.values(), default=0.0) or 1.0
 - `conditional = {...}`: §10.4's formula for each class. `prior.get(c, 0.0)` gives 0 for a class with no signatures anywhere.
 - `max_conditional = max(...) or 1.0`: the `or 1.0` avoids dividing by zero when every estimate is 0.
 
-Then line 319 rescales: `applicability = conditional / max_conditional`, so the best class on this stack gets 1.0 and
-the term is comparable with the other $[0, 1]$ components. In stack A, XSS gets 1.0 and SSRF 0.147 / 0.293 = 0.5.
+Then line 319 rescales: `applicability = conditional / max_conditional`, so the best class on this stack gets 1.0 and the term is comparable with the other $[0, 1]$ components. In stack A, XSS gets 1.0 and SSRF 0.147 / 0.293 = 0.5.
 
 A class can be a candidate with $n_c = 0$, when it's reached only through a CVE found during recon (lines 279–283).
 It then gets just $\alpha\,p_c / (N + \alpha)$: the prior's opinion.
@@ -1706,8 +1620,7 @@ def _log_scale(value: float, saturation: float) -> float:
 
 #### 10.7 The result
 
-On 400 held-out cases across 147 products (20% of a product's signatures held out as gold **and removed from the
-evidence**, so the planner can't grade itself on the answer):
+On 400 held-out cases across 147 products (20% of a product's signatures held out as gold **and removed from the evidence**, so the planner can't grade itself on the answer):
 
 | strategy | P@1 | MRR |
 |---|---|---|
@@ -1722,18 +1635,15 @@ Beating the **prior** is the bar that matters: it shows the planner actually use
 
 ##### "Why α = 25?"
 
-There's no recorded tuning. The comment reads it as "pretend we saw 25 extra templates". To choose it properly, sweep
-α (5, 10, 25, 50, 100) on a separate validation split of products and pick the best P@1, never on the 400 test cases.
+There's no recorded tuning. The comment reads it as "pretend we saw 25 extra templates". To choose it properly, sweep α (5, 10, 25, 50, 100) on a separate validation split of products and pick the best P@1, never on the 400 test cases.
 
 ##### "How is this different from Laplace smoothing?"
 
-Laplace adds 1 to every count: a **uniform** prior. Here the pseudo-counts follow the **global** prior, so a stack with
-no data defaults to "what's common everywhere", which is a much better guess than "all classes equally likely".
+Laplace adds 1 to every count: a **uniform** prior. Here the pseudo-counts follow the **global** prior, so a stack with no data defaults to "what's common everywhere", which is a much better guess than "all classes equally likely".
 
 ##### "Why did the evaluation need `exclude_signature_paths`?"
 
-The gold label for a held-out template **is** a signature → CWE edge. If that edge stayed in the evidence pool, the
-planner would be scored on a fact it was handed, and would look near-perfect for free.
+The gold label for a held-out template **is** a signature → CWE edge. If that edge stayed in the evidence pool, the planner would be scored on a fact it was handed, and would look near-perfect for free.
 
 #### 10.9 Check your understanding
 

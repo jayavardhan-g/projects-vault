@@ -125,9 +125,7 @@ Part of [[Interview plan (Nov 2026)]]. Repo `vLLMmini` (branch `main`). About 7 
 > [!tip] Explained from scratch: [[#8. Deep dive: the radix prefix cache from scratch|§8 the radix prefix cache (match, acquire, insert, safe eviction, why 7.4× only at 8k)]]
 
 
-**Maths: why 0% below 2k and 7.41× at 8k.** Prefill time is roughly `T(n) ≈ a + b·n + c·n²`: fixed overhead `a`,
-linear MLP and projection cost `b·n`, and quadratic attention cost `c·n²`. For small n, `a` dominates, so skipping
-tokens saves almost nothing. For large n, `n²` dominates. Your measurements (README around line 305):
+**Maths: why 0% below 2k and 7.41× at 8k.** Prefill time is roughly `T(n) ≈ a + b·n + c·n²`: fixed overhead `a`, linear MLP and projection cost `b·n`, and quadratic attention cost `c·n²`. For small n, `a` dominates, so skipping tokens saves almost nothing. For large n, `n²` dominates. Your measurements (README around line 305):
 
 | context | no cache | 90% cached | speedup |
 |---|---|---|---|
@@ -178,8 +176,7 @@ Read this **with the files open**. It starts with a picture of the whole day and
 Repo `vLLMmini`, branch `main` (`3679394`). Builds on
 [[Day 01 - mini-vLLM I#Code, explained]].
 
-**The whole day in one picture:** every engine step asks the scheduler for a batch, runs one forward pass, then
-hands the sampled tokens back.
+**The whole day in one picture:** every engine step asks the scheduler for a batch, runs one forward pass, then hands the sampled tokens back.
 
 ```mermaid
 flowchart TB
@@ -196,9 +193,7 @@ flowchart TB
 
 ### The flow, step by step
 
-One engine step with two requests. Block size **B = 4**. Request **A** is running: prompt 10 + 2 generated = 12 tokens,
-all computed, table of 3 full blocks, all published to the radix tree. Request **B** has just arrived: a 6-token
-prompt whose **first 4 tokens equal A's first 4**.
+One engine step with two requests. Block size **B = 4**. Request **A** is running: prompt 10 + 2 generated = 12 tokens, all computed, table of 3 full blocks, all published to the radix tree. Request **B** has just arrived: a 6-token prompt whose **first 4 tokens equal A's first 4**.
 
 1. `engine.step` (`engine.py:111`) calls `schedule()` (`scheduler.py:296`). Budget = 8,192 tokens.
 2. **Running first.** `_schedule_running` (`:322`): A needs 1 token. `blocks_needed_for(1)`: 13 tokens need ceil(13/4) = 4 blocks, A holds 3, so **1 new block**. A free block exists, so `_prepare(A)` (`:599`) appends 1 token. Budget is now 8,191.
@@ -738,24 +733,19 @@ def _finish(self, request: Request, now: float) -> None:
 ### 6. Deep dive: continuous batching from scratch
 
 The scheduler (sections 1–3 above) exists to do **continuous batching**. This section builds the idea from zero.
-Order: why batch at all → static batching and its waste → continuous batching → the measured 3.82× and 13.7× → what
-makes it possible in code → questions → check.
+Order: why batch at all → static batching and its waste → continuous batching → the measured 3.82× and 13.7× → what makes it possible in code → questions → check.
 
 > [!important] The one sentence to hold on to
-> Instead of running a fixed group of requests until the **slowest** one finishes, re-decide the batch at **every
-> step**: finished requests leave immediately and waiting ones take their place.
+> Instead of running a fixed group of requests until the **slowest** one finishes, re-decide the batch at **every step**: finished requests leave immediately and waiting ones take their place.
 
 #### 6.1 Why batch at all?
 
-At batch size 1, a decode step reads **all ~2.5 GB of weights** from GPU memory to produce **one** token. The GPU's
-arithmetic units mostly wait for memory (decode is memory-bound; see the prerequisite note). If 32 requests share
-that step, the same weights are read **once** and used 32 times: nearly 32× more tokens for almost the same time.
+At batch size 1, a decode step reads **all ~2.5 GB of weights** from GPU memory to produce **one** token. The GPU's arithmetic units mostly wait for memory (decode is memory-bound; see the prerequisite note). If 32 requests share that step, the same weights are read **once** and used 32 times: nearly 32× more tokens for almost the same time.
 So a server wants **as many requests in flight per step as memory allows**.
 
 #### 6.2 Static batching, and where it wastes time
 
-The simple approach (the Hugging Face baseline here): take the next B requests, run `generate` on all of them, and
-start the next batch only when **every** member is done.
+The simple approach (the Hugging Face baseline here): take the next B requests, run `generate` on all of them, and start the next batch only when **every** member is done.
 
 Take 2 batch slots and 4 requests that generate **2, 8, 3 and 5** tokens, arriving together:
 - batch 1 = {A, B}: runs **8** steps, because B needs 8. A finishes at step 2, and its slot sits **idle for 6 steps**;
@@ -776,8 +766,7 @@ Orca (Yu et al., OSDI 2022) changed the unit of scheduling from "a batch" to "**
 2. waiting requests **join**, if there's room;
 3. the next step runs on whoever is in the batch now.
 
-The same example: A leaves after step 2, C joins at step 3; C leaves after step 5, D joins at step 6. Total **10
-steps**, 18 of 20 slot-steps used (**90%**), and D starts at step 6 instead of 9.
+The same example: A leaves after step 2, C joins at step 3; C leaves after step 5, D joins at step 6. Total **10 steps**, 18 of 20 slot-steps used (**90%**), and D starts at step 6 instead of 9.
 
 | | static | continuous |
 |---|---|---|
@@ -808,20 +797,15 @@ Three pieces from Days 1–2 work together:
 
 ##### "Doesn't mixing prefills and decodes in one step slow the decodes down?"
 
-Yes, somewhat: a step containing a long prefill takes longer, and the decodes in it wait for it. That's why the token
-budget (`max_num_batched_tokens`, §7) caps how much prefill work a step can take. Chunked prefill (splitting long
-prompts across steps) is a refinement this project doesn't do.
+Yes, somewhat: a step containing a long prefill takes longer, and the decodes in it wait for it. That's why the token budget (`max_num_batched_tokens`, §7) caps how much prefill work a step can take. Chunked prefill (splitting long prompts across steps) is a refinement this project doesn't do.
 
 ##### "Why is the throughput gain 3.82× and not more?"
 
-Throughput is limited by GPU memory (how many requests' caches fit), by the per-step overhead, and by the baseline's
-batch size. The README's *uniform* vs *varied* modes separate how much comes from the scheduling itself (Day 3's
-benchmark deep dive).
+Throughput is limited by GPU memory (how many requests' caches fit), by the per-step overhead, and by the baseline's batch size. The README's *uniform* vs *varied* modes separate how much comes from the scheduling itself (Day 3's benchmark deep dive).
 
 ##### "Is continuous batching only for LLMs?"
 
-It matters most for autoregressive generation, where requests have very different, unknown output lengths. With fixed
-work per request (image classification, say), static batches waste little.
+It matters most for autoregressive generation, where requests have very different, unknown output lengths. With fixed work per request (image classification, say), static batches waste little.
 
 #### 6.7 Check your understanding
 
@@ -850,19 +834,14 @@ work per request (image classification, say), static batches waste little.
 
 ### 7. Deep dive: the scheduler's rules from scratch (budget, admission, watermark, preemption)
 
-Sections 2–3 above walk the scheduler's code. This section explains **why** each rule exists, on a worked example
-small enough to follow by hand. Order: the scheduler's job → the token budget → admission and the watermark →
-preemption, recompute vs swap → the full example → questions → check.
+Sections 2–3 above walk the scheduler's code. This section explains **why** each rule exists, on a worked example small enough to follow by hand. Order: the scheduler's job → the token budget → admission and the watermark → preemption, recompute vs swap → the full example → questions → check.
 
 > [!important] The one sentence to hold on to
-> Every step, the scheduler first lets **running** requests decode (preempting the newest if memory runs out), then
-> admits **waiting** requests in arrival order, but only while the step's token budget allows and a **watermark** of
-> free blocks remains.
+> Every step, the scheduler first lets **running** requests decode (preempting the newest if memory runs out), then admits **waiting** requests in arrival order, but only while the step's token budget allows and a **watermark** of free blocks remains.
 
 #### 7.1 The scheduler's job
 
-Each step it answers: *which requests run in this forward pass, and how many tokens of each?* Two resources limit the
-answer:
+Each step it answers: *which requests run in this forward pass, and how many tokens of each?* Two resources limit the answer:
 - **compute per step:** how many tokens one forward pass may process (the token budget);
 - **memory:** how many KV blocks are free (Day 1).
 
@@ -872,16 +851,11 @@ answer:
 
 ![[d02s-budget.svg]] [[d02s-budget.html|▶ Step through it]]
 
-`max_num_batched_tokens` (8,192 here) caps the tokens in one step: each decode counts 1, a prefill counts its whole
-prompt. Without it, one 8,000-token prompt could join a step and make all 30 decodes in that step wait for it. With it,
-a step stays bounded in time. A prompt longer than the budget is rejected at `add_request` (prefills aren't chunked
-here).
+`max_num_batched_tokens` (8,192 here) caps the tokens in one step: each decode counts 1, a prefill counts its whole prompt. Without it, one 8,000-token prompt could join a step and make all 30 decodes in that step wait for it. With it, a step stays bounded in time. A prompt longer than the budget is rejected at `add_request` (prefills aren't chunked here).
 
 #### 7.3 Why running requests go first
 
-A decode needs at most **one** new block (only when it crosses a block boundary), while admitting a prefill can need
-**many**. Serving waiting requests first would let new arrivals take the memory that nearly finished requests need to
-continue. So `schedule()` runs `_schedule_running` before `_schedule_waiting`.
+A decode needs at most **one** new block (only when it crosses a block boundary), while admitting a prefill can need **many**. Serving waiting requests first would let new arrivals take the memory that nearly finished requests need to continue. So `schedule()` runs `_schedule_running` before `_schedule_waiting`.
 
 #### 7.4 Admission and the watermark
 
@@ -889,12 +863,9 @@ A waiting request is admitted only if:
 
 $$\text{free blocks} - \text{blocks it needs now} \ \ge\ \text{watermark}$$
 
-The watermark is a small **reserve** (1% of the pool here). Why keep spare blocks? If you admit right up to the last
-free block, the very next decode step finds no block for a running request, which then gets preempted: **admit, then
-immediately evict** (thrashing). The reserve lets running requests keep growing for a while.
+The watermark is a small **reserve** (1% of the pool here). Why keep spare blocks? If you admit right up to the last free block, the very next decode step finds no block for a running request, which then gets preempted: **admit, then immediately evict** (thrashing). The reserve lets running requests keep growing for a while.
 
-Admission is **FCFS** (first come, first served): if the request at the head of the queue doesn't fit, nobody behind it
-is admitted either. That's simple and fair, at the cost of head-of-line blocking.
+Admission is **FCFS** (first come, first served): if the request at the head of the queue doesn't fit, nobody behind it is admitted either. That's simple and fair, at the cost of head-of-line blocking.
 
 #### 7.5 Preemption: recompute vs swap
 
@@ -914,9 +885,7 @@ How do you "pause" a request? Two options:
 | cost to resume | copy back over PCIe: bytes ÷ bandwidth | re-run prefill over prompt + generated tokens |
 | extra machinery | a CPU buffer and copy streams | none: just reset `num_computed_tokens = 0` |
 
-For a 1B model, prefill is fast, so recomputing is cheap and simple. The request goes back to the **front** of the
-waiting queue. When it's re-admitted, all its tokens (prompt plus what it already generated) are "uncomputed", so it
-simply prefills them, and greedy decoding produces exactly the tokens it would have.
+For a 1B model, prefill is fast, so recomputing is cheap and simple. The request goes back to the **front** of the waiting queue. When it's re-admitted, all its tokens (prompt plus what it already generated) are "uncomputed", so it simply prefills them, and greedy decoding produces exactly the tokens it would have.
 
 #### 7.6 The full example, step by step
 
@@ -949,26 +918,19 @@ What to notice:
 
 ##### "Why preempt the newest request and not the one using the most memory?"
 
-To keep first-come, first-served order: older requests have been waiting longest, and the newest one has the least
-work to redo. Other policies (largest first, lowest priority first) are possible; this one is simple and fair.
+To keep first-come, first-served order: older requests have been waiting longest, and the newest one has the least work to redo. Other policies (largest first, lowest priority first) are possible; this one is simple and fair.
 
 ##### "When would you switch to swapping?"
 
-When prefill is expensive relative to a PCIe copy: big models, very long contexts, or many preemptions. Recompute costs
-compute proportional to the context; swap costs bandwidth proportional to the KV bytes.
+When prefill is expensive relative to a PCIe copy: big models, very long contexts, or many preemptions. Recompute costs compute proportional to the context; swap costs bandwidth proportional to the KV bytes.
 
 ##### "What if a request can never fit?"
 
-`add_request` rejects it up front (`RequestTooLargeError`) if its maximum size, prompt + `max_new_tokens`, exceeds the
-pool minus the watermark, or if its prompt exceeds the token budget. Otherwise it could sit in the queue forever.
+`add_request` rejects it up front (`RequestTooLargeError`) if its maximum size, prompt + `max_new_tokens`, exceeds the pool minus the watermark, or if its prompt exceeds the token budget. Otherwise it could sit in the queue forever.
 
 ##### "What was the admission bug?" (the hardest-bug story)
 
-An earlier version looked up the prefix cache **before** checking the watermark, and the lookup already **took
-references** and set `num_computed_tokens`. When the watermark check then failed, those references were never released
-(blocks that could never be evicted), and the next admission attempt built a fresh table while `num_computed_tokens`
-still claimed the cached prefix. Positions then addressed the wrong blocks. The fix: **change nothing about the request
-until admission is certain** (`_schedule_waiting`'s docstring; section 3 above).
+An earlier version looked up the prefix cache **before** checking the watermark, and the lookup already **took references** and set `num_computed_tokens`. When the watermark check then failed, those references were never released (blocks that could never be evicted), and the next admission attempt built a fresh table while `num_computed_tokens` still claimed the cached prefix. Positions then addressed the wrong blocks. The fix: **change nothing about the request until admission is certain** (`_schedule_waiting`'s docstring; section 3 above).
 
 #### 7.8 Check your understanding
 
@@ -1001,31 +963,23 @@ until admission is certain** (`_schedule_waiting`'s docstring; section 3 above).
 
 ### 8. Deep dive: the radix prefix cache from scratch
 
-Section 4 above walks `prefix_cache.py`. This section builds the idea from zero. Order: why reuse prefixes → what a
-radix tree is → why one node = one full block → matching and inserting → refcounts and safe eviction → why 91% hits
-save 0% time at short contexts but 7.41× at 8k → questions → check.
+Section 4 above walks `prefix_cache.py`. This section builds the idea from zero. Order: why reuse prefixes → what a radix tree is → why one node = one full block → matching and inserting → refcounts and safe eviction → why 91% hits save 0% time at short contexts but 7.41× at 8k → questions → check.
 
 > [!important] The one sentence to hold on to
-> Store already-computed KV blocks in a tree keyed by their tokens, so a new request that starts with the same tokens
-> **adopts** those blocks instead of recomputing them; a block is evicted only when it's a leaf that **nobody** is using.
+> Store already-computed KV blocks in a tree keyed by their tokens, so a new request that starts with the same tokens **adopts** those blocks instead of recomputing them; a block is evicted only when it's a leaf that **nobody** is using.
 
 #### 8.1 Why reuse prefixes?
 
-Many requests start the same way: the same system prompt, or a chat whose turn 2 repeats all of turn 1. The K and V of
-those shared tokens are **identical** (same tokens at the same positions give the same K, V). Computing them again is
-pure waste: prefill cost grows with the prompt length (and its attention part with the square).
+Many requests start the same way: the same system prompt, or a chat whose turn 2 repeats all of turn 1. The K and V of those shared tokens are **identical** (same tokens at the same positions give the same K, V). Computing them again is pure waste: prefill cost grows with the prompt length (and its attention part with the square).
 
-Day 1's paging makes reuse cheap: a request's block table can simply **point at** blocks another request already
-filled, with refcounts tracking who uses them.
+Day 1's paging makes reuse cheap: a request's block table can simply **point at** blocks another request already filled, with refcounts tracking who uses them.
 
 #### 8.2 What a radix tree is
 
 A **trie** (prefix tree) stores sequences so that sequences sharing a prefix share a path from the root. For words:
-"cat", "car" and "dog" share the path c → a, then split into t and r. A **radix tree** compresses chains into bigger
-steps.
+"cat", "car" and "dog" share the path c → a, then split into t and r. A **radix tree** compresses chains into bigger steps.
 
-Here each **node holds one full block** (16 tokens; 4 in the example) and that block's physical id. The path from the
-root to a node spells out a token prefix, and the blocks along it hold that prefix's K and V.
+Here each **node holds one full block** (16 tokens; 4 in the example) and that block's physical id. The path from the root to a node spells out a token prefix, and the blocks along it hold that prefix's K and V.
 
 ![[d2-3-radix.svg]]
 
@@ -1034,8 +988,7 @@ root to a node spells out a token prefix, and the blocks along it hold that pref
 - **Matching works block by block:** one dictionary lookup per block (`children[tuple_of_16_tokens]`), not per token.
 - **Only full blocks can be shared.** A half-filled last block is still being written by its request, and its key (the tokens it will hold) isn't final. Sharing it would need copy-on-write. So a request reuses $\lfloor \text{matched tokens} / B \rfloor$ blocks and recomputes the rest.
 
-In the example: a new request C = system prompt (8 tokens) + 3 new tokens. Its full blocks are `[s0..s3]` and
-`[s4..s7]`, both in the tree → **8 tokens reused**. Its third block `[c0 c1 c2]` isn't full, so C prefills just those 3.
+In the example: a new request C = system prompt (8 tokens) + 3 new tokens. Its full blocks are `[s0..s3]` and `[s4..s7]`, both in the tree → **8 tokens reused**. Its third block `[c0 c1 c2]` isn't full, so C prefills just those 3.
 
 #### 8.4 Match, acquire, insert
 
@@ -1044,8 +997,7 @@ In the example: a new request C = system prompt (8 tokens) + 3 new tokens. Its f
 3. **`insert(tokens, blocks)`** publishes a request's newly **full, computed** blocks into the tree. The tree takes its **own** reference to each new block.
 
 Blocks are published **while the request is still running**, after each forward pass, not only when it finishes.
-Under continuous batching, requests sharing a system prompt are all in flight before the first one ends; publishing
-only at the end would miss nearly every hit.
+Under continuous batching, requests sharing a system prompt are all in flight before the first one ends; publishing only at the end would miss nearly every hit.
 
 #### 8.5 Refcounts and safe eviction
 
@@ -1067,17 +1019,14 @@ Block 5 is the only evictable block above. Blocks 0 and 1 can't go while A or C 
 
 #### 8.6 Hit rate is not time saved: why "up to 7.4×"
 
-The README's striking result: by turn 4 of a chat, **91%** of prompt tokens hit the cache, yet short prompts got
-**no faster**. Why? Model the prefill time of an n-token prompt as:
+The README's striking result: by turn 4 of a chat, **91%** of prompt tokens hit the cache, yet short prompts got **no faster**. Why? Model the prefill time of an n-token prompt as:
 
 $$T(n) \approx a + c\,n^2$$
 
 - $a$: a fixed cost per forward pass (kernel launches, Python, the linear layers' minimum work);
 - $c\,n^2$: attention's quadratic part.
 
-Fitting the three measured no-cache points gives $a \approx 14.7$ ms and $c \approx 1.0 \times 10^{-5}$ ms per token²
-(the linear term is too small to separate with three points). With 90% cached, only the new 10% are computed, but they
-still attend to the whole context:
+Fitting the three measured no-cache points gives $a \approx 14.7$ ms and $c \approx 1.0 \times 10^{-5}$ ms per token² (the linear term is too small to separate with three points). With 90% cached, only the new 10% are computed, but they still attend to the whole context:
 
 $$T_{\text{cached}}(n) \approx a + c \cdot (0.1\,n) \cdot n$$
 
@@ -1089,30 +1038,25 @@ $$T_{\text{cached}}(n) \approx a + c \cdot (0.1\,n) \cdot n$$
 
 ![[d2-4-prefill-cost.svg]]
 
-At 512 tokens, the fixed ~15 ms **is** the cost: skipping 90% of tokens saves nothing visible. At 8,192 the
-quadratic part dominates, and skipping it pays off. So always quote it as "**7.4× at 8k context**".
+At 512 tokens, the fixed ~15 ms **is** the cost: skipping 90% of tokens saves nothing visible. At 8,192 the quadratic part dominates, and skipping it pays off. So always quote it as "**7.4× at 8k context**".
 
 #### 8.7 Questions people usually ask next
 
 ##### "Why not cache per token instead of per block?"
 
-The memory unit is a block anyway (Day 1), so a token-level match would still have to copy or split blocks. Per-block
-keys mean one lookup per 16 tokens and no partially shared blocks.
+The memory unit is a block anyway (Day 1), so a token-level match would still have to copy or split blocks. Per-block keys mean one lookup per 16 tokens and no partially shared blocks.
 
 ##### "Could two requests with the same new prefix share it if they arrive together?"
 
-Not within the same step: both would compute the uncached prefix in the same forward pass, so neither can reuse the
-other's. The scheduler holds the second one back one step (`_first_uncached_chunk`), and then it hits the cache.
+Not within the same step: both would compute the uncached prefix in the same forward pass, so neither can reuse the other's. The scheduler holds the second one back one step (`_first_uncached_chunk`), and then it hits the cache.
 
 ##### "What if the cache fills the memory?"
 
-Cached-but-unused blocks are the first thing reclaimed when a running request or an admission needs memory (§7.5),
-before any preemption.
+Cached-but-unused blocks are the first thing reclaimed when a running request or an admission needs memory (§7.5), before any preemption.
 
 ##### "Is this the same as vLLM's or SGLang's?"
 
-The idea is SGLang's RadixAttention (Zheng et al., 2024). vLLM's automatic prefix caching uses hashes of full blocks
-instead of an explicit tree; the reuse rules (full blocks, refcounts, LRU) are the same in spirit.
+The idea is SGLang's RadixAttention (Zheng et al., 2024). vLLM's automatic prefix caching uses hashes of full blocks instead of an explicit tree; the reuse rules (full blocks, refcounts, LRU) are the same in spirit.
 
 #### 8.8 Check your understanding
 
@@ -1143,8 +1087,7 @@ instead of an explicit tree; the reuse rules (full blocks, refcounts, LRU) are t
 
 ## C. Rebuild it yourself (60 min)
 
-In about 80 lines, build a toy radix cache with `match(tokens) -> blocks`, `insert(tokens, blocks)`, `release(blocks)` and
-`evict(n)`, using refcounts and LRU over leaves only. Test it:
+In about 80 lines, build a toy radix cache with `match(tokens) -> blocks`, `insert(tokens, blocks)`, `release(blocks)` and `evict(n)`, using refcounts and LRU over leaves only. Test it:
 - two requests that share 2 blocks of system prompt;
 - evicting while one of them still runs must not touch the shared blocks.
 
@@ -1152,8 +1095,7 @@ Then compare your version with `prefix_cache.py`.
 
 ## D. Traces
 
-**D1. Scheduler (30 min).** Block size 4, a pool of 8 blocks, a watermark of 1 block. Requests A (prompt 5), B (prompt 9),
-C (prompt 3), each generating 4 tokens. For 5 steps, write down:
+**D1. Scheduler (30 min).** Block size 4, a pool of 8 blocks, a watermark of 1 block. Requests A (prompt 5), B (prompt 9), C (prompt 3), each generating 4 tokens. For 5 steps, write down:
 - which requests are prefill and which are decode;
 - every block table;
 - the free list.

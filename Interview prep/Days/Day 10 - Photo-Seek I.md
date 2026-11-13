@@ -12,8 +12,7 @@ Prep pack: [[Photo-Seek - prep]] (diagram and Trace 1 in §2, stories 4.4–4.5,
 
 **Code, explained:** the figures, the code to read and what each snippet does are in [[#Code, explained]], right after section B.
 
-**Resume bullet (part 2 of 2, both resumes):** "Engineered an on-device multimodal retrieval engine combining **FAISS vector search, CLIP embeddings**, and
-**LLM-based query routing** to translate natural-language queries into structured, **fully offline** photo search."
+**Resume bullet (part 2 of 2, both resumes):** "Engineered an on-device multimodal retrieval engine combining **FAISS vector search, CLIP embeddings**, and **LLM-based query routing** to translate natural-language queries into structured, **fully offline** photo search."
 Faces (part 1) are tomorrow ([[Day 11 - Photo-Seek II and emotion steering]]).
 
 **Wording to fix** (prep pack §5.1, §5.4):
@@ -487,18 +486,14 @@ self._index.add_with_ids(vecs, id_arr)
 ### 4. Deep dive: CLIP and cosine similarity from scratch
 
 Section 3 above calls `embed_texts` and searches by inner product. This section builds the idea from zero. Order:
-embeddings → cosine similarity → why normalise → how CLIP is trained (on a 3-pair batch) → zero-shot search →
-Recall@K → the code line by line → questions → check.
+embeddings → cosine similarity → why normalise → how CLIP is trained (on a 3-pair batch) → zero-shot search → Recall@K → the code line by line → questions → check.
 
 > [!important] The one sentence to hold on to
-> CLIP turns a photo and a sentence into **arrows of length 1 in the same space**, trained so that a photo and its
-> own caption point the same way. Searching = find the photo arrows closest in angle to the query's arrow.
+> CLIP turns a photo and a sentence into **arrows of length 1 in the same space**, trained so that a photo and its own caption point the same way. Searching = find the photo arrows closest in angle to the query's arrow.
 
 #### 4.1 What an embedding is
 
-An **embedding** is a list of numbers that stands for a thing. Photo-Seek's CLIP gives **512** numbers per photo and
-512 per sentence. The numbers themselves mean nothing alone. What matters is **direction**: two things that mean
-the same should point the same way.
+An **embedding** is a list of numbers that stands for a thing. Photo-Seek's CLIP gives **512** numbers per photo and 512 per sentence. The numbers themselves mean nothing alone. What matters is **direction**: two things that mean the same should point the same way.
 
 To see it, shrink 512 down to **2**. Then each embedding is an arrow in a plane, and its direction is one angle.
 
@@ -526,8 +521,7 @@ $$\cos(a, b) = \frac{a \cdot b}{\lVert a \rVert \, \lVert b \rVert}$$
 - lengths: $\sqrt{9 + 16} = 5$ and 5;
 - cosine: $24 / 25 = \mathbf{0.96}$, a small angle (16°).
 
-**Why divide by the lengths?** Take $c = (6, 8)$, the same direction as $a$ but twice as long. The raw dot
-$a \cdot c = 50$ is bigger than $a \cdot b = 24$, but only because $c$ is long. The cosine is $50 / (5 \cdot 10) = 1.0$:
+**Why divide by the lengths?** Take $c = (6, 8)$, the same direction as $a$ but twice as long. The raw dot $a \cdot c = 50$ is bigger than $a \cdot b = 24$, but only because $c$ is long. The cosine is $50 / (5 \cdot 10) = 1.0$:
 same direction, the best possible match. Length is noise here; direction is meaning.
 
 #### 4.3 Normalise once, then a dot product is enough
@@ -536,16 +530,14 @@ If every vector has length 1 ("unit vectors"), the bottom of the fraction is $1 
 
 $$\cos(a, b) = a \cdot b \qquad \text{when } \lVert a \rVert = \lVert b \rVert = 1$$
 
-So Photo-Seek divides every vector by its length **once**, when it's made (`normalize` in `clip.py`; decision 4 in the
-prep pack). After that, FAISS's plain inner-product index (`IndexFlatIP`) computes cosine similarity for free.
+So Photo-Seek divides every vector by its length **once**, when it's made (`normalize` in `clip.py`; decision 4 in the prep pack). After that, FAISS's plain inner-product index (`IndexFlatIP`) computes cosine similarity for free.
 
 In our 2-D table, every vector is already (cos θ, sin θ), which has length 1. So the dog photo vs "a dog":
 $0.985 \cdot 0.940 + 0.174 \cdot 0.342 = 0.985$, which is $\cos(20° - 10°) = \cos 10°$.
 
 #### 4.4 How CLIP is trained: a batch of 3 pairs
 
-CLIP (Radford et al., 2021) has **two encoders**: one for images (a ViT), one for text (a Transformer). Training
-takes a batch of N (photo, caption) pairs. Take N = 3: the table above, before training is finished.
+CLIP (Radford et al., 2021) has **two encoders**: one for images (a ViT), one for text (a Transformer). Training takes a batch of N (photo, caption) pairs. Take N = 3: the table above, before training is finished.
 
 **Step 1: all N × N similarities.** Every photo against every caption:
 
@@ -555,20 +547,17 @@ takes a batch of N (photo, caption) pairs. Take N = 3: the table above, before t
 | cake photo | 0.500 | **0.985** | 0.707 |
 | hill photo | 0.906 | 0.906 | **0.985** |
 
-The bold **diagonal** holds the true pairs. The other 6 cells are mismatches ("negatives"), and they come free from
-the batch: no extra labels are needed.
+The bold **diagonal** holds the true pairs. The other 6 cells are mismatches ("negatives"), and they come free from the batch: no extra labels are needed.
 
 ![[d10-1-clip-space.svg]] [[d10-1-clip-space.html|▶ Step through it]]
 
-**Step 2: turn each row into probabilities.** Multiply by a scale $s$ (CLIP learns it; take $s = 10$ here), then
-softmax. Row "hill photo": $10 \times (0.906, 0.906, 0.985) = (9.06, 9.06, 9.85)$.
+**Step 2: turn each row into probabilities.** Multiply by a scale $s$ (CLIP learns it; take $s = 10$ here), then softmax. Row "hill photo": $10 \times (0.906, 0.906, 0.985) = (9.06, 9.06, 9.85)$.
 
 $$p = \frac{e^{9.85}}{e^{9.06} + e^{9.06} + e^{9.85}} = \mathbf{0.52}$$
 
 So the hill photo picks its own caption with probability only 0.52. "a hill" at 35° is too close to the dog photo.
 
-**Step 3: the loss.** Cross-entropy says: the right caption should get probability 1. Loss $= -\ln p$ for the
-true pair:
+**Step 3: the loss.** Cross-entropy says: the right caption should get probability 1. Loss $= -\ln p$ for the true pair:
 
 | row (photo → caption) | p(own caption) | −ln p |
 |---|---|---|
@@ -576,18 +565,13 @@ true pair:
 | cake | 0.935 | 0.068 |
 | hill | 0.523 | 0.648 |
 
-CLIP does this **both ways**: each photo picks among the captions (rows), and each caption picks among the photos
-(columns). The final loss is the average of the two directions: here $(0.366 + 0.393) / 2 = \mathbf{0.38}$. This
-"symmetric InfoNCE" loss is the whole training signal:
+CLIP does this **both ways**: each photo picks among the captions (rows), and each caption picks among the photos (columns). The final loss is the average of the two directions: here $(0.366 + 0.393) / 2 = \mathbf{0.38}$. This "symmetric InfoNCE" loss is the whole training signal:
 
 $$L = \tfrac12 \Big( \underbrace{-\tfrac1N \sum_i \ln \operatorname{softmax}_j(s\,S_{ij})_{i}}_{\text{photo → caption}} \;+\; \underbrace{-\tfrac1N \sum_j \ln \operatorname{softmax}_i(s\,S_{ij})_{j}}_{\text{caption → photo}} \Big)$$
 
-**What training does.** Lowering the loss rotates "a hill" toward the hill photo and away from the dog photo (the
-animation). With hundreds of millions of pairs and batches of tens of thousands, the two encoders learn one shared
-space. Photo-Seek's checkpoint, `laion2b_s34b_b79k`, saw 34 billion samples from LAION-2B with batch size 79k.
+**What training does.** Lowering the loss rotates "a hill" toward the hill photo and away from the dog photo (the animation). With hundreds of millions of pairs and batches of tens of thousands, the two encoders learn one shared space. Photo-Seek's checkpoint, `laion2b_s34b_b79k`, saw 34 billion samples from LAION-2B with batch size 79k.
 
-**The scale $s$.** At $s = 10$ the softmax is soft. At $s = 100$ (CLIP's learned value is capped at 100), the same
-row gives $p \approx 0.999$. A larger $s$ makes small cosine gaps decisive.
+**The scale $s$.** At $s = 10$ the softmax is soft. At $s = 100$ (CLIP's learned value is capped at 100), the same row gives $p \approx 0.999$. A larger $s$ makes small cosine gaps decisive.
 
 #### 4.5 Zero-shot search
 
@@ -596,13 +580,11 @@ After training, searching needs **no more training**:
 2. embed the query text;
 3. rank photos by cosine with the query.
 
-Query "a dog" at 15°: dog photo $\cos 5° = 0.996$, hill photo $\cos 30° = 0.866$, cake photo $\cos 65° = 0.423$. The
-dog photo ranks first. "Zero-shot" means nobody trained CLIP on *your* photos or *your* queries.
+Query "a dog" at 15°: dog photo $\cos 5° = 0.996$, hill photo $\cos 30° = 0.866$, cake photo $\cos 65° = 0.423$. The dog photo ranks first. "Zero-shot" means nobody trained CLIP on *your* photos or *your* queries.
 
 #### 4.6 Recall@K: how the 39.4 was measured
 
-For each query caption there is **one** right image. Find where it ranks. **R@K** = the share of queries whose right
-image is in the top K.
+For each query caption there is **one** right image. Find where it ranks. **R@K** = the share of queries whose right image is in the top K.
 
 Four captions whose right image ranks 1, 3, 1 and 12:
 
@@ -651,8 +633,7 @@ The search call is `embed_texts(["beach"])`: one text.
 
 ##### "Why does text land near the right images if the encoders are different networks?"
 
-Because the loss only goes down when matching pairs point the same way. The two networks never share weights. They
-are trained **together** so that their outputs agree.
+Because the loss only goes down when matching pairs point the same way. The two networks never share weights. They are trained **together** so that their outputs agree.
 
 ##### "Why not train CLIP on my own photos?"
 
@@ -661,9 +642,7 @@ Off-the-shelf zero-shot CLIP is the honest choice, and it's what the 39.4 measur
 
 ##### "Is a cosine of 0.3 good or bad?"
 
-It depends on the model. CLIP's text–image cosines are often small in absolute value (around 0.2–0.35 for a good
-match). Only the **ranking** matters for search, which is why Photo-Seek returns the top k, not "everything above
-0.5".
+It depends on the model. CLIP's text–image cosines are often small in absolute value (around 0.2–0.35 for a good match). Only the **ranking** matters for search, which is why Photo-Seek returns the top k, not "everything above 0.5".
 
 ##### "Why ViT-B-32 and not a bigger model?"
 
@@ -699,20 +678,14 @@ The prep pack (decision 7) says no rationale was written. The likely reason: sma
 
 ### 5. Deep dive: FAISS indexes and pre-filtering from scratch
 
-Section 3 above calls `FaissStore.search` with a `subset`. This section explains what an index is, the four index
-families you'll be asked about, and why Photo-Seek filters **before** it ranks. Order: nearest-neighbour search →
-Flat → what it costs → IVF, PQ, HNSW → IDs → pre- vs post-filtering → the code line by line → questions → check.
+Section 3 above calls `FaissStore.search` with a `subset`. This section explains what an index is, the four index families you'll be asked about, and why Photo-Seek filters **before** it ranks. Order: nearest-neighbour search → Flat → what it costs → IVF, PQ, HNSW → IDs → pre- vs post-filtering → the code line by line → questions → check.
 
 > [!important] The one sentence to hold on to
-> Photo-Seek uses the simplest index, **Flat** (compare the query with every vector, exactly), because a personal
-> library is small; and it tells FAISS **which ids are allowed** before ranking, so a strict filter can never leave
-> the top k empty.
+> Photo-Seek uses the simplest index, **Flat** (compare the query with every vector, exactly), because a personal library is small; and it tells FAISS **which ids are allowed** before ranking, so a strict filter can never leave the top k empty.
 
 #### 5.1 The problem: nearest neighbours
 
-Given a query vector q and N stored vectors, return the k stored vectors with the **largest** inner product with q
-(for unit vectors: the most similar; §4.3). That's "k-nearest-neighbour search". An **index** is a data structure
-that answers it.
+Given a query vector q and N stored vectors, return the k stored vectors with the **largest** inner product with q (for unit vectors: the most similar; §4.3). That's "k-nearest-neighbour search". An **index** is a data structure that answers it.
 
 Our toy library: six photos as 2-D unit vectors (angle only), query "beach" at 0°.
 
@@ -727,8 +700,7 @@ Our toy library: six photos as 2-D unit vectors (angle only), query "beach" at 0
 
 #### 5.2 Flat: just compare with everything
 
-`IndexFlatIP` ("flat, inner product") stores the vectors in one big array and computes **all N scores**, then keeps
-the k largest. Top 2 here: photos 5 and 9. It's **exact**: it can never miss the true answer.
+`IndexFlatIP` ("flat, inner product") stores the vectors in one big array and computes **all N scores**, then keeps the k largest. Top 2 here: photos 5 and 9. It's **exact**: it can never miss the true answer.
 
 **Cost per query** = N × d multiply-adds:
 - Photo-Seek's COCO eval: 5,000 photos × 512 = **2.56 million**. A CPU does that in about a millisecond or less.
@@ -738,39 +710,31 @@ So the question "which index?" is really "how big is N?".
 
 #### 5.3 IVF: only look in the nearest bucket(s)
 
-**IVF** (inverted file) runs k-means once to split the vectors into `nlist` groups ("lists"), each with a centre. A
-search compares q with the **centres** first, then scans only the `nprobe` nearest lists.
+**IVF** (inverted file) runs k-means once to split the vectors into `nlist` groups ("lists"), each with a centre. A search compares q with the **centres** first, then scans only the `nprobe` nearest lists.
 
-Split our 6 photos into 2 lists: A = {5, 9, 40} (centre at 16.7°) and B = {77, 12, 81} (centre at 79.3°). Query at
-**42°**, `nprobe = 1`:
+Split our 6 photos into 2 lists: A = {5, 9, 40} (centre at 16.7°) and B = {77, 12, 81} (centre at 79.3°). Query at **42°**, `nprobe = 1`:
 1. q vs centres: A 0.904, B 0.795 → scan list A only;
 2. best in A: photo 40, 0.978;
 3. but the true best is photo **77, 0.990**, in list B. **Missed.**
 
 ![[d10-3-ivf.svg]]
 
-That's IVF's trade: scan ~`nprobe/nlist` of the data, accept that a query near a boundary can miss. `nprobe = 2`
-finds 77, but then you've scanned everything. IVF also needs a **training** step (the k-means) before you can add
-vectors.
+That's IVF's trade: scan ~`nprobe/nlist` of the data, accept that a query near a boundary can miss. `nprobe = 2` finds 77, but then you've scanned everything. IVF also needs a **training** step (the k-means) before you can add vectors.
 
 #### 5.4 PQ: compress each vector
 
-**PQ** (product quantisation) cuts each 512-d vector into, say, 64 pieces of 8 numbers. For each piece it learns 256
-typical values, and stores just the **index** of the closest one: 1 byte per piece.
+**PQ** (product quantisation) cuts each 512-d vector into, say, 64 pieces of 8 numbers. For each piece it learns 256 typical values, and stores just the **index** of the closest one: 1 byte per piece.
 
 | | per vector | 1 million photos |
 |---|---|---|
 | float32, Flat | 512 × 4 = 2,048 bytes | 2.05 GB |
 | PQ, 64 bytes | 64 bytes (32× smaller) | 64 MB |
 
-Scores are computed on the approximations, so they're slightly wrong. PQ is for when memory is the limit; it's
-often combined with IVF ("IVF-PQ").
+Scores are computed on the approximations, so they're slightly wrong. PQ is for when memory is the limit; it's often combined with IVF ("IVF-PQ").
 
 #### 5.5 HNSW: walk a graph
 
-**HNSW** links each vector to its near neighbours in a layered graph. A search starts at the top layer and greedily
-walks toward q, dropping down a layer at a time. It's fast with high recall, but it uses extra memory for the links,
-and FAISS's HNSW can't delete vectors.
+**HNSW** links each vector to its near neighbours in a layered graph. A search starts at the top layer and greedily walks toward q, dropping down a layer at a time. It's fast with high recall, but it uses extra memory for the links, and FAISS's HNSW can't delete vectors.
 
 #### 5.6 Why Flat here
 
@@ -785,9 +749,7 @@ A personal library is thousands of photos: Flat is fast enough, loses no recall,
 
 #### 5.7 Your own ids: `IndexIDMap2`
 
-FAISS numbers vectors 0, 1, 2, … in insertion order. Photo-Seek wants its own **photo ids** (12, 40, 77). The wrapper
-`IndexIDMap2(IndexFlatIP)` keeps a map from row to id (and back, the "2"), so searches return photo ids and
-`remove_ids` can delete by photo id. That's what lets `add` replace a re-embedded photo (lines 96–99 above).
+FAISS numbers vectors 0, 1, 2, … in insertion order. Photo-Seek wants its own **photo ids** (12, 40, 77). The wrapper `IndexIDMap2(IndexFlatIP)` keeps a map from row to id (and back, the "2"), so searches return photo ids and `remove_ids` can delete by photo id. That's what lets `add` replace a re-embedded photo (lines 96–99 above).
 
 #### 5.8 Pre-filtering vs post-filtering
 
@@ -798,8 +760,7 @@ The SQL filters (date, people) allow only photos **{12, 40, 77}**. We want the t
 - **Post-filter:** take the top 2 of **all** photos = {5, 9}, then drop the disallowed ones → **nothing left**. You could ask for more (top 20, top 200…), but with a strict filter you never know how many is enough.
 - **Pre-filter:** tell the index which ids may be scored. Only 12, 40, 77 compete → **40 (0.866), 77 (0.643)**. Always k results if k photos are allowed.
 
-Photo-Seek pre-filters with `IDSelectorBatch` (decision 6). The cost: Flat still visits every vector and checks it
-against the allowed set, so a filtered search isn't faster, just correct.
+Photo-Seek pre-filters with `IDSelectorBatch` (decision 6). The cost: Flat still visits every vector and checks it against the allowed set, so a filtered search isn't faster, just correct.
 
 #### 5.9 The code, line by line
 
@@ -822,8 +783,7 @@ return [
 ]
 ```
 
-Run it on the toy: `subset = {12, 40, 77}`, `k = 10` asked, 6 photos in the index, `q` = the query as a `[1, 512]`
-float32 array (FAISS always takes a 2-D batch of queries).
+Run it on the toy: `subset = {12, 40, 77}`, `k = 10` asked, 6 photos in the index, `q` = the query as a `[1, 512]` float32 array (FAISS always takes a 2-D batch of queries).
 
 | line | code | value |
 |---|---|---|
@@ -845,19 +805,15 @@ Three details:
 
 ##### "When would you switch away from Flat?"
 
-When N reaches millions and query time or memory hurts. Then IVF (or HNSW) for speed, PQ for memory, and you'd
-measure recall against Flat as ground truth.
+When N reaches millions and query time or memory hurts. Then IVF (or HNSW) for speed, PQ for memory, and you'd measure recall against Flat as ground truth.
 
 ##### "Doesn't the SQL step make the vector search pointless?"
 
-No. SQL answers the hard constraints (dates, people), which embeddings are bad at. CLIP ranks what's left by
-meaning ("beach"). A pure-filter query with no text skips CLIP and sorts by date (engine.py:95–100).
+No. SQL answers the hard constraints (dates, people), which embeddings are bad at. CLIP ranks what's left by meaning ("beach"). A pure-filter query with no text skips CLIP and sorts by date (engine.py:95–100).
 
 ##### "Why keep vectors in SQLite too?"
 
-The SQLite catalog is the source of truth; the FAISS file is derived and can be deleted and rebuilt (decision 2). A
-FAISS upgrade is then a rebuild, not a data migration. `save` writes a temp file and renames it, so a crash never
-leaves a half-written index.
+The SQLite catalog is the source of truth; the FAISS file is derived and can be deleted and rebuilt (decision 2). A FAISS upgrade is then a rebuild, not a data migration. `save` writes a temp file and renames it, so a crash never leaves a half-written index.
 
 ##### "How does IDSelectorBatch check membership quickly?"
 
@@ -893,15 +849,10 @@ The scan over all N vectors still happens.
 
 ### 6. Deep dive: turning a sentence into filters from scratch
 
-Section 1 above walks the three routers. This section explains the ideas under them: why parse at all, how the
-rules compute "last summer", what "schema-constrained" decoding really guarantees, why the hybrid takes dates from
-the rules, and how the 84% was measured. Order: the target structure → rules → half-open dates → the LLM with a
-schema → fallback → the hybrid → measuring it → the code → questions → check.
+Section 1 above walks the three routers. This section explains the ideas under them: why parse at all, how the rules compute "last summer", what "schema-constrained" decoding really guarantees, why the hybrid takes dates from the rules, and how the 84% was measured. Order: the target structure → rules → half-open dates → the LLM with a schema → fallback → the hybrid → measuring it → the code → questions → check.
 
 > [!important] The one sentence to hold on to
-> A query becomes a `StructuredQuery` (people, dates, place, leftover text). The LLM is better at words (people,
-> places); the rules are exact at date arithmetic. So the hybrid takes the LLM's parse and **overwrites its dates
-> whenever the rules found a date phrase**.
+> A query becomes a `StructuredQuery` (people, dates, place, leftover text). The LLM is better at words (people, places); the rules are exact at date arithmetic. So the hybrid takes the LLM's parse and **overwrites its dates whenever the rules found a date phrase**.
 
 #### 6.1 Why parse the sentence at all?
 
@@ -919,8 +870,7 @@ So the query is split into **hard filters** (answered by SQL) and **leftover tex
 | `place` | `"beach"` | SQL `LIKE`, or folded into the text if no photo has that label |
 | `text` | `""` (becomes `"beach"`) | CLIP |
 
-`StructuredQuery` is the **contract** between parsing and search (decision 8): any router that fills these fields
-plugs in.
+`StructuredQuery` is the **contract** between parsing and search (decision 8): any router that fills these fields plugs in.
 
 #### 6.2 The rule router: regular expressions plus a calendar
 
@@ -951,14 +901,11 @@ return year
 | 2026-11-05 | 11 | no | 2026 | 2026-06-01 → 2026-08-31 |
 | 2026-07-10 | 7 | yes | 2025 | 2025-06-01 → 2025-08-31 |
 
-In July 2026, summer 2026 isn't over, so "last summer" means 2025. `previous` is True for "last" and "past"; for
-"this summer" the year is never reduced.
+In July 2026, summer 2026 isn't over, so "last summer" means 2025. `previous` is True for "last" and "past"; for "this summer" the year is never reduced.
 
 Then `_cut` removes "last summer" from the text, so it doesn't also reach CLIP.
 
-The rules are **conservative** (decision 9): they only fire on phrases they're sure of. A wrong filter silently
-hides the right photo; a missed one only falls back to CLIP ranking. That's why they scored 58% on all filters: they
-miss a lot, but rarely invent.
+The rules are **conservative** (decision 9): they only fire on phrases they're sure of. A wrong filter silently hides the right photo; a missed one only falls back to CLIP ranking. That's why they scored 58% on all filters: they miss a lot, but rarely invent.
 
 #### 6.3 Half-open date ranges: why `< date_to + 1 day`
 
@@ -967,18 +914,14 @@ miss a lot, but rarely invent.
 - `taken_at <= '2026-08-31'` compares text: `'2026-08-31 18:20:00'` is **greater** than `'2026-08-31'` (it's longer and starts the same), so this photo is **dropped**.
 - `taken_at < '2026-09-01'` keeps every moment of August 31.
 
-So the code adds one day and uses `<` (engine.py, section 2). A range $[\text{from}, \text{to} + 1)$ that includes the
-start and excludes the end is called **half-open**. Half-open ranges also tile without overlaps: June = [06-01, 07-01),
-July = [07-01, 08-01).
+So the code adds one day and uses `<` (engine.py, section 2). A range $[\text{from}, \text{to} + 1)$ that includes the start and excludes the end is called **half-open**. Half-open ranges also tile without overlaps: June = [06-01, 07-01), July = [07-01, 08-01).
 
 #### 6.4 The LLM router: JSON with a schema
 
 The LLM (qwen2.5:7b on a local Ollama server) gets the query, today's date and instructions, and must answer in JSON.
 With Ollama's `format` set to a **JSON schema**, decoding is **constrained**:
 
-At every step, the model scores every possible next token. Constrained decoding **masks out** every token that would
-break the schema, and picks among the rest. An illustrative step: the output so far is `{"people": [` and the model's
-top choices are:
+At every step, the model scores every possible next token. Constrained decoding **masks out** every token that would break the schema, and picks among the rest. An illustrative step: the output so far is `{"people": [` and the model's top choices are:
 
 | candidate next token | model's preference | allowed by the schema? |
 |---|---|---|
@@ -986,15 +929,11 @@ top choices are:
 | `"` | 2nd | **yes** → chosen |
 | `]` | 3rd | yes (an empty list) |
 
-So the output is **always** valid JSON with the right keys and types. It does **not** make the values right: the
-model can still write `"date_from": "2025-06-01"` for last summer, a year early (story 4.5). Temperature 0 makes it
-greedy (always the top allowed token), so runs are nearly repeatable (3 of 100 queries still changed across reps).
+So the output is **always** valid JSON with the right keys and types. It does **not** make the values right: the model can still write `"date_from": "2025-06-01"` for last summer, a year early (story 4.5). Temperature 0 makes it greedy (always the top allowed token), so runs are nearly repeatable (3 of 100 queries still changed across reps).
 
 #### 6.5 The fallback: never let the LLM break search
 
-`OllamaRouter.route` wraps the whole call in `try` (section 1 above). Any problem (server down, timeout, no JSON
-object found, or a parse that `is_empty`) is caught, and the rule router answers instead. `last_fallback = True`
-records that it happened. On the gold set, **1 of 100** queries fell back.
+`OllamaRouter.route` wraps the whole call in `try` (section 1 above). Any problem (server down, timeout, no JSON object found, or a parse that `is_empty`) is caught, and the rule router answers instead. `last_fallback = True` records that it happened. On the gold set, **1 of 100** queries fell back.
 
 #### 6.6 The hybrid: the LLM's words, the rules' dates
 
@@ -1007,19 +946,15 @@ Measured per field on the 100 gold queries:
 | date_from | **87** | 82 | 94 |
 | date_to | **87** | 82 | 92 |
 
-The LLM is better at language; the rules are better at dates. The hybrid runs both and keeps the better source for
-each:
+The LLM is better at language; the rules are better at dates. The hybrid runs both and keeps the better source for each:
 
 ![[d10-4-hybrid.svg]]
 
-Why does the hybrid beat **both** on dates (94 vs 87 and 82)? When the rules find a date phrase, they're nearly
-always right, so they replace the LLM's date. When they find none (a holiday, an odd phrase), the LLM's date is kept
-instead of nothing.
+Why does the hybrid beat **both** on dates (94 vs 87 and 82)? When the rules find a date phrase, they're nearly always right, so they replace the LLM's date. When they find none (a holiday, an odd phrase), the LLM's date is kept instead of nothing.
 
 #### 6.7 How "84%" was measured, and how sure it is
 
-**Per field vs per query.** A query counts as right only if **all four filters** (people, date_from, date_to, place)
-are right at once. Four toy queries:
+**Per field vs per query.** A query counts as right only if **all four filters** (people, date_from, date_to, place) are right at once. Four toy queries:
 
 | query | people | dates | place | all right? |
 |---|---|---|---|---|
@@ -1028,19 +963,13 @@ are right at once. Four toy queries:
 | q3 | ✓ | ✓ | ✓ | ✓ |
 | q4 | ✗ | ✓ | ✓ | ✗ |
 
-Every field is right on 3 of 4 queries (75%), yet only 2 of 4 queries (**50%**) are fully right. Per-query is the
-stricter number. That's what 84 / 73 / 58 count.
+Every field is right on 3 of 4 queries (75%), yet only 2 of 4 queries (**50%**) are fully right. Per-query is the stricter number. That's what 84 / 73 / 58 count.
 
-**How precise is 84 out of 100?** A 95% confidence interval (Wilson) for 84/100 is **75.6% to 89.9%**; for 73/100 it's
-63.6–80.7%; for 58/100, 48.2–67.2%. The hybrid-vs-LLM intervals overlap, so "84 vs 73" alone isn't conclusive.
+**How precise is 84 out of 100?** A 95% confidence interval (Wilson) for 84/100 is **75.6% to 89.9%**; for 73/100 it's 63.6–80.7%; for 58/100, 48.2–67.2%. The hybrid-vs-LLM intervals overlap, so "84 vs 73" alone isn't conclusive.
 
-**Paired comparison.** Both systems ran on the **same** 100 queries. Look only where they disagree: the hybrid was
-right and the LLM wrong on **11** queries, the reverse on **0**. If the two were equally good, each disagreement
-would be a coin flip; 11 heads in a row has probability $2 \times 0.5^{11} = 0.001$ (two-sided). That's McNemar's
-idea, and it's the strong evidence. Hybrid vs rules: 29 wins, 3 losses.
+**Paired comparison.** Both systems ran on the **same** 100 queries. Look only where they disagree: the hybrid was right and the LLM wrong on **11** queries, the reverse on **0**. If the two were equally good, each disagreement would be a coin flip; 11 heads in a row has probability $2 \times 0.5^{11} = 0.001$ (two-sided). That's McNemar's idea, and it's the strong evidence. Hybrid vs rules: 29 wins, 3 losses.
 
-**The text field** is scored by token F1. Gold "dog running beach", predicted "dog beach": precision 2/2 = 1.0,
-recall 2/3 = 0.67, F1 = 2 · 1.0 · 0.67 / 1.67 = **0.80**. The hybrid's mean was 0.79.
+**The text field** is scored by token F1. Gold "dog running beach", predicted "dog beach": precision 2/2 = 1.0, recall 2/3 = 0.67, F1 = 2 · 1.0 · 0.67 / 1.67 = **0.80**. The hybrid's mean was 0.79.
 
 #### 6.8 The code, line by line: the merge
 
@@ -1068,9 +997,7 @@ Both dates are taken together, never one from each router. Mixing could produce 
 
 ##### "Why not just prompt the LLM better for dates?"
 
-The prompt already had explicit season, week and month rules and examples (story 4.5). A 7B model still failed the
-arithmetic: Christmas as 25–26 December, last summer a year early. Rules do date arithmetic exactly; the LLM is for
-language.
+The prompt already had explicit season, week and month rules and examples (story 4.5). A 7B model still failed the arithmetic: Christmas as 25–26 December, last summer a year early. Rules do date arithmetic exactly; the LLM is for language.
 
 ##### "Doesn't the hybrid cost two parses?"
 
@@ -1078,14 +1005,11 @@ Yes, but the rules take 0.19 ms against the LLM's 1.52 s median. The cost is all
 
 ##### "Is the 84% honest?"
 
-It's 100 hand-written queries by the prompt's author, today pinned to 2026-10-22, with a ±7–9 point interval. The
-paired 11–0 is the strongest part. Own two gaps: the gold set's author also designed the router, and no doc says
-whether the hybrid was designed after seeing gold results (story 4.5's caveat).
+It's 100 hand-written queries by the prompt's author, today pinned to 2026-10-22, with a ±7–9 point interval. The paired 11–0 is the strongest part. Own two gaps: the gold set's author also designed the router, and no doc says whether the hybrid was designed after seeing gold results (story 4.5's caveat).
 
 ##### "Why does an unknown person return nothing?"
 
-So a typo shows up as "no results", not as a silently wider search (decision 14). The cost: an LLM output like
-`people = ["family"]` also gives nothing.
+So a typo shows up as "no results", not as a silently wider search (decision 14). The cost: an LLM output like `people = ["family"]` also gives nothing.
 
 #### 6.10 Check your understanding
 

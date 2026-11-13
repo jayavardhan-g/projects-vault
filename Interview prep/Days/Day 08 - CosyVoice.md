@@ -6,14 +6,12 @@ tags: [interview, day, cosyvoice, speech, lora]
 ---
 # Day 8 (Sun Nov 15): CosyVoice Indic LoRA
 
-Part of [[Interview plan (Nov 2026)]]. Repo `/data/jayavardhan/cosyvoice_rnd` (branch `main`). Data and checkpoints in
-`/mnt/warm_storage/jayavardhan/cosy/` (`phase2`, `phase3`, `phase4`, `phase4_te`, `phase4_multi`, `phase4_cv3_*`). About 7 h.
+Part of [[Interview plan (Nov 2026)]]. Repo `/data/jayavardhan/cosyvoice_rnd` (branch `main`). Data and checkpoints in `/mnt/warm_storage/jayavardhan/cosy/` (`phase2`, `phase3`, `phase4`, `phase4_te`, `phase4_multi`, `phase4_cv3_*`). About 7 h.
 Builds on [[Day 07 - Seminar and speech basics]] (the CosyVoice 2 pipeline). Project note: [[CosyVoice Indic LoRA (R&D)]].
 
 **Code, explained:** the figures, the code to read and what each snippet does are in [[#Code, explained]], right after section B.
 
-**There is no prep pack for this project yet.** This note is written from the code and training logs. The upstream
-`cosyvoice/` package is Alibaba's code, not yours: skim it only. Your code is `scripts/`.
+**There is no prep pack for this project yet.** This note is written from the code and training logs. The upstream `cosyvoice/` package is Alibaba's code, not yours: skim it only. Your code is `scripts/`.
 
 **Resume bullets (both resumes):**
 - "Adapted CosyVoice 2 to Hindi and Telugu via LoRA fine-tuning on its Qwen2 LLM component (**9M params, 1.36%** of the base model, 17 MB), trained on **35 hours** of speech across **4 H200 GPUs** with BF16 precision."
@@ -148,8 +146,7 @@ Builds on [[Day 07 - Seminar and speech basics]] (the CosyVoice 2 pipeline). Pro
 ### B4. Phases 1–3 (block 8, 30 min, skim)
 
 `step1_run_hindi_baseline.py`, `phase2_codec_benchmark.py` (533), `phase3_prepare_data.py`, `phase3_train_codec.py` (397), `compile_results.py`.
-For each, write one line: what question did it answer, and what was the answer? For phase 3, the logs are in
-`cosy/phase3/checkpoints*/training.log` (runs `lam05`, `lam10`, `v2`). Why did you move from codec work to LoRA on the LLM?
+For each, write one line: what question did it answer, and what was the answer? For phase 3, the logs are in `cosy/phase3/checkpoints*/training.log` (runs `lam05`, `lam10`, `v2`). Why did you move from codec work to LoRA on the LLM?
 
 ## Code, explained
 
@@ -590,13 +587,10 @@ for label in df["label"].unique():
 
 ### 6. Deep dive: LoRA from scratch, down to 8,798,208
 
-Section 2 above injects LoRA with one library call. This section builds it from zero. Order: why not fine-tune
-everything → the low-rank idea on a 4-number example → the formula with α and r → why B starts at zero → the full
-count for Qwen2.5-0.5B → what the code does, line by line → saving only the adapter → questions → check.
+Section 2 above injects LoRA with one library call. This section builds it from zero. Order: why not fine-tune everything → the low-rank idea on a 4-number example → the formula with α and r → why B starts at zero → the full count for Qwen2.5-0.5B → what the code does, line by line → saving only the adapter → questions → check.
 
 > [!important] The one sentence to hold on to
-> Keep every original weight frozen, and learn for each chosen matrix a small correction $\Delta W = B A$ made of two
-> thin matrices (rank r = 16), so you train 1.36% of CosyVoice 2's parameters and start exactly from the base model.
+> Keep every original weight frozen, and learn for each chosen matrix a small correction $\Delta W = B A$ made of two thin matrices (rank r = 16), so you train 1.36% of CosyVoice 2's parameters and start exactly from the base model.
 
 #### 6.1 Why not fine-tune everything?
 
@@ -605,8 +599,7 @@ Full fine-tuning updates all ~494M Qwen weights. That costs:
 - **storage:** each language adapter would be a full 1 GB copy of the model;
 - **risk:** changing every weight on 35 hours of Indic speech can damage what the model already knew (catastrophic forgetting).
 
-The LoRA paper's observation: the **change** a fine-tune makes to a weight matrix tends to have low "rank", meaning it
-can be written with far fewer numbers than the matrix itself.
+The LoRA paper's observation: the **change** a fine-tune makes to a weight matrix tends to have low "rank", meaning it can be written with far fewer numbers than the matrix itself.
 
 #### 6.2 Low rank on a tiny example
 
@@ -614,8 +607,7 @@ A rank-1 matrix is one column times one row. With $d = 4$ and $r = 1$:
 
 $$B = \begin{bmatrix}0.2\\0\\-0.1\\0\end{bmatrix},\quad A = \begin{bmatrix}0.5 & 0 & 0 & 0.5\end{bmatrix},\quad BA = \begin{bmatrix}0.1&0&0&0.1\\0&0&0&0\\-0.05&0&0&-0.05\\0&0&0&0\end{bmatrix}$$
 
-$BA$ is a full 4 × 4 matrix (16 numbers), but it's built from only **4 + 4 = 8** trained numbers. At real sizes the
-saving is huge: a 896 × 896 matrix has 802,816 numbers, and rank 16 needs 16 · (896 + 896) = **28,672** (3.6%).
+$BA$ is a full 4 × 4 matrix (16 numbers), but it's built from only **4 + 4 = 8** trained numbers. At real sizes the saving is huge: a 896 × 896 matrix has 802,816 numbers, and rank 16 needs 16 · (896 + 896) = **28,672** (3.6%).
 
 **You never build $BA$.** Apply it to an input $x$ right to left, which is cheap:
 
@@ -642,15 +634,12 @@ $$h = W x + \frac{\alpha}{r}\, B A x$$
 
 ![[d08-1-lora.svg]] [[d08-1-lora.html|▶ Step through it]]
 
-**Why α / r?** If you change r, the scale keeps the update's size roughly the same, so the learning rate doesn't have
-to be retuned. **Why B = 0 at the start?** Then $BAx = 0$, so the adapted model is **exactly** the base model at step
-0. Training begins from known-good behaviour, and only moves away as far as the data pushes it. (A is random, not
-zero: if both were zero, neither would ever get a gradient.)
+**Why α / r?** If you change r, the scale keeps the update's size roughly the same, so the learning rate doesn't have to be retuned. **Why B = 0 at the start?** Then $BAx = 0$, so the adapted model is **exactly** the base model at step
+0. Training begins from known-good behaviour, and only moves away as far as the data pushes it. (A is random, not zero: if both were zero, neither would ever get a gradient.)
 
 #### 6.4 The full count: 8,798,208
 
-Qwen2.5-0.5B: 24 layers, hidden size 896, MLP size 4,864, and 2 KV heads × 64 = 128 for k and v (grouped-query
-attention, as on Day 1). Per adapted matrix, LoRA adds $r\,(d_{in} + d_{out})$:
+Qwen2.5-0.5B: 24 layers, hidden size 896, MLP size 4,864, and 2 KV heads × 64 = 128 for k and v (grouped-query attention, as on Day 1). Per adapted matrix, LoRA adds $r\,(d_{in} + d_{out})$:
 
 | projection | $d_{in} \to d_{out}$ | 16 · ($d_{in} + d_{out}$) |
 |---|---|---|
@@ -664,63 +653,46 @@ attention, as on Day 1). Per adapted matrix, LoRA adds $r\,(d_{in} + d_{out})$:
 | **per layer** | | **366,592** |
 | **× 24 layers** | | **8,798,208** ✓ |
 
-The training log confirms it: `trainable_params 8798208` of `total_params 647972675` = **1.358%**. That denominator
-is **all of CosyVoice 2** (LLM + flow + vocoder). Against Qwen2.5-0.5B alone (494,032,768 parameters), it's 1.78%.
+The training log confirms it: `trainable_params 8798208` of `total_params 647972675` = **1.358%**. That denominator is **all of CosyVoice 2** (LLM + flow + vocoder). Against Qwen2.5-0.5B alone (494,032,768 parameters), it's 1.78%.
 
-Each adapted matrix has two tensors (A and B): 24 × 7 × 2 = **336 tensors**. The log's `n_params_saved: 336` is
-exactly that.
+Each adapted matrix has two tensors (A and B): 24 × 7 × 2 = **336 tensors**. The log's `n_params_saved: 336` is exactly that.
 
 #### 6.5 The code, line by line (`phase4b_train_lora.py`)
 
-**Freeze everything** (`:155–158`): every parameter of `cv.model.llm`, `cv.model.flow` and `cv.model.hift` gets
-`requires_grad = False`. Nothing can change yet.
+**Freeze everything** (`:155–158`): every parameter of `cv.model.llm`, `cv.model.flow` and `cv.model.hift` gets `requires_grad = False`. Nothing can change yet.
 
 **Inject** (`apply_lora_to_qwen`, `:96–112`):
 - `LoraConfig(r=16, lora_alpha=32, lora_dropout=0.05, target_modules=[…7 names…], bias="none")` describes the adapters.
 - `inject_adapter_in_model(config, qwen2_model)` walks the model, finds every `nn.Linear` whose name ends in one of the 7 targets (7 × 24 = 168 layers), and wraps each so it computes $Wx + 2·B(A(\text{dropout}(x)))$. The new A and B are created with `requires_grad = True`; the original W stays frozen.
 - Why `inject_adapter_in_model` and not `get_peft_model`? `get_peft_model` wraps the whole model in a new class, which would break CosyVoice's hard-coded paths such as `self.llm.model.model.embed_tokens`. Injecting in place keeps the original classes.
 
-**Count** (`:172–181`): `sum(p.numel() for p in all_params() if p.requires_grad)` adds up the sizes of the trainable
-tensors: 8,798,208.
+**Count** (`:172–181`): `sum(p.numel() for p in all_params() if p.requires_grad)` adds up the sizes of the trainable tensors: 8,798,208.
 
-**Optimise** (`:196–199`): `AdamW` receives **only** the trainable tensors, lr 2e-4, weight decay 0.01. So the optimiser
-state is also tiny: two moments for 8.8M numbers, not 494M.
+**Optimise** (`:196–199`): `AdamW` receives **only** the trainable tensors, lr 2e-4, weight decay 0.01. So the optimiser state is also tiny: two moments for 8.8M numbers, not 494M.
 
-**Save** (`:272–275`): `{n: p.detach().cpu() for n, p in cv.model.llm.named_parameters() if p.requires_grad}` keeps
-just the 336 adapter tensors. **Load** (`phase4c_generate.py:52–68`): inject the same structure, then copy each saved
-tensor into the parameter with the same name; a shape or name mismatch lands in `skipped`.
+**Save** (`:272–275`): `{n: p.detach().cpu() for n, p in cv.model.llm.named_parameters() if p.requires_grad}` keeps just the 336 adapter tensors. **Load** (`phase4c_generate.py:52–68`): inject the same structure, then copy each saved tensor into the parameter with the same name; a shape or name mismatch lands in `skipped`.
 
 #### 6.6 How big is `lora.pt`, really?
 
-The resume says "17 MB". That's 8,798,208 × **2 bytes** (bf16) = 17.6 MB. But the file on disk,
-`cosy/phase4/checkpoints/best/lora.pt`, is **35,284,758 bytes**: 8,798,208 × **4 bytes** (float32) = 35.19 MB, plus a
-little pickle overhead. Why? `torch.autocast` runs the **maths** in bf16, but the **parameters** stay float32, and
-`p.detach().cpu()` saves them as they are. Either say "35 MB as saved (fp32), 17.6 MB if stored in bf16", or convert
-before quoting.
+The resume says "17 MB". That's 8,798,208 × **2 bytes** (bf16) = 17.6 MB. But the file on disk, `cosy/phase4/checkpoints/best/lora.pt`, is **35,284,758 bytes**: 8,798,208 × **4 bytes** (float32) = 35.19 MB, plus a little pickle overhead. Why? `torch.autocast` runs the **maths** in bf16, but the **parameters** stay float32, and `p.detach().cpu()` saves them as they are. Either say "35 MB as saved (fp32), 17.6 MB if stored in bf16", or convert before quoting.
 
 #### 6.7 Questions people usually ask next
 
 ##### "Why r = 16 and all seven projections?"
 
-The config doesn't document a reason, so say it's a common choice. The LoRA paper found small ranks often enough, and
-later work (QLoRA, practitioners' sweeps) found adapting **all** linear layers, MLP included, usually beats adapting
-only q and v. For a new language, the MLP (where much of the model's knowledge sits) likely matters.
+The config doesn't document a reason, so say it's a common choice. The LoRA paper found small ranks often enough, and later work (QLoRA, practitioners' sweeps) found adapting **all** linear layers, MLP included, usually beats adapting only q and v. For a new language, the MLP (where much of the model's knowledge sits) likely matters.
 
 ##### "Does LoRA slow down inference?"
 
-Not if you **merge**: compute $W' = W + 2BA$ once and use $W'$ as an ordinary weight. The extra cost vanishes. Keeping
-it separate (as `phase4c` does) costs two thin matrix multiplies per layer and lets you swap adapters.
+Not if you **merge**: compute $W' = W + 2BA$ once and use $W'$ as an ordinary weight. The extra cost vanishes. Keeping it separate (as `phase4c` does) costs two thin matrix multiplies per layer and lets you swap adapters.
 
 ##### "Why not adapt the flow model or the vocoder?"
 
-The LM decides **which speech tokens** to produce for a text, which is the language-specific part. The flow model and
-vocoder turn tokens into sound for any language, and the voice comes from the speaker embedding and prompt. So the LM
-is where Hindi and Telugu were missing.
+The LM decides **which speech tokens** to produce for a text, which is the language-specific part. The flow model and vocoder turn tokens into sound for any language, and the voice comes from the speaker embedding and prompt. So the LM is where Hindi and Telugu were missing.
 
 ##### "Are the speech embedding and the output layer trained?"
 
-No. `speech_embedding` and `llm_decoder` belong to `cv.model.llm` and were frozen; LoRA wraps only the inner Qwen's 7
-projections. The adapter must work with the existing speech-token vocabulary.
+No. `speech_embedding` and `llm_decoder` belong to `cv.model.llm` and were frozen; LoRA wraps only the inner Qwen's 7 projections. The adapter must work with the existing speech-token vocabulary.
 
 #### 6.8 Check your understanding
 
@@ -753,22 +725,14 @@ projections. The adapter must work with the existing speech-token vocabulary.
 
 ### 7. Deep dive: the TTS training loss, from scratch
 
-Section 3 above shows `prepare_lm_input_target` and the loss call. This section builds both on a toy clip you can
-follow cell by cell. Order: next-token prediction → the unistream sequence → IGNORE_ID → the bistream (5 : 15)
-sequence → cross-entropy on real numbers → what one optimiser step does (bf16, accumulation, clipping) → what the
-training log shows → questions → check.
+Section 3 above shows `prepare_lm_input_target` and the loss call. This section builds both on a toy clip you can follow cell by cell. Order: next-token prediction → the unistream sequence → IGNORE_ID → the bistream (5 : 15) sequence → cross-entropy on real numbers → what one optimiser step does (bf16, accumulation, clipping) → what the training log shows → questions → check.
 
 > [!important] The one sentence to hold on to
-> The LM reads `[sos, text, task_id, speech]` and at every position predicts the **next** token, but only the speech
-> positions (and `eos`) are graded: text positions get the target −1 (IGNORE_ID), so the loss is "given this text,
-> how well do you predict its speech tokens?"
+> The LM reads `[sos, text, task_id, speech]` and at every position predicts the **next** token, but only the speech positions (and `eos`) are graded: text positions get the target −1 (IGNORE_ID), so the loss is "given this text, how well do you predict its speech tokens?"
 
 #### 7.1 Next-token prediction, for speech
 
-A text LM learns $p(\text{next token} \mid \text{all previous tokens})$. CosyVoice 2's LM does the same over a sequence
-that **mixes** text and speech tokens. At inference, you give it the text and it generates speech tokens one by one,
-until it emits `eos`. Training must therefore teach: *after this text, these speech tokens come, in this order, and
-then the end.*
+A text LM learns $p(\text{next token} \mid \text{all previous tokens})$. CosyVoice 2's LM does the same over a sequence that **mixes** text and speech tokens. At inference, you give it the text and it generates speech tokens one by one, until it emits `eos`. Training must therefore teach: *after this text, these speech tokens come, in this order, and then the end.*
 
 #### 7.2 The unistream sequence on a toy clip
 
@@ -779,8 +743,7 @@ Take a clip with **3 text tokens** (t1 t2 t3) and **4 speech tokens** (s1 … s4
 
 ![[d08-2-sequence.svg]] [[d08-2-sequence.html|▶ Step through it]]
 
-Read it column by column. Position 4 holds `task_id` (a special "now start speaking" token); its target is **s1**. Position
-8 holds s4; its target is **eos**. Positions 0–3 (sos and the text) have target −1.
+Read it column by column. Position 4 holds `task_id` (a special "now start speaking" token); its target is **s1**. Position 8 holds s4; its target is **eos**. Positions 0–3 (sos and the text) have target −1.
 
 | | count for the toy | for the 4-second Hindi clip (20 text, 100 speech) |
 |---|---|---|
@@ -790,22 +753,17 @@ Read it column by column. Position 4 holds `task_id` (a special "now start speak
 
 #### 7.3 IGNORE_ID: why the text isn't graded
 
-`IGNORE_ID = −1` (`cosyvoice/utils/common.py:26`). The loss skips every position whose target is −1. Why not grade the
-text too?
+`IGNORE_ID = −1` (`cosyvoice/utils/common.py:26`). The loss skips every position whose target is −1. Why not grade the text too?
 - The text is **given** at inference; the model never has to generate it.
 - The output layer `llm_decoder` only has **6,564 speech classes** (6,561 codes + eos + 2 special tokens, `llm.py:281`), so it can't even name a text token.
 
-The padding added to make a batch rectangular also gets −1 (`pad_sequence(..., padding_value=IGNORE_ID)`), so padding
-never counts either. That's why `collate_fn` passes the **true lengths**: upstream cuts each clip back to its real
-length (`unpad_sequence`) before building the sequence.
+The padding added to make a batch rectangular also gets −1 (`pad_sequence(..., padding_value=IGNORE_ID)`), so padding never counts either. That's why `collate_fn` passes the **true lengths**: upstream cuts each clip back to its real length (`unpad_sequence`) before building the sequence.
 
 #### 7.4 The bistream sequence: 5 text, 15 speech, repeat
 
-Half the time (`random.random() < 0.5`, `llm.py:318`), and only if the clip has more than 15 / 5 = 3 speech tokens per
-text token, the sequence is **interleaved** instead. This is the streaming mode from Day 7 §7.5.
+Half the time (`random.random() < 0.5`, `llm.py:318`), and only if the clip has more than 15 / 5 = 3 speech tokens per text token, the sequence is **interleaved** instead. This is the streaming mode from Day 7 §7.5.
 
-The loop runs ⌈(text length + 1) / 5⌉ times (`:322`). Each pass takes the next 5 text tokens and the next 15 speech
-tokens. Example: **7 text tokens, 40 speech tokens** (ratio 5.7 > 3, so bistream is allowed); ⌈8 / 5⌉ = 2 passes.
+The loop runs ⌈(text length + 1) / 5⌉ times (`:322`). Each pass takes the next 5 text tokens and the next 15 speech tokens. Example: **7 text tokens, 40 speech tokens** (ratio 5.7 > 3, so bistream is allowed); ⌈8 / 5⌉ = 2 passes.
 
 | pass | text chunk | inputs added | targets added |
 |---|---|---|---|
@@ -819,13 +777,11 @@ What each special target teaches:
 - at the **15th speech token**, the target is **fill** (`fill_token = 6,563`, `:277`): "I've said this chunk; give me the next 5 text tokens";
 - in the last chunk, `task_id` marks "no more text is coming", and the final target is **eos**.
 
-At inference in streaming mode, the server feeds 5 text tokens, lets the model generate until it emits **fill**,
-then feeds the next 5. That's how speech starts after only 5 text tokens.
+At inference in streaming mode, the server feeds 5 text tokens, lets the model generate until it emits **fill**, then feeds the next 5. That's how speech starts after only 5 text tokens.
 
 #### 7.5 Cross-entropy on real numbers
 
-At each graded position, the LM outputs 6,564 **logits** (scores). Softmax turns them into probabilities, and the loss
-is $-\log p(\text{correct token})$. Toy with 3 classes, logits (2.0, 0.5, −1.0), correct class 0:
+At each graded position, the LM outputs 6,564 **logits** (scores). Softmax turns them into probabilities, and the loss is $-\log p(\text{correct token})$. Toy with 3 classes, logits (2.0, 0.5, −1.0), correct class 0:
 
 | | class 0 | class 1 | class 2 |
 |---|---|---|---|
@@ -834,10 +790,7 @@ is $-\log p(\text{correct token})$. Toy with 3 classes, logits (2.0, 0.5, −1.0
 
 Loss = −ln 0.786 = **0.241**. A confident right answer gives a loss near 0; a confident wrong one, a large loss.
 
-The batch loss sums this over all graded positions and divides by **how many there are** (`normalize_length=True`,
-`label_smoothing_loss.py`): an average per speech token. The repo's CosyVoice 2 example config sets
-`lsm_weight: 0` (`examples/libritts/cosyvoice2/conf/cosyvoice2.yaml:28`), so it's plain cross-entropy, not
-label-smoothed (the pretrained model's own `cosyvoice2.yaml` isn't on the server to confirm).
+The batch loss sums this over all graded positions and divides by **how many there are** (`normalize_length=True`, `label_smoothing_loss.py`): an average per speech token. The repo's CosyVoice 2 example config sets `lsm_weight: 0` (`examples/libritts/cosyvoice2/conf/cosyvoice2.yaml:28`), so it's plain cross-entropy, not label-smoothed (the pretrained model's own `cosyvoice2.yaml` isn't on the server to confirm).
 
 **A scale to judge losses against:** guessing uniformly over 6,564 classes gives ln 6,564 = **8.79**.
 
@@ -881,13 +834,11 @@ The LM learns content (which tokens follow this text), conditioned only on the t
 
 ##### "Why train on both unistream and bistream?"
 
-So one model works in both modes: offline (all text known) and streaming (text arriving in chunks). The coin flip per
-clip mixes them.
+So one model works in both modes: offline (all text known) and streaming (text arriving in chunks). The coin flip per clip mixes them.
 
 ##### "Why is the loss per token and not per clip?"
 
-With `normalize_length=True`, a long clip contributes more tokens but each token weighs the same. Per-clip averaging
-would let short clips dominate.
+With `normalize_length=True`, a long clip contributes more tokens but each token weighs the same. Per-clip averaging would let short clips dominate.
 
 #### 7.9 Check your understanding
 
@@ -920,19 +871,14 @@ would let short clips dominate.
 
 ### 8. Deep dive: WER from scratch, and why 1.99 is possible
 
-Section 5 above scores each generated clip with `jiwer`. This section builds WER by hand. Order: what WER measures →
-edit operations → the dynamic-programming table on a 4-word example → why WER can exceed 1 → per-clip mean vs corpus
-WER → normalisation → what the code does, line by line → what WER can't tell you → questions → check.
+Section 5 above scores each generated clip with `jiwer`. This section builds WER by hand. Order: what WER measures → edit operations → the dynamic-programming table on a 4-word example → why WER can exceed 1 → per-clip mean vs corpus WER → normalisation → what the code does, line by line → what WER can't tell you → questions → check.
 
 > [!important] The one sentence to hold on to
-> WER is the fewest word edits (substitutions + deletions + insertions) that turn the reference into the hypothesis,
-> divided by the number of reference words; insertions have no limit, so a babbling clip can score far above 1.
+> WER is the fewest word edits (substitutions + deletions + insertions) that turn the reference into the hypothesis, divided by the number of reference words; insertions have no limit, so a babbling clip can score far above 1.
 
 #### 8.1 What it measures here
 
-To grade **TTS**, you can't compare waveforms to a reference: many correct readings exist. Instead, an **ASR** model
-(IndicConformer) transcribes the generated audio, and you ask: *does the transcript match the text we asked it to
-say?* So TTS WER measures **intelligibility**: can a listener (here, an ASR) recover the words?
+To grade **TTS**, you can't compare waveforms to a reference: many correct readings exist. Instead, an **ASR** model (IndicConformer) transcribes the generated audio, and you ask: *does the transcript match the text we asked it to say?* So TTS WER measures **intelligibility**: can a listener (here, an ASR) recover the words?
 
 #### 8.2 Three edit operations
 
@@ -945,8 +891,7 @@ $$\text{WER} = \frac{S + D + I}{N}, \qquad N = \text{number of reference words}$
 
 #### 8.3 The table, on a 4-word example
 
-Reference "the cat sat down" (N = 4), hypothesis "the bat sat". Fill a table where **D[i][j] = the fewest edits that
-turn the first i reference words into the first j hypothesis words**:
+Reference "the cat sat down" (N = 4), hypothesis "the bat sat". Fill a table where **D[i][j] = the fewest edits that turn the first i reference words into the first j hypothesis words**:
 - row 0 and column 0 are 0, 1, 2, …: turning i words into nothing takes i deletions (and nothing into j words takes j insertions);
 - every other cell is the cheapest of three moves:
 
@@ -963,19 +908,15 @@ The bottom-right cell is 2 (S = 1, D = 1). **WER = 2 / 4 = 0.50.**
 
 #### 8.4 Why WER can exceed 1
 
-Substitutions and deletions are capped at N (you can't miss more words than exist). **Insertions are not.** A
-reference of 4 words, transcribed as 10 words of which one is a substitution and six are extra:
+Substitutions and deletions are capped at N (you can't miss more words than exist). **Insertions are not.** A reference of 4 words, transcribed as 10 words of which one is a substitution and six are extra:
 
 $$\text{WER} = \frac{1 + 0 + 6}{4} = 1.75$$
 
-That's what a zero-shot model does on a language it doesn't know: it produces long, wrong speech, and the ASR writes
-down many extra words. So the resume's **1.99** zero-shot Hindi WER means "mostly garbage, much longer than the
-reference", not a bug. Say this before the interviewer asks.
+That's what a zero-shot model does on a language it doesn't know: it produces long, wrong speech, and the ASR writes down many extra words. So the resume's **1.99** zero-shot Hindi WER means "mostly garbage, much longer than the reference", not a bug. Say this before the interviewer asks.
 
 #### 8.5 Mean of per-clip WERs vs corpus WER
 
-`phase5_eval_wer.py` computes a WER **per clip**, then averages them (`sub['wer'].mean()`, line 169). That is not the
-same as pooling all edits:
+`phase5_eval_wer.py` computes a WER **per clip**, then averages them (`sub['wer'].mean()`, line 169). That is not the same as pooling all edits:
 
 | clip | reference words | edits | clip WER |
 |---|---|---|---|
@@ -984,8 +925,7 @@ same as pooling all edits:
 | **mean of clip WERs** | | | (0.10 + 4.00) / 2 = **2.05** |
 | **corpus WER** | 12 | 9 | 9 / 12 = **0.75** |
 
-One short babbling clip pulls the mean far up. When you quote 1.99 → 0.11, say "mean per-clip WER". The result CSVs
-aren't on the server, so you can't recompute the corpus WER today.
+One short babbling clip pulls the mean far up. When you quote 1.99 → 0.11, say "mean per-clip WER". The result CSVs aren't on the server, so you can't recompute the corpus WER today.
 
 #### 8.6 Normalisation
 
@@ -993,8 +933,7 @@ aren't on the server, so you can't recompute the corpus WER today.
 1. collapse runs of whitespace to one space and strip the ends: `"नमस्ते   दुनिया "` → `"नमस्ते दुनिया"`;
 2. delete punctuation the ASR never outputs, including the Devanagari **danda** `।`: `"नमस्ते दुनिया।"` → `"नमस्ते दुनिया"`.
 
-Without step 2, every sentence ending in `।` would carry a free substitution (`दुनिया।` ≠ `दुनिया`), adding up to 1 / N
-to every clip's WER.
+Without step 2, every sentence ending in `।` would carry a free substitution (`दुनिया।` ≠ `दुनिया`), adding up to 1 / N to every clip's WER.
 
 #### 8.7 The code, line by line (`phase5_eval_wer.py:138–145`)
 
@@ -1024,18 +963,15 @@ for sid, cat, ref, hyp in zip(ids, cats, refs, hyps):
 
 ##### "Is a lower WER always better TTS?"
 
-Only for intelligibility. A model that reads very slowly and flatly can win on WER and lose on naturalness. Report WER
-alongside SIM and MOS if you have them; say plainly if you don't.
+Only for intelligibility. A model that reads very slowly and flatly can win on WER and lose on naturalness. Report WER alongside SIM and MOS if you have them; say plainly if you don't.
 
 ##### "Why use an ASR model at all, instead of people?"
 
-It's cheap, repeatable and fast across hundreds of clips and several systems. Human listening tests are the gold
-standard but cost time and money.
+It's cheap, repeatable and fast across hundreds of clips and several systems. Human listening tests are the gold standard but cost time and money.
 
 ##### "Why CER as well as WER?"
 
-Word boundaries in Hindi transcripts vary (compounds, spacing), so one small slip can count as a whole wrong word. CER
-is less sensitive to that.
+Word boundaries in Hindi transcripts vary (compounds, spacing), so one small slip can count as a whole wrong word. CER is less sensitive to that.
 
 #### 8.10 Check your understanding
 
