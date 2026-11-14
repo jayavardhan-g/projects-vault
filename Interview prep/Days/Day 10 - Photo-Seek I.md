@@ -46,6 +46,26 @@ Faces (part 1) are tomorrow ([[Day 11 - Photo-Seek II and emotion steering]]).
 | 10 | 20 min | trace | Trace 1, by hand (D) |
 | 11 | 40 min | practice | The questions (E) |
 
+## Block notes (added 2026-11-14)
+
+Each block of the schedule now has its own note in `Days/Day 10/`. They **add to** the sections below; nothing here was removed. Work through them in order. Labels used in them: **[code]** read in the repo, **[doc]** a README / result / prep-pack number, **[lib]** library behaviour, **[mine]** Claude's reasoning, **[ran]** produced by running your code on 2026-11-14.
+
+| # | Block | Note | What it adds to this note |
+|---|---|---|---|
+| 0 | Recall | [[D10-00 Recall]] | six Day 9 questions with folded answers |
+| 1 | Overview | [[D10-01 Overview]] | the problem, why local, two pipelines, architecture figure, who made what |
+| 2 | CLIP theory | [[D10-02 CLIP theory]] | why two encoders, both loss directions, temperature table, limitations, training vs inference |
+| 3 | CLIP code | [[D10-03 CLIP code]] | `load`, preprocessing, tokenisation, `embed_images` slot trace, dtypes, the Protocol pattern |
+| 4 | FAISS theory | [[D10-04 FAISS theory]] | HNSW walk, PQ with numbers, trade-off table, 1 M and 100 M |
+| 5 | FAISS code | [[D10-05 FAISS code]] | `add`, `remove`, `save`, five-vector trace, how the id selector works |
+| 6 | Structured output | [[D10-06 Ollama and structured output]] | serving process, JSON, what the schema does not constrain, three real outputs |
+| 7 | Parser code | [[D10-07a Query parser code]] | `from_dict`, `RuleRouter.route`, the nine date patterns, `_generate`, fallback table |
+| 7 | Engine code | [[D10-07b Search engine code]] | the real engine run on a toy catalog, `resolve_people`, `_ensure_models`, `_hydrate` |
+| 8 | Skim | [[D10-08 Skim map]] | one line per function in eight files |
+| 9 | Rebuild | [[D10-09 Rebuild]] | a four-step exercise, standard library only (`exercises/day10_tiny_search.py`) |
+| 10 | Trace | [[D10-10 Trace and failures]] | the 15-step trace and six "what if" cases |
+| 11 | Practice | [[D10-11 Interview questions]] | 30 questions with folded answers and follow-ups |
+
 ## A. Theory
 
 ### A1. CLIP (block 2, 50 min)
