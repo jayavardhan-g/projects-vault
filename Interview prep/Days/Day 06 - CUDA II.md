@@ -9,6 +9,9 @@ tags: [interview, day, cuda]
 Part of [[Interview plan (Nov 2026)]]. Repo `sysml` (branch `main`). About 7 h. Builds on [[Day 05 - CUDA I]]. Prep pack:
 [[CUDA kernels - prep]] (stories S1–S6 are today's).
 
+> [!tip] Interview edition (added 2026-11-15)
+> [[Day 06 - CUDA II (interview)]]: streams, checkpointing and FlashAttention as an interview guide: component cards, line-by-line walks, 5 new step animations (`d06i-*`), question banks, performance analysis, speaking scripts, claims to avoid, and a 100-question mock with model answers.
+
 **Code, explained:** the figures, the code to read and what each snippet does are in [[#Code, explained]], right after section B.
 
 **Resume bullet (part 2 of 2):** "Accelerated MLP inference **1.73×** using column-wise CUDA stream parallelism at large dimensions, while reducing peak activation memory **13.3%** through gradient checkpointing."

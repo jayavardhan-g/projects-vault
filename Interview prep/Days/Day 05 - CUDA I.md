@@ -9,6 +9,9 @@ tags: [interview, day, cuda]
 Part of [[Interview plan (Nov 2026)]]. Repo `sysml` (branch `main`, one commit `16870fb`). About 7 h. Prep pack:
 [[CUDA kernels - prep]] (architecture §2, decisions §3, stories §4, numbers §5, 50 questions §7).
 
+> [!tip] Interview edition (added 2026-11-15)
+> [[Day 05 - CUDA I (interview)]]: the same project as an interview guide: a component card per optimisation, line-by-line code walks with "what breaks if changed", 7 new step animations (`d05i-*`), question banks at three levels, performance analysis, speaking scripts (30 s / 2 min / 5 min / whiteboard), claims to avoid, and a 100-question mock with model answers.
+
 
 **How this note is built:** one study guide, [[#Study guide]]. Each part goes *idea → tiny example → formula → the code → every variable with its shape → the code traced on small numbers → where the output goes next → questions → check*. Theory and code are never in separate sections.
 
