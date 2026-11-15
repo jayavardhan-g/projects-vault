@@ -60,6 +60,9 @@ Part of [[Interview plan (Nov 2026)]]. Built from [[Day 05 - CUDA I]] (the study
 
 ![[d05i-ladder.svg]] [[d05i-ladder.html|▶ Step through it]]
 
+![[d05m-ladder.mp4]]
+*Manim video: the eight measured kernels grow bar by bar, with the shared-memory roofs and what each step fixed (40 s). Pause and scrub with the video controls.*
+
 All at N = 32768, FP32, H200, kernel time by CUDA events **[MEAS]**:
 
 | # | kernel (`matmul_bench.cu`) | time | TFLOP/s | step gain | what changed **[IMPL]** | the bottleneck it removed / exposed **[THEORY]** |
@@ -330,6 +333,9 @@ $$\text{lines fetched} = \#\{\lfloor 4 \cdot \text{index}_\ell / 128 \rfloor : \
 
 ![[d5-7-coalescing.svg]] [[d5-7-coalescing.html|▶ Step through it]]
 
+![[d05m-coalescing.mp4]]
+*Manim video: one warp's 32 lanes hitting 32 lines (naive) vs one line (coalesced) after swapping two index lines (35 s). Pause and scrub with the video controls.*
+
 ![[d05s-warp.svg]] [[d05s-warp.html|▶ Step through it]]
 
 ### 3.3 The diff and one warp's addresses
@@ -419,6 +425,9 @@ and the consecutive-`tx` pair in block (0, 0) now owns C[0][0] and C[0][1]: a **
 ### 4.2 Where the reuse comes from, and the formula
 
 ![[d5-8-tiling.svg]] [[d5-8-tiling.html|▶ Step through it]]
+
+![[d05m-tiling-blocks.mp4]]
+*Manim video: block (1, 0) of the TILE = 2 toy computing C₀₁ = A₀₀·B₀₁ + A₀₁·B₁₁ through sA, sB and acc (50 s). Pause and scrub with the video controls.*
 
 Toy N = 4, TILE = 2: naive loads 16 outputs × 8 = **128** floats; tiled loads 4 blocks × 2 steps × 8 = **64**. Each loaded float served TILE = 2 threads.
 
@@ -691,6 +700,9 @@ Thread (1, 0):
 ### 6.2 The idea: an outer product per k
 
 ![[d5-9-regblock.svg]] [[d5-9-regblock.html|▶ Step through it]]
+
+![[d05m-register-blocking.mp4]]
+*Manim video: thread (1, 0)'s 2 × 2 patch built from 4 outer products, then the loop-order comparison and R = 4 (45 s). Pause and scrub with the video controls.*
 
 Per k: `av` is R × 1, `bv` is 1 × R, `reg += av · bv` is R × R. Each loaded value is used R times. Toy: `av = [1, 0]`, `bv = [2, 1]` gives [[2, 1], [0, 0]]: 4 products from 4 loads.
 
