@@ -124,6 +124,37 @@ All at N = 32768, FP32, H200, kernel time by CUDA events **[MEAS]**:
 
 Check it on the whiteboard: 1024 × 32 = 32,768 ✓; 512 × 16 × 4 = 32,768 ✓.
 
+#### From the launch line to the maths (how to read every "How it is called" box below)
+
+Every kernel is launched from the per-N loop of the harness, for example (`matmul_bench.cu:454–467`) **[IMPL]**:
+
+```cpp
+dim3 b32(32, 32);                                   // :454  block = 32 × 32 threads
+dim3 g32((N + 31) / 32, (N + 31) / 32);             // :455  grid  = ceil(N/32) × ceil(N/32) blocks
+record("tiled_1to1", time_kernel([&]{ mm_tiled_1to1<32><<<g32,b32>>>(dA,dB,dC,N); }, 1, iters, budget));  // :467
+```
+
+- `[&]{ … }` is a lambda. `time_kernel` calls it for the warm-ups and the timed runs (§7), so the code inside the braces **is** the launch.
+- `<32>` is a template argument: a compile-time constant baked into the kernel (here TILE).
+- `<<<g32, b32>>>` means "run g32.x × g32.y blocks of b32.x × b32.y threads". Every thread runs the same body; only its `(blockIdx, threadIdx)` differ.
+- `(dA, dB, dC, N)` are ordinary arguments, the same for every thread: three device pointers to flat row-major N² arrays, and N.
+
+**Read any launch in four steps:**
+
+| step | question | `mm_tiled_1to1<32>` at N = 32768 |
+|---|---|---|
+| 1 | how many threads, in what shape? | grid 1024 × 1024 blocks, block 32 × 32 threads → 2³⁰ threads |
+| 2 | which entries of C does thread (bx, by, tx, ty) own? | the kernel's index lines: `row = by·32 + ty`, `col = bx·32 + tx` |
+| 3 | what does it compute for them? | C[row][col] = Σₖ A[row][k] · B[k][col] |
+| 4 | do the owned entries cover C exactly once? | 1024 · 32 = 32,768 rows and columns, one thread each ✓ |
+
+**Step 3 never changes.** Every kernel computes C[i][j] = Σₖ A[i][k]·B[k][j]. What changes from kernel to kernel is step 2 (which thread owns which entries) and *where and in what order* the sum is accumulated (registers, shared tiles, outer products). So each kernel section below has a **"How it is called, on an example"** box: the real call from the harness, then a 4 × 4 call small enough to do by hand on the toy matrices of [[Day 05 - CUDA I]]:
+
+$$A = \begin{bmatrix}1&2&0&1\\0&1&2&1\\2&0&1&0\\1&1&0&2\end{bmatrix}\quad B = \begin{bmatrix}1&0&2&1\\2&1&0&0\\0&1&1&2\\1&2&0&1\end{bmatrix}\quad C = A \cdot B = \begin{bmatrix}6&4&2&2\\3&5&2&5\\2&1&5&4\\5&5&2&3\end{bmatrix}$$
+
+> [!note] The hand-sized calls are not in the repo
+> They are the same kernel bodies with a smaller block or template argument, so every index line is unchanged; only the numbers shrink. Their values are hand counts, checked with a line-for-line CPU port of each kernel's index arithmetic **[THEORY]**. cuBLAS is called differently (a library call, not a `<<< >>>` launch); its 2 × 2 example is in §7.3.
+
 ### 1.3 What happens when you write `kernel<<<grid, block>>>(args)` **[THEORY]**
 
 1. **Host side.** The CPU call packs the arguments and pushes a launch command into a stream's queue (the default stream here). It **returns immediately**: the launch is asynchronous. That is why timing needs events (§7).
@@ -208,6 +239,27 @@ Check it on the whiteboard: 1024 × 32 = 32,768 ✓; 512 × 16 × 4 = 32,768 ✓
 | 50 | `acc` lives in a register | the running sum never touches memory until line 53 | |
 | 51–52 | dot product of row `row` of A with column `col` of B, one FMA per k | `fmaf` = a·b + c in one instruction, one rounding; counts as 2 FLOPs | Dropping `(size_t)`: `row * N + k` is 32-bit `int`; fine at N = 32768 (max 1.07 × 10⁹) but overflows for N > 46,340. |
 | 53 | one store per thread | | |
+
+#### How it is called, on an example
+
+**Real call** (`:460`) **[IMPL]**: `mm_naive<<<g32, b32>>>(dA, dB, dC, N)`. At N = 32768: grid (1024, 1024), block (32, 32), one thread per entry of C. The harness skips it when its projected time passes 400 s (`:457–464`).
+
+**Hand-sized call [THEORY]:** `mm_naive<<<dim3(2, 2), dim3(2, 2)>>>(dA, dB, dC, 4)`. The kernel reads its block size from `blockDim`, so a 2 × 2 block needs no code change: 4 blocks × 4 threads = 16 threads for 16 outputs.
+
+With `blockDim = 2` the index lines become **row = 2·bx + tx, col = 2·by + ty**. Who computes each entry of C, written `(bx,by) / (tx,ty)`:
+
+| | col 0 | col 1 | col 2 | col 3 |
+|---|---|---|---|---|
+| **row 0** | (0,0) / (0,0) | (0,0) / (0,1) | (0,1) / (0,0) | (0,1) / (0,1) |
+| **row 1** | (0,0) / (1,0) | (0,0) / (1,1) | (0,1) / (1,0) | (0,1) / (1,1) |
+| **row 2** | (1,0) / (0,0) | (1,0) / (0,1) | (1,1) / (0,0) | (1,1) / (0,1) |
+| **row 3** | (1,0) / (1,0) | (1,0) / (1,1) | (1,1) / (1,0) | (1,1) / (1,1) |
+
+**The maths of the launch:** the map (bx, by, tx, ty) ↦ (i, j) = (2bx + tx, 2by + ty) sends the 16 threads onto the 16 entries of C one to one, and each thread evaluates one dot product. Example: block (1, 0), thread (0, 1) → row 2, col 1:
+
+$$C[2][1] = \underbrace{[2, 0, 1, 0]}_{A[2][\,:\,]} \cdot \underbrace{[0, 1, 1, 2]}_{B[\,:\,][1]} = 0 + 0 + 1 + 0 = 1 \;✓$$
+
+The two threads with consecutive `tx` in block (0, 0) (a toy "warp") own C[0][0] and C[1][0]: a **column** of C, i.e. rows of A that are N floats apart in memory. That is the uncoalesced pattern of §3, in miniature.
 
 ### 2.3 Traced with real numbers
 
@@ -301,6 +353,25 @@ Block (2, 1), warp `threadIdx.y = 3`, N = 32768, step k = 0:
 | C store | 32 lines (scattered) | 1 line |
 
 **The shapes changed, not the work:** each thread still reads a 1 × N row of A and an N × 1 column of B. What changed is the shape **a warp** reads at one step: naive reads a 32 × 1 column piece of A; coalesced reads a 1 × 32 row piece of B.
+
+#### How it is called, on an example
+
+**Real call** (`:466`) **[IMPL]**: `mm_coalesced<<<g32, b32>>>(dA, dB, dC, N)`: the launch is character for character the same as `mm_naive`'s. Only the two index lines inside differ, so the difference is entirely in step 2 (who owns what).
+
+**Hand-sized call [THEORY]:** `mm_coalesced<<<dim3(2, 2), dim3(2, 2)>>>(dA, dB, dC, 4)`. Index lines: **col = 2·bx + tx, row = 2·by + ty**. Owner table, `(bx,by) / (tx,ty)`:
+
+| | col 0 | col 1 | col 2 | col 3 |
+|---|---|---|---|---|
+| **row 0** | (0,0) / (0,0) | (0,0) / (1,0) | (1,0) / (0,0) | (1,0) / (1,0) |
+| **row 1** | (0,0) / (0,1) | (0,0) / (1,1) | (1,0) / (0,1) | (1,0) / (1,1) |
+| **row 2** | (0,1) / (0,0) | (0,1) / (1,0) | (1,1) / (0,0) | (1,1) / (1,0) |
+| **row 3** | (0,1) / (0,1) | (0,1) / (1,1) | (1,1) / (0,1) | (1,1) / (1,1) |
+
+It is the naive table **transposed**. The same 16 dot products are computed; they are just dealt out to threads differently. The thread that computed C[2][1] in the naive launch (block (1, 0), thread (0, 1)) now computes
+
+$$C[1][2] = \underbrace{[0, 1, 2, 1]}_{A[1][\,:\,]} \cdot \underbrace{[2, 0, 1, 0]}_{B[\,:\,][2]} = 0 + 0 + 2 + 0 = 2 \;✓$$
+
+and the consecutive-`tx` pair in block (0, 0) now owns C[0][0] and C[0][1]: a **row** of C, adjacent columns of B, adjacent addresses in memory. Same maths, coalesced access.
 
 ### 3.4 Question bank: coalescing
 
@@ -409,6 +480,31 @@ Each of the TILE² threads loads **one** element of each tile per step: thread (
 | 95–97 | the inner product over this tile, all from shared memory | `sA[ty][k]` is one address per warp (broadcast); `sB[k][tx]` is 32 consecutive words = 32 different banks | |
 | 98 | **barrier 2**: everyone has *finished reading* the tile | the next iteration overwrites `sA`, `sB` | Remove it → a fast warp overwrites the tile while a slow warp still reads it: a race, wrong only sometimes. |
 | 100 | guarded store | out-of-range threads computed a meaningless 0 | |
+
+#### How it is called, on an example
+
+**Real call** (`:467`) **[IMPL]**: `mm_tiled_1to1<32><<<g32, b32>>>(dA, dB, dC, N)`. The template argument and the block must agree: the kernel indexes with `TILE`, not `blockDim`, and each thread loads exactly one cell of each tile, so "block = TILE × TILE" is a contract of the call that nothing in the code checks. At N = 32768: 1024 × 1024 blocks, each owning one 32 × 32 tile of C.
+
+**Hand-sized call [THEORY]:** `mm_tiled_1to1<2><<<dim3(2, 2), dim3(2, 2)>>>(dA, dB, dC, 4)`. Four blocks, each owning a 2 × 2 tile of C; inside a block, thread (tx, ty) owns C[2·by + ty][2·bx + tx] (the coalesced owner table above). The loop at `:88` runs ⌈4 / 2⌉ = 2 times.
+
+**The maths: block matrix multiplication.** Cut A, B and C into TILE × TILE blocks, A_{I,t}, B_{t,J}, C_{I,J}. Then
+
+$$C_{I,J} = \sum_{t=0}^{N/\text{TILE} - 1} A_{I,t}\, B_{t,J}$$
+
+exactly like ordinary matrix multiplication, with numbers replaced by small matrices. **CUDA block (bx, by) computes C_{by, bx}**, and **iteration t of the loop is term t of the sum**: lines 91–92 copy A_{by,t} into `sA` and B_{t,bx} into `sB`, and the inner `k` loop adds each thread's entry of the small product `sA · sB` to its `acc`.
+
+Toy, block (bx = 1, by = 0) → C_{0,1} = rows 0–1, columns 2–3 of C:
+
+| t | `sA` = A_{0,t} | `sB` = B_{t,1} | `sA · sB` | `acc` of the 4 threads after step t |
+|---|---|---|---|---|
+| 0 | [[1, 2], [0, 1]] | [[2, 1], [0, 0]] | [[2, 1], [0, 0]] | [[2, 1], [0, 0]] |
+| 1 | [[0, 1], [2, 1]] | [[1, 2], [0, 1]] | [[0, 1], [2, 5]] | **[[2, 2], [2, 5]]** ✓ = C rows 0–1, cols 2–3 |
+
+One thread of it: (tx = 1, ty = 0) owns entry (0, 1) of the tile = **C[0][3]**:
+- t = 0: `sA[0][0]·sB[0][1] + sA[0][1]·sB[1][1]` = 1·1 + 2·0 = **1**
+- t = 1: 0·2 + 1·1 = 1 → `acc` = **2** = C[0][3] ✓
+
+Its dot product of length 4 was split into 2 partial dot products of length TILE = 2, one per tile step. At real size, block (2, 1) computes C_{1,2} = Σ A_{1,t} B_{t,2} over t = 0 … 1023: 1,024 products of 32 × 32 matrices, each thread adding 32 terms per step.
 
 ### 4.5 Synchronisation and races
 
@@ -526,6 +622,37 @@ int c = tx * F + u;
 
 **Why only 4% apart [THEORY]:** the u = 1 instruction of the contiguous loader reads the other half of the same two lines, which is usually still in L1; and loading is a small share of these kernels' time (most time is the inner loop). The pair is valuable as a controlled experiment, not as a big win.
 
+#### How it is called, on an example
+
+**Real calls** (`:469–472`) **[IMPL]**:
+```cpp
+dim3 g64((N + 63) / 64, (N + 63) / 64);                          // :470  (512, 512) at N = 32768
+mm_tiled_strided<64,32><<<g64, b32>>>(dA, dB, dC, N);            // :471
+mm_tiled_contiguous<64,32><<<g64, b32>>>(dA, dB, dC, N);         // :472
+```
+Two template arguments: `TILE = 64` is the side of the C tile a block owns; `BLK = 32` is the block side and must equal `blockDim`. F = TILE / BLK = 2 outputs per thread in each direction. The grid is ⌈N / 64⌉, not ⌈N / 32⌉, because each block now covers 64 × 64 of C with 32 × 32 threads.
+
+**Hand-sized call [THEORY]:** `mm_tiled_strided<4,2><<<dim3(1, 1), dim3(2, 2)>>>(dA, dB, dC, 4)`, and the same with `mm_tiled_contiguous<4,2>`. One block owns all of C (TILE = 4 = N); 4 threads × F² = 4 outputs each; the tile loop runs ⌈4 / 4⌉ = 1 time.
+
+**The maths** is the block sum of §4.4 again; what's new is that one thread holds F × F entries of the block's result. Which ones:
+- strided: thread (tx, ty) owns C[row0 + ty + 2i][col0 + tx + 2j], i, j ∈ {0, 1}
+- contiguous: thread (tx, ty) owns C[row0 + 2ty + i][col0 + 2tx + j]
+
+Owner of each entry, `(tx,ty)` (the same maps say which thread **loads** each cell of `sA`/`sB`, because each kernel uses one (r, c) formula for loading and computing):
+
+| strided | c0 | c1 | c2 | c3 | | contiguous | c0 | c1 | c2 | c3 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **r0** | (0,0) | (1,0) | (0,0) | (1,0) | | **r0** | (0,0) | (0,0) | (1,0) | (1,0) |
+| **r1** | (0,1) | (1,1) | (0,1) | (1,1) | | **r1** | (0,0) | (0,0) | (1,0) | (1,0) |
+| **r2** | (0,0) | (1,0) | (0,0) | (1,0) | | **r2** | (0,1) | (0,1) | (1,1) | (1,1) |
+| **r3** | (0,1) | (1,1) | (0,1) | (1,1) | | **r3** | (0,1) | (0,1) | (1,1) | (1,1) |
+
+Thread (1, 0):
+- strided: C[0][1] = 4, C[0][3] = 2, C[2][1] = 1, C[2][3] = 4. For example `acc[1][1]` = C[2][3] = Σₖ `sA[2][k]·sB[k][3]` = 2·1 + 0·0 + 1·2 + 0·1 = **4** ✓.
+- contiguous: the 2 × 2 patch C[0…1][2…3] = [[2, 2], [2, 5]] ✓.
+
+**Where the register reuse shows up:** for fixed k and i the code reads `a = sA[ty + 2i][k]` once and multiplies it into `sB[k][tx]` and `sB[k][tx + 2]`: one shared read of A feeds F = 2 FMAs. In the toy: thread (1, 0) at k = 0, i = 0 reads `a` = A[0][0] = 1 once and uses it for both C[0][1] and C[0][3].
+
 ### 5.3 Question bank
 
 **L2. Why give each thread several outputs?**
@@ -626,6 +753,36 @@ for (int i = 0; i < R; ++i) {                                // the store (:277�
 5. Check: 512 × 64 × 16 = 524,288 FMAs = 16 outputs × 32,768 terms ✓.
 
 The toy trace (N = 4, R = 2, thread (1, 0) → C[0…1][2…3] = [[2, 2], [2, 5]]) is in the study guide, [[Day 05 - CUDA I#6.2 The code]].
+
+#### How it is called, on an example
+
+**Real calls** (`:475–483`) **[IMPL]**:
+```cpp
+dim3 gb((N + 63) / 64, (N + 63) / 64);          // :476 / :480  (512, 512) at N = 32768
+mm_block2d<64,2><<<gb, b32>>>(dA, dB, dC, N);   // :477  block 32 × 32 = 64/2 per side
+dim3 bb(16, 16);                                // :481
+mm_block2d<64,4><<<gb, bb>>>(dA, dB, dC, N);    // :482  block 16 × 16 = 64/4 per side
+```
+The contract is **block side = TILE / R**: each thread covers R columns and R rows of the 64 × 64 tile. That's why R = 4 needs its own 16 × 16 block `bb`, and why both configs share the same grid: a block still owns 64 × 64 of C.
+
+**Hand-sized call [THEORY]:** `mm_block2d<4,2><<<dim3(1, 1), dim3(2, 2)>>>(dA, dB, dC, 4)` (the study guide's toy). One block owns all of C; thread (tx, ty) owns the 2 × 2 patch rows `2ty … 2ty+1`, cols `2tx … 2tx+1` (the contiguous owner map in §5). One tile step.
+
+**The maths: a sum of outer products.** For the patch with top-left (r, c):
+
+$$C[r{:}r{+}R,\; c{:}c{+}R] = \sum_{k=0}^{N-1} \underbrace{A[r{:}r{+}R,\; k]}_{\texttt{av},\ R \times 1}\ \underbrace{B[k,\; c{:}c{+}R]}_{\texttt{bv},\ 1 \times R}$$
+
+Thread (tx = 1, ty = 0): r = 0, c = 2:
+
+| k | `av` = A[0…1][k] | `bv` = B[k][2…3] | `av · bv` (outer product) | `reg` after k |
+|---|---|---|---|---|
+| 0 | [1, 0] | [2, 1] | [[2, 1], [0, 0]] | [[2, 1], [0, 0]] |
+| 1 | [2, 1] | [0, 0] | [[0, 0], [0, 0]] | [[2, 1], [0, 0]] |
+| 2 | [0, 2] | [1, 2] | [[0, 0], [2, 4]] | [[2, 1], [2, 4]] |
+| 3 | [1, 1] | [0, 1] | [[0, 1], [0, 1]] | **[[2, 2], [2, 5]]** ✓ |
+
+**Tiling vs register blocking, as loop orders.** Both compute the same 16 terms per patch entry. Tiling (§4.4) runs `for i, j: for k:` (one dot product at a time); register blocking runs `for k: for i, j:` (the whole patch moves one rank-1 update per k). Swapping the loops is what lets 2R loaded values (`av`, `bv`) feed R² FMAs.
+
+At real size (`<64,4>`), thread (3, 5) of block (2, 1) computes the 4 × 4 patch C[84…87][140…143] as the sum of 32,768 outer products: 64 per tile × 512 tiles.
 
 ### 6.4 Registers, occupancy and why 50% still wins
 

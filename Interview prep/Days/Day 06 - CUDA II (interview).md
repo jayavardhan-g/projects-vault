@@ -156,6 +156,43 @@ Part of [[Interview plan (Nov 2026)]]. Built from [[Day 06 - CUDA II]] (the stud
 
 **Traced with real numbers (baseline, N = 32768):** grid `((32768 + 255)/256, 32)` = (128, 32) = 4,096 blocks. Block (bx = 5, by = 7), thread 10: `m = 7`, `col = 5·256 + 10 = 1,290`. It computes `A1[7][1290] = ReLU(Σₖ X[7][k]·W1[k][1290] + b1[1290])` over 32,768 values of k, in 1,024 slices of 32. Its warp (threads 0–31) reads `W1[k][1280 … 1311]` at each k: one 128-byte line.
 
+#### How it is called, on an example
+
+**Real call** (baseline layer 1, `mlp_bench.cu:203–255`) **[IMPL]**:
+```cpp
+constexpr int BN = 256, BK = 32;                             // :203
+dim3 blk(BN);                                                // :250  256 threads, 1-D block
+dim3 grd((N + BN - 1) / BN, B);                              // :251  (column chunks, batch rows)
+mm_thin<BN,BK><<<grd, blk>>>(X, W1, b1, A1, B, N, N, 1);     // :255  A1 = ReLU(X·W1 + b1)
+```
+
+| kernel parameter | host argument | shape / value |
+|---|---|---|
+| `A` | `X` | [M × K] = [32 × N], the input batch |
+| `B` | `W1` | [K × N] = [N × N], the weights |
+| `bias` | `b1` | [N] |
+| `C` | `A1` | [32 × N], the output activations |
+| `M, K, N` | `B, N, N` | 32, N, N. **Name clash:** the host's `B` is the batch size (32); the kernel's `B` is the weight matrix. |
+| `relu` | `1` | apply ReLU in the epilogue (0 for layer 2) |
+
+**The maths:** C[m][col] = act(Σₖ A[m][k]·B[k][col] + bias[col]). Block (bx, by) owns **one row** m = by and **256 columns** 256·bx … 256·bx + 255; thread `tx` owns one column. That's a matrix-vector product per block: one row of X times a 256-column slice of W.
+
+**Hand-sized call [THEORY]:** `mm_thin<2,2><<<dim3(2, 2), dim3(2)>>>(X, W, b, Y, 2, 4, 4, 1)`: batch M = 2, K = N = 4, blocks of 2 columns, K staged 2 at a time. Inputs (X = rows 0–1 of Day 5's toy A, W = Day 5's toy B):
+
+$$X = \begin{bmatrix}1&2&0&1\\0&1&2&1\end{bmatrix},\ W = \begin{bmatrix}1&0&2&1\\2&1&0&0\\0&1&1&2\\1&2&0&1\end{bmatrix},\ b = [-4, 0, -3, 0]$$
+
+X·W = [[6, 4, 2, 2], [3, 5, 2, 5]]; + b = [[2, 4, −1, 2], [−1, 5, −1, 5]]; ReLU → **Y = [[2, 4, 0, 2], [0, 5, 0, 5]]**.
+
+Grid (2, 2): block (bx, by) computes Y[by][2bx] and Y[by][2bx + 1]. Block (1, 0), i.e. row m = 0, columns 2–3:
+
+| k0 | `sA` = X[0][k0 … k0+1] | thread 0 (col 2) `acc` | thread 1 (col 3) `acc` |
+|---|---|---|---|
+| 0 | [1, 2] | 1·W[0][2] + 2·W[1][2] = 1·2 + 2·0 = 2 | 1·W[0][3] + 2·W[1][3] = 1·1 + 2·0 = 1 |
+| 2 | [0, 1] | 2 + 0·1 + 1·0 = 2 | 1 + 0·2 + 1·1 = 2 |
+| epilogue `:77–78` | | 2 + (−3) = −1 → ReLU → **0** | 2 + 0 = **2** |
+
+Y[0][2] = 0, Y[0][3] = 2 ✓. The same `sA` pair is reused by both threads (in the real kernel by all 256): that is the only reuse `mm_thin` designs in.
+
 ### 1.4 Question bank: streams and `mm_thin`
 
 **L1. What is a CUDA stream?**
@@ -261,9 +298,30 @@ auto streamed_col = [&] {
 | barrier between layers | every layer-2 output needs every A1 column, which all 4 streams produce | the two layers can't be pipelined per stream |
 | **bug for N ≤ 512 [RECON]** | the guard inside `mm_thin` is `col < N` with the full width, but `cchunk < 256`, so a 256-thread block covers more than its chunk: threads write into other streams' columns and the last stream writes past the end of `A1`/`Y` | the N ≥ 1024 results, including 1.73×, are unaffected (chunks are multiples of 256); fix: pass `cols` as a separate bound |
 
+#### The three variants called on the toy: the maths of each split
+
+Same toy as §1.3 (X is 2 × 4, W is 4 × 4, Y = ReLU(X·W + b)), with **2 streams instead of 4** and `BN = BK = 2` **[THEORY]**:
+
+| variant | the launches | the maths | each launch reads |
+|---|---|---|---|
+| baseline | `mm_thin<<<dim3(2, 2), 2>>>(X, W, b, Y, 2, 4, 4, 1)` | Y = X·W | all of X, all of W |
+| batch split (chunk = 1 row) | stream s: `mm_thin<<<dim3(2, 1), 2, 0, st[s]>>>(X + 4s, W, b, Y + 4s, 1, 4, 4, 1)` | $\begin{bmatrix}X_0\\X_1\end{bmatrix} W = \begin{bmatrix}X_0 W\\X_1 W\end{bmatrix}$: stream s computes row s | 1 row of X, **all of W** |
+| column split (chunk = 2 cols) | stream s: `mm_thin<<<dim3(1, 2), 2, 0, st[s]>>>(X, W + 2s, b + 2s, Y + 2s, 2, 4, 4, 1)` | $X\,[\,W_L \mid W_R\,] = [\,X W_L \mid X W_R\,]$: stream s computes columns 2s, 2s + 1 | all of X, **half of W** |
+
+All three produce Y = [[2, 4, 0, 2], [0, 5, 0, 5]] (checked with a CPU port of `mm_thin`).
+
+**How a pointer offset selects a sub-matrix.** Row offsets are easy: rows are contiguous, so `X + 4s` is row s. Column offsets work because the **full N is still passed as the row stride**: the kernel reads `B[(k0 + kk)·N + col]` with N = 4 and a local `col` ∈ {0, 1}. With `B = W + 2` that is `W[k·4 + 2 + col]` = **W[k][2 + col]**, columns 2–3. The store `C[m·N + col]` with `C = Y + 2` lands in Y[m][2 + col] the same way. This is BLAS's "leading dimension": a pointer to the top-left element plus the stride of the full matrix is a view of a sub-matrix, with no copy. (It's also why the N ≤ 512 bug exists: the guard `col < N` uses the stride, not the chunk width.)
+
+**Why layer 2 needs the barrier, in the same notation:** layer 2's output column j is A1 · W2[:, j], which needs **every** column of A1, and in the column split those columns were produced by different streams. In the batch split, row s of layer 2 needs only row s of A1, made earlier in the same stream.
+
+At the real size: batch split offsets `X + r0·N` with r0 = 0, 8, 16, 24; column split `W1 + c0` with c0 = 0, 8,192, 16,384, 24,576.
+
 ### 2.3 Waves, L2, and the locality explanation
 
 ![[d06i-waves.svg]] [[d06i-waves.html|▶ Step through it]]
+
+![[d06m-stream-splits.mp4]]
+*Manim video: baseline waves vs batch split vs column split, and how many times W comes from HBM (1 min). Pause and scrub with the video controls.*
 
 **Count the waves [THEORY]:** `mm_thin` has 256 threads per block and an SM holds up to 2,048 threads, so up to 8 blocks per SM → **1,056 blocks per wave** on 132 SMs (ignoring register limits, which aren't documented for this kernel).
 
@@ -355,6 +413,9 @@ Toy (16 layers, 1 unit each): keep all = 16 units; checkpoint every 4th layer = 
 
 ![[d06i-ckpt-life.svg]] [[d06i-ckpt-life.html|▶ Step through it]]
 
+![[d06m-ckpt-arena.mp4]]
+*Manim video: keep-all vs checkpointed memory side by side, the arena being overwritten, and the 0 MB first version (1 min). Pause and scrub with the video controls.*
+
 ```
 Z1 = X·W1 + b1,  A1 = ReLU(Z1)      ← segment A (arena)
 Z2 = A1·W2 + b2, A2 = ReLU(Z2)      ← A2: checkpoint (own buffer)
@@ -430,6 +491,58 @@ if (checkpointed) {
 All these kernels run on the default stream, so "every use of z3/a3 before this line" is guaranteed by stream order on the GPU, but only because the **source order** is right. Nothing checks it. Then layer 2 and 1 gradients and SGD (`:525–543`).
 
 `mm_tiled` here (`:90–107`) is the same 32 × 32 1-to-1 tiled kernel as Day 5's `mm_tiled_1to1<32>`. Custom GEMMs are used everywhere, not cuBLAS, because cuBLAS keeps an internal workspace that would pollute `cudaMemGetInfo` (`:17–18`, documented).
+
+#### How the training-step kernels are called, on an example
+
+Every launch in the training step uses one of two shape helpers (`mlp_bench.cu:183–184`) **[IMPL]**:
+```cpp
+static inline int  g1(size_t n, int tpb = 256) { return (int)((n + tpb - 1) / tpb); }   // ceil(n/256) blocks
+static inline dim3 g2(int M, int N) { return dim3((N + TS - 1) / TS, (M + TS - 1) / TS); }  // TS = 32
+```
+- `g2(M, N)` takes C's shape as (rows, columns) but returns `dim3(columns, rows)`: grid.x walks C's columns so that `tx → col` and loads coalesce (Day 5 §3). Used with `dim3(TS, TS)` = 32 × 32 blocks: **one thread per entry of C**, Day 5's 1-to-1 tiling.
+- `g1(n)` with 256-thread blocks: **one thread per element** of a flat array of n floats, thread i = `blockIdx.x·256 + threadIdx.x`.
+
+**Every kernel, its call for layer 3 / 4, and its maths** (buffers are row-major [rows × cols]):
+
+| kernel | a real call (line) | maths |
+|---|---|---|
+| `mm_tiled(A, B, C, M, K, N)` | `<<<g2(Nb,H3), dim3(TS,TS)>>>(A2, W3, rZ3, Nb, H2, H3)` :495 | C = A·B: **Z3 = A2·W3** |
+| `mm_tiled_AT(A, B, C, M, K, N)`, A stored [K × M] | `<<<g2(H2,H3), …>>>(A2, dZ3, dW3, H2, Nb, H3)` :510 | *meant to be* C = Aᵀ·B: **dW3 = A2ᵀ·dZ3**. ⚠️ It isn't: see the warning below the toy. |
+| `mm_tiled_BT(A, B, C, M, K, N)`, B stored [N × K] | `<<<g2(Nb,H3), …>>>(dZ4, W4, dZ3, Nb, OUT, H3)` :508 | C = A·Bᵀ: **dZ3 ← dZ4·W4ᵀ** (the gradient reaching A3) |
+| `k_add_bias_relu(Z, b, M, D, relu)` | `<<<g1(n3),256>>>(rZ3, b3, Nb, H3, 0)` :496 | Z[i] += b[i mod D] (relu = 0 at every call in the training step, so bias only) |
+| `k_relu_into(Z, A, n)` | `<<<g1(n3),256>>>(rZ3, rA3, n3)` :497 | A[i] = max(Z[i], 0) |
+| `k_mse_grad(Z, Y, dZ, n)` | `<<<g1(n4),256>>>(Z4, Yt, dZ4, n4)` :504 | dZ[i] = 2(Z[i] − Y[i]) / n, n = Nb·OUT (gradient of the mean squared error) |
+| `k_relu_deriv(Z, dZ, n)` | `<<<g1(n3),256>>>(z3, dZ3, n3)` :509 | dZ[i] ← dZ[i] if Z[i] > 0, else 0 (in place) |
+| `k_bias_grad(dZ, db, M, D)` | `<<<g1(OUT),256>>>(dZ4, db4, Nb, OUT)` :506 | db[j] = Σᵢ dZ[i][j]: one thread per **column**, looping over M rows |
+| `k_sgd(p, g, lr, n)` | `<<<g1((size_t)IN*H1),256>>>(W1, dW1, lr, …)` :536 | p[i] −= lr·g[i] |
+
+At N4096, `mm_tiled(A2, W3, rZ3, 4096, 4096, 4096)` launches g2 = (128, 128) blocks of 32 × 32: 16.8 M threads, one per entry of Z3.
+
+**One layer, end to end, by hand [THEORY]** (batch Nb = 2, 2 inputs, 2 outputs; checked with a CPU port of the kernels). Map it onto layer 3: A_prev ↔ A2, W ↔ W3, Z ↔ Z3, A ↔ A3.
+
+$$A_\text{prev} = \begin{bmatrix}1&2\\3&0\end{bmatrix},\quad W = \begin{bmatrix}1&-1\\0&2\end{bmatrix},\quad b = [0, -1]$$
+
+| # | call | what the threads do | result |
+|---|---|---|---|
+| 1 | `mm_tiled<<<g2(2,2), dim3(32,32)>>>(A_prev, W, Z, 2, 2, 2)` | grid (1, 1); threads with tx, ty < 2 own Z[ty][tx]; the other 1,020 load zeros and skip the store | Z = A_prev·W = [[1, 3], [3, −3]] |
+| 2 | `k_add_bias_relu<<<g1(4),256>>>(Z, b, 2, 2, 0)` | threads i = 0…3: Z[i] += b[i mod 2] | Z = [[1, 2], [3, −4]] |
+| 3 | `k_relu_into<<<1,256>>>(Z, A, 4)` | | A = [[1, 2], [3, 0]] |
+| | *backward; the gradient arriving at A is G = [[1, 1], [1, 1]] (in the code, the next layer's `mm_tiled_BT` output, already in the `dZ` buffer)* | | |
+| 4 | `k_relu_deriv<<<1,256>>>(Z, dZ, 4)` | zero the entries where Z ≤ 0 (only Z[1][1] = −4) | dZ = [[1, 1], [1, 0]] |
+| 5 | `mm_tiled_AT<<<g2(2,2), …>>>(A_prev, dZ, dW, 2, 2, 2)` | meant: C = Aᵀ·B | should be dW = [[1, 3], [2, 0]]·[[1, 1], [1, 0]] = [[4, 1], [2, 2]]; **the kernel as written returns [[3, 1], [3, 3]] = A_prev·dZ** (warning below) |
+| 6 | `k_bias_grad<<<1,256>>>(dZ, db, 2, 2)` | thread j sums column j | db = [2, 1] |
+| 7 | `mm_tiled_BT<<<g2(2,2), …>>>(dZ, W, dA_prev, 2, 2, 2)` | C = A·Bᵀ | dA_prev = [[1, 1], [1, 0]]·[[1, 0], [−1, 2]] = [[0, 2], [1, 0]]: the G for the layer below |
+| 8 | `k_sgd<<<1,256>>>(W, dW, 0.1, 4)` | | W = [[0.6, −1.1], [−0.2, 1.8]] (b likewise) |
+
+**How the transposes happen without a transpose.** `mm_tiled_BT`: thread (tx, ty) stores `sB[ty][tx] = B[col·K + t·TS + ty]` = W[col][k] = (Wᵀ)[k][col], so `sB` holds the tile of Wᵀ and the inner loop is the ordinary tiled product. Nothing is copied; the cost is that this load is no longer lane-adjacent (lanes `tx` are K floats apart: §3.6, "why backward is 3.4× the forward").
+
+> [!danger] `mm_tiled_AT` does not compute Aᵀ·B (found while writing this example) **[RECON, CPU port; not run on the GPU]**
+> `mlp_bench.cu:117–118`: thread (tx, ty) stores `sA[tx][ty] = A[(t·TS + tx)·M + row]` with `row = by·TS + ty`, so `sA[i][j]` = A[t·TS + i][by·TS + j]: the **untransposed** tile of A. The inner loop then reads `sA[ty][k]` as if it held Aᵀ. Two transposes cancel inside each 32 × 32 tile, while the tile *positions* are transposed. Result: within one tile it computes A·B (the toy above: [[3, 1], [3, 3]] instead of [[4, 1], [2, 2]]); at real sizes it computes a block-scrambled product. A line-for-line Python port gives the wrong answer on every random shape tried; `mm_tiled` and `mm_tiled_BT` ported the same way are correct.
+> - **Consequence:** every dW (dW1 … dW4) in the training step is wrong. **Not affected:** the memory numbers, the timings (same FLOPs and loads), and the baseline-vs-checkpointed checksum equality (both modes use the same wrong kernel, which is exactly why that check couldn't catch it, as §3.5 warns).
+> - **Fix (verified on the same port for TS = 2, 4, 32 and non-square shapes):** load with the indices swapped, `aR = t·TS + ty`, column `by·TS + tx`: `sA[tx][ty] = (aR < K && by*TS + tx < M) ? A[(size_t)aR * M + by*TS + tx] : 0.f;`. As a bonus, lanes `tx` then read adjacent floats, so the load becomes coalesced.
+> - **In an interview:** "A per-tensor gradient check against PyTorch would have caught it; that's the first thing I'd add."
+
+A loss example for step 0 of backward: Z4 = [[1, 2], [3, −4]], Y = [[0, 2], [1, 0]], n = 4 → `k_mse_grad` gives dZ4 = 2(Z4 − Y)/4 = [[0.5, 0], [1, −2]].
 
 ### 3.5 Measuring memory and correctness
 
@@ -510,6 +623,9 @@ Multiplying the old sums by $e^{m - m'}$ turns every $e^{s_j - m}$ into $e^{s_j 
 
 ![[d6-7-online-softmax.svg]] [[d6-7-online-softmax.html|▶ Step through it]]
 
+![[d06m-online-softmax.mp4]]
+*Manim video: the §4.2 toy row; tile 1's weights shrink by e^(2 − 3) when the bigger max arrives (45 s). Pause and scrub with the video controls.*
+
 **The same toy inside the real code** (one row, two 2-key tiles, s = [2, 1 | 3, 0], v = [1, 3 | 2, 0]; answer 1.786):
 
 ![[d06i-flash-dbg.svg]] [[d06i-flash-dbg.html|▶ Step through it]]
@@ -555,6 +671,59 @@ Multiplying the old sums by $e^{m - m'}$ turns every $e^{s_j - m}$ into $e^{s_j 
 | 210–211 | grid (256, 16, 8), block (32, 8) | 32,768 blocks × 256 threads |
 | 212 | launch on the **default stream** with dynamic shared memory | correct only because PyTorch's current stream is also the default stream here [RECON] |
 | 213 | returns launch errors to Python | (Day 5's matmul harness lacked this) |
+
+#### How it is called, on an example
+
+**The real call chain** (Python → C → kernel) **[IMPL]**:
+```python
+q = torch.randn(B, NH, N, D, device=dev, dtype=torch.float32)    # bench_attention.py:135  (8, 16, 8192, 64)
+got = custom_flash(lib, q, k, v)                                  # :147
+
+def custom_flash(lib, q, k, v):                                   # :46–55
+    B, NH, N, D = q.shape
+    o = torch.empty_like(q)
+    rc = lib.flash_attention_forward(
+        ctypes.c_void_p(q.data_ptr()), ctypes.c_void_p(k.data_ptr()),
+        ctypes.c_void_p(v.data_ptr()), ctypes.c_void_p(o.data_ptr()),
+        B, NH, N, D)
+```
+`data_ptr()` is the GPU address of the tensor's first float. ctypes hands the four addresses and four ints to the C function above, which computes the launch shape and launches. The tensors must be contiguous float32 [B, NH, N, D] on the GPU, so element (b, h, n, x) is at flat index `((b·NH + h)·N + n)·D + x`; nothing checks it.
+
+**The maths:** for each (b, h) independently, O[b, h] = softmax(Q[b, h]·K[b, h]ᵀ / √D)·V[b, h], each an N × D matrix. Block (qt, h, b) computes **rows 32·qt … 32·qt + 31** of O[b, h]; warp w of the block computes 4 of those rows (4w … 4w + 3).
+
+**Hand-sized call [THEORY]:** tensors of shape (1, 2, 4, 2), so `flash_attention_forward(q, k, v, o, 1, 2, 4, 2)`: B = 1, NH = 2, N = 4, D = 2.
+
+| host line | value |
+|---|---|
+| `Tr = Tc = (4 + 31) / 32` | 1 query tile, 1 key tile |
+| `scale = 1 / sqrtf(2)` | 0.7071 |
+| `shared = (32·2 + 32·3 + 32·2 + 32·32)·4` | 4,992 B |
+| `grid(Tr, NH, B)` | (1, 2, 1): block (0, 0, 0) is head 0, block (0, 1, 0) is head 1 |
+| `block(WARP, WPB)` | (32, 8) = 256 threads, as always |
+
+Head 1's block starts at `base = (0·2 + 1)·4·2 = 8`: floats 8–15 of each flat tensor. Follow head 0 (base = 0):
+
+$$Q = \begin{bmatrix}1&0\\0&1\\1&1\\0&0\end{bmatrix},\quad K = \begin{bmatrix}1&0\\0&1\\1&1\\-1&0\end{bmatrix},\quad V = \begin{bmatrix}1&0\\0&1\\2&2\\0&-1\end{bmatrix}$$
+
+**Who does what in block (0, 0, 0):**
+- **Warp 0** owns query rows 0–3, all live. **Warps 1–7** own rows 4–31, all ≥ N: `live[r]` is false, they stage zeros, compute on them, and skip the final store. At N = 4, 7 of 8 warps are wasted: the ragged-tile cost at tiny N.
+- **Score phase:** lane c < `kv_len` = 4 owns **key c**. Lane 2, for example, computes the scores of key 2 = [1, 1] against all 4 rows of warp 0: q·k = 1, 1, 2, 0 → × 0.7071 = 0.707, 0.707, 1.414, 0 (column 2 of the table below). Lanes 4–31 get s = −∞, so p = 0.
+- **PV phase:** lane x < D = 2 owns **output feature x**; lanes 2–31 skip the loop (`x = lane ≥ D`).
+
+**The values** (rounded; each row: s = q·kᶜ / √2 for keys c = 0…3, then m = max, p = e^(s − m), l = Σp, pv = Σ p·vᶜ, O = pv / l):
+
+| row | s (keys 0–3) | m | p | l | pv (features 0, 1) | **O** |
+|---|---|---|---|---|---|---|
+| 0 | 0.707, 0, 0.707, −0.707 | 0.707 | 1, 0.493, 1, 0.243 | 2.736 | 3.000, 2.250 | **1.096, 0.822** |
+| 1 | 0, 0.707, 0.707, 0 | 0.707 | 0.493, 1, 1, 0.493 | 2.986 | 2.493, 2.507 | **0.835, 0.840** |
+| 2 | 0.707, 0.707, 1.414, −0.707 | 1.414 | 0.493, 0.493, 1, 0.120 | 2.106 | 2.493, 2.373 | **1.184, 1.127** |
+| 3 | 0, 0, 0, 0 | 0 | 1, 1, 1, 1 | 4 | 3, 2 | **0.75, 0.50** |
+
+- The **m** column is the 5-step `__shfl_xor_sync` max across lanes 0–31; **l** is the shuffle sum. The **p** row is what warp 0 writes into its 4 rows of `S`; the PV phase reads it back.
+- With a single key tile the online-softmax bookkeeping is trivial: `m_run` starts at −∞, so `e_run` = e^(−∞) = 0 and `e_tile` = 1, giving `o_acc` = pv and `l_run` = l. With N > 32 there are more key tiles and the rescaling of §4.2 starts to matter (the d06i-flash-dbg animation traces a two-tile row).
+- Sanity check: row 3 is a zero query, so all scores are equal and O is the plain mean of V's rows, [3/4, 2/4] ✓.
+
+At the real size, `flash_attention_forward(…, 8, 16, 8192, 64)` gives Tr = Tc = 256, grid (256, 16, 8) = 32,768 blocks, and the same per-block roles, with 256 key tiles per block instead of 1.
 
 ### 4.5 The kernel, part by part (`flash_lib.cu:47–184`)
 
@@ -636,6 +805,9 @@ for (int x = lane; x < D; x += WARP, ++jj) {
 ### 4.6 The bank conflict, and why D + 1 fixes it (7.0×)
 
 ![[d6-9-banks.svg]] [[d6-9-banks.html|▶ Step through it]]
+
+![[d06m-bank-conflict.mp4]]
+*Manim video: Kj words slide from stride 64 to stride 65, and the 32-request pile-up on bank 5 flattens (50 s). Pause and scrub with the video controls.*
 
 In the score loop, at a fixed feature x, lane c reads `Kj[c·stride + x]`.
 - **Stride 64 (= D):** bank = (64c + x) mod 32 = **x mod 32** for every c. 32 different addresses in one bank → **32-way conflict**, on every one of the 64 feature steps of the hottest loop.
