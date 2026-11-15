@@ -158,13 +158,9 @@ Part of [[Interview plan (Nov 2026)]]. Built from [[Day 06 - CUDA II]] (the stud
 
 #### How it is called, on an example
 
-**Real call** (baseline layer 1, `mlp_bench.cu:203–255`) **[IMPL]**:
-```cpp
-constexpr int BN = 256, BK = 32;                             // :203
-dim3 blk(BN);                                                // :250  256 threads, 1-D block
-dim3 grd((N + BN - 1) / BN, B);                              // :251  (column chunks, batch rows)
-mm_thin<BN,BK><<<grd, blk>>>(X, W1, b1, A1, B, N, N, 1);     // :255  A1 = ReLU(X·W1 + b1)
-```
+**Real call** **[IMPL]**: line 255 of `part1()`, which is shown complete in §2.2 (`mlp_bench.cu:195–334`):
+
+`mm_thin<BN,BK><<<grd, blk>>>(X, W1, b1, A1, B, N, N, 1);`  where `BN = 256`, `BK = 32` (`:203`), `blk = dim3(BN)` = 256 threads (`:250`), `grd = dim3((N + BN − 1)/BN, B)` = (128, 32) blocks at N = 32768 (`:251`), and `X`, `W1`, `b1`, `A1` are the `cudaMalloc`'d buffers of `:226–233`. `B` = 32 is `part1()`'s parameter, set in `main()` (`:638`).
 
 | kernel parameter | host argument | shape / value |
 |---|---|---|
@@ -236,32 +232,214 @@ Y[0][2] = 0, Y[0][3] = 2 ✓. The same `sA` pair is reused by both threads (in t
 
 ### 2.2 The three variants, line by line
 
-```cpp
-// (a) baseline :254–257
-auto baseline = [&] {
-    mm_thin<BN,BK><<<grd, blk>>>(X,  W1, b1, A1, B, N, N, 1);   // layer 1, ReLU
-    mm_thin<BN,BK><<<grd, blk>>>(A1, W2, b2, Y,  B, N, N, 0);   // layer 2
-};
-```
-Two launches in the default stream: layer 2 starts after layer 1 ends (same stream = in order), so no barrier is needed. `grd = ((N + 255)/256, B)`, `blk = 256`.
+All of Part 1 is one function, `part1()`, called from `main()`. Both are complete below, with the random fill they use.
+
+**`fill_random`, `part1()` (`mlp_bench.cu:186–334`)**
 
 ```cpp
-// (b) batch split :261–273
-const int chunk = (B + NS - 1) / NS;                        // (32 + 3)/4 = 8
-auto streamed = [&] {
-    for (int s = 0; s < NS; ++s) {
-        int r0 = s * chunk;                                 // 0, 8, 16, 24
-        int rows = (r0 + chunk <= B) ? chunk : (B - r0);
-        if (rows <= 0) continue;
-        dim3 g((N + BN - 1) / BN, rows);                    // (128, 8) at N = 32768
-        mm_thin<BN,BK><<<g, blk, 0, st[s]>>>(X  + (size_t)r0 * N, W1, b1,
-                                             A1 + (size_t)r0 * N, rows, N, N, 1);
-        mm_thin<BN,BK><<<g, blk, 0, st[s]>>>(A1 + (size_t)r0 * N, W2, b2,
-                                             Y  + (size_t)r0 * N, rows, N, N, 0);
-    }
-    for (int s = 0; s < NS; ++s) cudaStreamSynchronize(st[s]);
-};
+186  static void fill_random(float* p, size_t n, unsigned seed, float scale = 1.0f)
+187  {
+188      unsigned s = seed;
+189      for (size_t i = 0; i < n; ++i) {
+190          s = s * 1103515245u + 12345u;
+191          p[i] = ((float)((s >> 16) % 2001) / 1000.0f - 1.0f) * scale;
+192      }
+193  }
+194
+195  // ═════════════════════════════════════════════════════════════════════════════
+196  // PART 1 — 2-layer forward pass: baseline vs 4 streams
+197  // ═════════════════════════════════════════════════════════════════════════════
+198  static void part1(FILE* out, int B, const std::vector<int>& widths, int iters)
+199  {
+200      fprintf(stderr, "\n=== Part 1: 2-layer MLP forward pass (B = %d) ===\n", B);
+201      fprintf(stderr, "%-8s %14s %14s %14s\n", "N", "baseline_ms", "streams_ms", "streams_col_ms");
+202
+203      constexpr int BN = 256, BK = 32;
+204      const int NS = 4;
+205
+206      cudaStream_t st[NS];
+207      for (int i = 0; i < NS; ++i) CUDA_CHECK(cudaStreamCreate(&st[i]));
+208
+209      cudaEvent_t beg, end;
+210      CUDA_CHECK(cudaEventCreate(&beg));
+211      CUDA_CHECK(cudaEventCreate(&end));
+212
+213      for (int N : widths) {
+214          size_t wbytes = (size_t)N * N * sizeof(float);
+215          size_t abytes = (size_t)B * N * sizeof(float);
+216
+217          size_t freeb, totalb;
+218          CUDA_CHECK(cudaMemGetInfo(&freeb, &totalb));
+219          if (2 * wbytes + 3 * abytes + (size_t)2 * N * sizeof(float) > freeb - (1ull << 30)) {
+220              fprintf(stderr, "%-8d  skipped: needs %.1f GB, only %.1f GB free\n",
+221                      N, (2.0 * wbytes) / 1e9, freeb / 1e9);
+222              fprintf(out, "p1_baseline,%d,,skipped_oom\n", N);
+223              continue;
+224          }
+225
+226          float *X, *W1, *b1, *A1, *W2, *b2, *Y;
+227          CUDA_CHECK(cudaMalloc(&X,  abytes));
+228          CUDA_CHECK(cudaMalloc(&W1, wbytes));
+229          CUDA_CHECK(cudaMalloc(&b1, (size_t)N * sizeof(float)));
+230          CUDA_CHECK(cudaMalloc(&A1, abytes));
+231          CUDA_CHECK(cudaMalloc(&W2, wbytes));
+232          CUDA_CHECK(cudaMalloc(&b2, (size_t)N * sizeof(float)));
+233          CUDA_CHECK(cudaMalloc(&Y,  abytes));
+234
+235          {   // initialise on the host once
+236              float* tmp = (float*)malloc(wbytes);
+237              fill_random(tmp, (size_t)N * N, 1u);
+238              CUDA_CHECK(cudaMemcpy(W1, tmp, wbytes, cudaMemcpyHostToDevice));
+239              fill_random(tmp, (size_t)N * N, 2u);
+240              CUDA_CHECK(cudaMemcpy(W2, tmp, wbytes, cudaMemcpyHostToDevice));
+241              fill_random(tmp, (size_t)B * N, 3u);
+242              CUDA_CHECK(cudaMemcpy(X, tmp, abytes, cudaMemcpyHostToDevice));
+243              fill_random(tmp, (size_t)N, 4u);
+244              CUDA_CHECK(cudaMemcpy(b1, tmp, N * sizeof(float), cudaMemcpyHostToDevice));
+245              fill_random(tmp, (size_t)N, 5u);
+246              CUDA_CHECK(cudaMemcpy(b2, tmp, N * sizeof(float), cudaMemcpyHostToDevice));
+247              free(tmp);
+248          }
+249
+250          dim3 blk(BN);
+251          dim3 grd((N + BN - 1) / BN, B);
+252
+253          // ── (a) baseline: whole batch, default stream
+254          auto baseline = [&] {
+255              mm_thin<BN,BK><<<grd, blk>>>(X,  W1, b1, A1, B, N, N, 1);
+256              mm_thin<BN,BK><<<grd, blk>>>(A1, W2, b2, Y,  B, N, N, 0);
+257          };
+258
+259          // ── (b) batch split across 4 streams: rows are contiguous, so each
+260          //        chunk is just an offset into X / A1 / Y.
+261          const int chunk = (B + NS - 1) / NS;
+262          auto streamed = [&] {
+263              for (int s = 0; s < NS; ++s) {
+264                  int r0 = s * chunk;
+265                  int rows = (r0 + chunk <= B) ? chunk : (B - r0);
+266                  if (rows <= 0) continue;
+267                  dim3 g((N + BN - 1) / BN, rows);
+268                  mm_thin<BN,BK><<<g, blk, 0, st[s]>>>(X  + (size_t)r0 * N, W1, b1,
+269                                                       A1 + (size_t)r0 * N, rows, N, N, 1);
+270                  mm_thin<BN,BK><<<g, blk, 0, st[s]>>>(A1 + (size_t)r0 * N, W2, b2,
+271                                                       Y  + (size_t)r0 * N, rows, N, N, 0);
+272              }
+273              for (int s = 0; s < NS; ++s) cudaStreamSynchronize(st[s]);
+274          };
+275
+276          // ── (c) column split across 4 streams. Layer 2 needs ALL of A1, so the
+277          //        two layers cannot be split the same way — layer 1 splits by
+278          //        output column, then a barrier, then layer 2 splits by column.
+279          const int cchunk = (N + NS - 1) / NS;
+280          auto streamed_col = [&] {
+281              for (int s = 0; s < NS; ++s) {
+282                  int c0 = s * cchunk;
+283                  int cols = (c0 + cchunk <= N) ? cchunk : (N - c0);
+284                  if (cols <= 0) continue;
+285                  dim3 g((cols + BN - 1) / BN, B);
+286                  mm_thin<BN,BK><<<g, blk, 0, st[s]>>>(X, W1 + c0, b1 + c0,
+287                                                       A1 + c0, B, N, N, 1);
+288              }
+289              for (int s = 0; s < NS; ++s) cudaStreamSynchronize(st[s]);
+290              for (int s = 0; s < NS; ++s) {
+291                  int c0 = s * cchunk;
+292                  int cols = (c0 + cchunk <= N) ? cchunk : (N - c0);
+293                  if (cols <= 0) continue;
+294                  dim3 g((cols + BN - 1) / BN, B);
+295                  mm_thin<BN,BK><<<g, blk, 0, st[s]>>>(A1, W2 + c0, b2 + c0,
+296                                                       Y + c0, B, N, N, 0);
+297              }
+298              for (int s = 0; s < NS; ++s) cudaStreamSynchronize(st[s]);
+299          };
+300
+301          auto measure = [&](auto fn) {
+302              for (int i = 0; i < 3; ++i) fn();
+303              CUDA_CHECK(cudaDeviceSynchronize());
+304              CUDA_CHECK(cudaEventRecord(beg));
+305              for (int i = 0; i < iters; ++i) fn();
+306              CUDA_CHECK(cudaEventRecord(end));
+307              CUDA_CHECK(cudaEventSynchronize(end));
+308              float ms = 0.f;
+309              CUDA_CHECK(cudaEventElapsedTime(&ms, beg, end));
+310              return (double)ms / iters;
+311          };
+312
+313          // NOTE on the column split: W1 + c0 is a column offset into a row-major
+314          // matrix, so the kernel sees a matrix of N columns but only writes the
+315          // first `cols` of them. The leading dimension is still N, which is what
+316          // mm_thin's N argument means, so passing N as the width and offsetting
+317          // both the pointer and the grid gives the right sub-block.
+318          double t_base = measure(baseline);
+319          double t_str  = measure(streamed);
+320          double t_col  = measure(streamed_col);
+321
+322          fprintf(stderr, "%-8d %14.4f %14.4f %14.4f\n", N, t_base, t_str, t_col);
+323          fprintf(out, "p1_baseline,%d,%.6f,\n",    N, t_base);
+324          fprintf(out, "p1_streams,%d,%.6f,\n",     N, t_str);
+325          fprintf(out, "p1_streams_col,%d,%.6f,\n", N, t_col);
+326          fflush(out);
+327
+328          cudaFree(X); cudaFree(W1); cudaFree(b1); cudaFree(A1);
+329          cudaFree(W2); cudaFree(b2); cudaFree(Y);
+330      }
+331
+332      for (int i = 0; i < NS; ++i) cudaStreamDestroy(st[i]);
+333      cudaEventDestroy(beg); cudaEventDestroy(end);
+334  }
 ```
+
+**`main()` (`mlp_bench.cu:635–665`)**: Part 1 runs widths 32, 64, …, 32768 with B = 32 and 20 timed iterations; Part 2 runs 100 iterations (§3).
+
+```cpp
+635  int main(int argc, char** argv)
+636  {
+637      const char* out_path = nullptr;
+638      int p1_iters = 20, p2_iters = 100, B = 32;
+639      bool do1 = true, do2 = true;
+640
+641      for (int i = 1; i < argc; ++i) {
+642          if (!strcmp(argv[i], "--out") && i + 1 < argc) out_path = argv[++i];
+643          else if (!strcmp(argv[i], "--part1-only")) do2 = false;
+644          else if (!strcmp(argv[i], "--part2-only")) do1 = false;
+645          else if (!strcmp(argv[i], "--p2-iters") && i + 1 < argc) p2_iters = atoi(argv[++i]);
+646      }
+647
+648      cudaDeviceProp prop;
+649      CUDA_CHECK(cudaGetDeviceProperties(&prop, 0));
+650      fprintf(stderr, "Device: %s (%d SMs)\n", prop.name, prop.multiProcessorCount);
+651
+652      FILE* out = out_path ? fopen(out_path, "w") : stdout;
+653      if (!out) { perror(out_path); return 1; }
+654      fprintf(out, "impl,config,a,b,c,d\n");
+655
+656      if (do1) {
+657          std::vector<int> widths;
+658          for (int n = 32; n <= 32768; n *= 2) widths.push_back(n);
+659          part1(out, B, widths, p1_iters);
+660      }
+661      if (do2) part2(out, p2_iters);
+662
+663      if (out_path) fclose(out);
+664      return 0;
+665  }
+```
+
+| lines | what `part1()` does |
+|---|---|
+| 203–211 | `BN = 256` columns per block, `BK = 32` A values staged per step, `NS = 4` streams created with `cudaStreamCreate`, two timing events |
+| 213–224 | per width N: skip if W1, W2 (N² floats each) and the activations don't fit in free memory |
+| 226–248 | allocate X, A1, Y (B × N), W1, W2 (N × N), b1, b2 (N); fill them on the host with `fill_random` and copy over |
+| 250–251 | `blk` = 256 threads; `grd` = (⌈N/256⌉, B) blocks: one block per (256-column chunk, batch row) |
+| 253–257 | **(a) baseline** lambda |
+| 259–274 | **(b) batch split** lambda |
+| 276–299 | **(c) column split** lambda |
+| 301–311 | `measure`: 3 warm-up calls, then `iters` calls between two events (§2.4) |
+| 313–326 | time the three lambdas, print and write CSV rows |
+| 328–333 | free, destroy streams and events |
+
+**(a) baseline, lines 253–257.** Two launches in the default stream: layer 2 starts after layer 1 ends (same stream = in order), so no barrier is needed. `grd = ((N + 255)/256, B)`, `blk = 256`.
+
+**(b) batch split, lines 259–274.** `chunk = (32 + 3)/4 = 8` rows per stream; stream s gets rows `r0 = 8s … 8s + 7` (r0 = 0, 8, 16, 24); its grid is (128, 8) at N = 32768.
 
 | piece | what | consequence |
 |---|---|---|
@@ -270,25 +448,7 @@ auto streamed = [&] {
 | grid `(128, 8)` | 1,024 blocks per kernel | |
 | `cudaStreamSynchronize` × 4 | the **host** waits for each stream, every iteration, inside the timed loop | at small N, host round-trips are part of the "4× slower" |
 
-```cpp
-// (c) column split :279–299
-const int cchunk = (N + NS - 1) / NS;                       // 8,192 at N = 32768
-auto streamed_col = [&] {
-    for (int s = 0; s < NS; ++s) {
-        int c0 = s * cchunk;                                // 0, 8192, 16384, 24576
-        int cols = (c0 + cchunk <= N) ? cchunk : (N - c0);
-        if (cols <= 0) continue;
-        dim3 g((cols + BN - 1) / BN, B);                    // (32, 32) = 1,024 blocks
-        mm_thin<BN,BK><<<g, blk, 0, st[s]>>>(X, W1 + c0, b1 + c0,
-                                             A1 + c0, B, N, N, 1);
-    }
-    for (int s = 0; s < NS; ++s) cudaStreamSynchronize(st[s]);   // layer 2 needs ALL of A1
-    for (int s = 0; s < NS; ++s) {
-        ... same with (A1, W2 + c0, b2 + c0, Y + c0) ...
-    }
-    for (int s = 0; s < NS; ++s) cudaStreamSynchronize(st[s]);
-};
-```
+**(c) column split, lines 276–299.** `cchunk = (N + 3)/4` = 8,192 columns per stream at N = 32768 (c0 = 0, 8192, 16384, 24576); grid (32, 32) = 1,024 blocks per kernel. Layer 1 (lines 281–288), a host barrier (289), layer 2 (290–297) with `A1, W2 + c0, b2 + c0, Y + c0`, a second barrier (298).
 
 | piece | what | consequence |
 |---|---|---|
@@ -340,6 +500,8 @@ At the real size: batch split offsets `X + r0·N` with r0 = 0, 8, 16, 24; column
 **The experiment that would settle it [FUTURE]** (prep pack exercise 2): replace `st[s]` with `st[0]` in the column split, so the four chunks run one after another on one stream. If it stays near 25–27 ms, the win is locality; if it returns to ~44 ms, overlap mattered. An even cleaner test: one kernel with `blockIdx.x` as the batch row and `blockIdx.y` as the column chunk.
 
 ### 2.4 How Part 1 is timed (`:301–311`)
+
+The `measure` lambda of `part1()` (complete in §2.2), again for reference:
 
 ```cpp
 auto measure = [&](auto fn) {
@@ -430,31 +592,337 @@ Sizes at N4096: a 4096 × 4096 float tensor = **64 MiB**; Z4 (4096 × 1024) = **
 
 ### 3.4 The code, line by line
 
-**Allocation (`:411–420`)**
-```cpp
-float *Z1=nullptr,*A1=nullptr,*Z2=nullptr,*A2=nullptr,*Z3=nullptr,*A3=nullptr,*Z4=nullptr;
-CUDA_CHECK(cudaMalloc(&A2, n2 * sizeof(float)));   // checkpoint
-CUDA_CHECK(cudaMalloc(&Z4, n4 * sizeof(float)));   // checkpoint
-if (!checkpointed) {
-    CUDA_CHECK(cudaMalloc(&Z1, n1 * sizeof(float)));
-    ... A1, Z2, Z3, A3 ...
-}
-```
-Both modes keep A2 and Z4. Only the baseline allocates the other five. That is the whole memory difference, apart from the arena.
+Part 2 is `part2_run()`, called twice per configuration (baseline, then checkpointed) by `part2()`. Both are complete below; the kernels they launch are listed in full in the next box.
 
-**The arena (`:453–462`)**
+**`part2_run()` (`mlp_bench.cu:336–593`)**
+
 ```cpp
-float *arena = nullptr;
-float *rZ1=nullptr,*rA1=nullptr,*rZ2=nullptr,*rZ3=nullptr,*rA3=nullptr;
-if (checkpointed) {
-    size_t segA = 2 * n1 + n2;                       // Z1, A1, Z2  = 192 MiB
-    size_t segB = 2 * n3;                            // Z3, A3      = 128 MiB
-    size_t arena_floats = segA > segB ? segA : segB;
-    CUDA_CHECK(cudaMalloc(&arena, arena_floats * sizeof(float)));
-    rZ1 = arena;  rA1 = rZ1 + n1;  rZ2 = rA1 + n1;   // segment A layout
-    rZ3 = arena;  rA3 = rZ3 + n3;                    // segment B, aliased
-}
+336  // ═════════════════════════════════════════════════════════════════════════════
+337  // PART 2 — 4-layer MLP: full-activation vs checkpointed backward
+338  //
+339  //   Z1 = X W1 + b1,  A1 = ReLU(Z1)
+340  //   Z2 = A1 W2 + b2, A2 = ReLU(Z2)     <- the checkpoint
+341  //   Z3 = A2 W3 + b3, A3 = ReLU(Z3)
+342  //   Z4 = A3 W4 + b4                    <- the checkpoint
+343  //
+344  // Baseline keeps Z1, A1, Z2, A2, Z3, A3, Z4 resident between forward and
+345  // backward. Checkpointed keeps only A2 and Z4, and rebuilds
+346  //   Z1, A1, Z2   from X  (layers 1-2)
+347  //   Z3, A3       from A2 (layer 3)
+348  // at the start of the backward pass.
+349  // ═════════════════════════════════════════════════════════════════════════════
+350  struct Part2Result { double fwd_ms, bwd_ms; size_t peak_bytes; double loss_check; };
+351
+352  static Part2Result part2_run(bool checkpointed, int Nb, int IN, int H1, int H2,
+353                               int H3, int OUT, int iters, float lr)
+354  {
+355      const size_t n1 = (size_t)Nb * H1, n2 = (size_t)Nb * H2;
+356      const size_t n3 = (size_t)Nb * H3, n4 = (size_t)Nb * OUT;
+357
+358      size_t free_before, total;
+359      CUDA_CHECK(cudaDeviceSynchronize());
+360      CUDA_CHECK(cudaMemGetInfo(&free_before, &total));
+361
+362      // Parameters and their gradients (identical in both modes).
+363      float *X, *Yt, *W1,*W2,*W3,*W4, *b1,*b2,*b3,*b4;
+364      float *dW1,*dW2,*dW3,*dW4, *db1,*db2,*db3,*db4;
+365      CUDA_CHECK(cudaMalloc(&X,  (size_t)Nb * IN * sizeof(float)));
+366      CUDA_CHECK(cudaMalloc(&Yt, n4 * sizeof(float)));
+367      CUDA_CHECK(cudaMalloc(&W1, (size_t)IN * H1 * sizeof(float)));
+368      CUDA_CHECK(cudaMalloc(&W2, (size_t)H1 * H2 * sizeof(float)));
+369      CUDA_CHECK(cudaMalloc(&W3, (size_t)H2 * H3 * sizeof(float)));
+370      CUDA_CHECK(cudaMalloc(&W4, (size_t)H3 * OUT* sizeof(float)));
+371      CUDA_CHECK(cudaMalloc(&b1, H1 * sizeof(float)));
+372      CUDA_CHECK(cudaMalloc(&b2, H2 * sizeof(float)));
+373      CUDA_CHECK(cudaMalloc(&b3, H3 * sizeof(float)));
+374      CUDA_CHECK(cudaMalloc(&b4, OUT* sizeof(float)));
+375      CUDA_CHECK(cudaMalloc(&dW1,(size_t)IN * H1 * sizeof(float)));
+376      CUDA_CHECK(cudaMalloc(&dW2,(size_t)H1 * H2 * sizeof(float)));
+377      CUDA_CHECK(cudaMalloc(&dW3,(size_t)H2 * H3 * sizeof(float)));
+378      CUDA_CHECK(cudaMalloc(&dW4,(size_t)H3 * OUT* sizeof(float)));
+379      CUDA_CHECK(cudaMalloc(&db1,H1 * sizeof(float)));
+380      CUDA_CHECK(cudaMalloc(&db2,H2 * sizeof(float)));
+381      CUDA_CHECK(cudaMalloc(&db3,H3 * sizeof(float)));
+382      CUDA_CHECK(cudaMalloc(&db4,OUT* sizeof(float)));
+383
+384      {
+385          size_t big = (size_t)H1 * H2;
+386          if ((size_t)IN*H1 > big) big = (size_t)IN*H1;
+387          if ((size_t)H2*H3 > big) big = (size_t)H2*H3;
+388          if ((size_t)H3*OUT > big) big = (size_t)H3*OUT;
+389          if ((size_t)Nb*IN  > big) big = (size_t)Nb*IN;
+390          if (n4 > big) big = n4;
+391          float* tmp = (float*)malloc(big * sizeof(float));
+392          auto up = [&](float* d, size_t n, unsigned s, float scale) {
+393              fill_random(tmp, n, s, scale);
+394              CUDA_CHECK(cudaMemcpy(d, tmp, n * sizeof(float), cudaMemcpyHostToDevice));
+395          };
+396          // Weights are scaled by 1/sqrt(fan_in). Without it, four 4096-wide
+397          // layers of U(-1,1) weights amplify the activations by ~sqrt(fan_in)
+398          // per layer and the training loop reaches inf/NaN within a few steps —
+399          // which makes the checksum useless as a cross-check between the two
+400          // modes.
+401          auto isq = [](int f) { return 1.0f / sqrtf((float)f); };
+402          up(X,  (size_t)Nb*IN, 11u, 1.0f);   up(Yt, n4, 12u, 1.0f);
+403          up(W1, (size_t)IN*H1, 13u, isq(IN));  up(W2, (size_t)H1*H2, 14u, isq(H1));
+404          up(W3, (size_t)H2*H3, 15u, isq(H2));  up(W4, (size_t)H3*OUT,16u, isq(H2));
+405          up(b1, H1, 17u, 0.01f); up(b2, H2, 18u, 0.01f);
+406          up(b3, H3, 19u, 0.01f); up(b4, OUT, 20u, 0.01f);
+407          free(tmp);
+408      }
+409
+410      // ── ACTIVATIONS: this is the entire difference between the two modes.
+411      float *Z1=nullptr,*A1=nullptr,*Z2=nullptr,*A2=nullptr,*Z3=nullptr,*A3=nullptr,*Z4=nullptr;
+412      CUDA_CHECK(cudaMalloc(&A2, n2 * sizeof(float)));   // checkpoint
+413      CUDA_CHECK(cudaMalloc(&Z4, n4 * sizeof(float)));   // checkpoint
+414      if (!checkpointed) {
+415          CUDA_CHECK(cudaMalloc(&Z1, n1 * sizeof(float)));
+416          CUDA_CHECK(cudaMalloc(&A1, n1 * sizeof(float)));
+417          CUDA_CHECK(cudaMalloc(&Z2, n2 * sizeof(float)));
+418          CUDA_CHECK(cudaMalloc(&Z3, n3 * sizeof(float)));
+419          CUDA_CHECK(cudaMalloc(&A3, n3 * sizeof(float)));
+420      }
+421
+422      // Gradient scratch, needed by both modes.
+423      float *dZ1,*dZ2,*dZ3,*dZ4;
+424      CUDA_CHECK(cudaMalloc(&dZ1, n1 * sizeof(float)));
+425      CUDA_CHECK(cudaMalloc(&dZ2, n2 * sizeof(float)));
+426      CUDA_CHECK(cudaMalloc(&dZ3, n3 * sizeof(float)));
+427      CUDA_CHECK(cudaMalloc(&dZ4, n4 * sizeof(float)));
+428
+429      // Peak measured with everything resident, which for the baseline includes
+430      // all seven activation buffers and for the checkpointed run only two.
+431      size_t free_after;
+432      CUDA_CHECK(cudaDeviceSynchronize());
+433      CUDA_CHECK(cudaMemGetInfo(&free_after, &total));
+434      size_t peak = free_before - free_after;
+435
+436      cudaEvent_t e0, e1, e2;
+437      CUDA_CHECK(cudaEventCreate(&e0));
+438      CUDA_CHECK(cudaEventCreate(&e1));
+439      CUDA_CHECK(cudaEventCreate(&e2));
+440
+441      // ── Recompute scratch for the checkpointed mode ──
+442      //
+443      // The saving comes from the fact that the two recomputed SEGMENTS are never
+444      // live at the same time. Backward runs layer4 -> layer1, so:
+445      //
+446      //   segment B (layers 3-4) needs Z3, A3      -> 2*n3 floats
+447      //   segment A (layers 1-2) needs Z1, A1, Z2  -> 2*n1 + n2 floats
+448      //
+449      // Segment B is finished with before segment A is rebuilt, so ONE arena
+450      // sized to the larger of the two serves both. Allocating five permanent
+451      // buffers instead (one per dropped activation) would hold exactly what the
+452      // baseline holds and save nothing at all.
+453      float *arena = nullptr;
+454      float *rZ1=nullptr,*rA1=nullptr,*rZ2=nullptr,*rZ3=nullptr,*rA3=nullptr;
+455      if (checkpointed) {
+456          size_t segA = 2 * n1 + n2;
+457          size_t segB = 2 * n3;
+458          size_t arena_floats = segA > segB ? segA : segB;
+459          CUDA_CHECK(cudaMalloc(&arena, arena_floats * sizeof(float)));
+460          rZ1 = arena;  rA1 = rZ1 + n1;  rZ2 = rA1 + n1;   // segment A layout
+461          rZ3 = arena;  rA3 = rZ3 + n3;                    // segment B, aliased
+462      }
+463
+464      auto forward = [&] {
+465          float *z1 = checkpointed ? rZ1 : Z1;
+466          float *a1 = checkpointed ? rA1 : A1;
+467          float *z2 = checkpointed ? rZ2 : Z2;
+468          float *z3 = checkpointed ? rZ3 : Z3;
+469          float *a3 = checkpointed ? rA3 : A3;
+470
+471          mm_tiled<<<g2(Nb,H1), dim3(TS,TS)>>>(X, W1, z1, Nb, IN, H1);
+472          k_add_bias_relu<<<g1(n1),256>>>(z1, b1, Nb, H1, 0);
+473          k_relu_into<<<g1(n1),256>>>(z1, a1, n1);
+474
+475          mm_tiled<<<g2(Nb,H2), dim3(TS,TS)>>>(a1, W2, z2, Nb, H1, H2);
+476          k_add_bias_relu<<<g1(n2),256>>>(z2, b2, Nb, H2, 0);
+477          k_relu_into<<<g1(n2),256>>>(z2, A2, n2);          // checkpoint
+478
+479          mm_tiled<<<g2(Nb,H3), dim3(TS,TS)>>>(A2, W3, z3, Nb, H2, H3);
+480          k_add_bias_relu<<<g1(n3),256>>>(z3, b3, Nb, H3, 0);
+481          k_relu_into<<<g1(n3),256>>>(z3, a3, n3);
+482
+483          mm_tiled<<<g2(Nb,OUT), dim3(TS,TS)>>>(a3, W4, Z4, Nb, H3, OUT);
+484          k_add_bias_relu<<<g1(n4),256>>>(Z4, b4, Nb, OUT, 0);   // checkpoint
+485      };
+486
+487      auto backward = [&] {
+488          // Segment B (layers 3-4) is recomputed, consumed, and then its arena is
+489          // reused for segment A (layers 1-2). Hence the strict ordering below:
+490          // every use of z3/a3 must precede the segment-A recompute that
+491          // overwrites them.
+492          float *z1, *a1, *z2, *z3, *a3;
+493          if (checkpointed) {
+494              // segment B, from the A2 checkpoint
+495              mm_tiled<<<g2(Nb,H3), dim3(TS,TS)>>>(A2, W3, rZ3, Nb, H2, H3);
+496              k_add_bias_relu<<<g1(n3),256>>>(rZ3, b3, Nb, H3, 0);
+497              k_relu_into<<<g1(n3),256>>>(rZ3, rA3, n3);
+498              z3 = rZ3; a3 = rA3;
+499          } else {
+500              z3 = Z3; a3 = A3;
+501          }
+502
+503          // layer 4
+504          k_mse_grad<<<g1(n4),256>>>(Z4, Yt, dZ4, n4);
+505          mm_tiled_AT<<<g2(H3,OUT), dim3(TS,TS)>>>(a3, dZ4, dW4, H3, Nb, OUT);
+506          k_bias_grad<<<g1(OUT),256>>>(dZ4, db4, Nb, OUT);
+507          // layer 3
+508          mm_tiled_BT<<<g2(Nb,H3), dim3(TS,TS)>>>(dZ4, W4, dZ3, Nb, OUT, H3);
+509          k_relu_deriv<<<g1(n3),256>>>(z3, dZ3, n3);
+510          mm_tiled_AT<<<g2(H2,H3), dim3(TS,TS)>>>(A2, dZ3, dW3, H2, Nb, H3);
+511          k_bias_grad<<<g1(H3),256>>>(dZ3, db3, Nb, H3);
+512
+513          // z3 / a3 are dead from here on: rebuild segment A over the same arena.
+514          if (checkpointed) {
+515              mm_tiled<<<g2(Nb,H1), dim3(TS,TS)>>>(X, W1, rZ1, Nb, IN, H1);
+516              k_add_bias_relu<<<g1(n1),256>>>(rZ1, b1, Nb, H1, 0);
+517              k_relu_into<<<g1(n1),256>>>(rZ1, rA1, n1);
+518              mm_tiled<<<g2(Nb,H2), dim3(TS,TS)>>>(rA1, W2, rZ2, Nb, H1, H2);
+519              k_add_bias_relu<<<g1(n2),256>>>(rZ2, b2, Nb, H2, 0);
+520              z1 = rZ1; a1 = rA1; z2 = rZ2;
+521          } else {
+522              z1 = Z1; a1 = A1; z2 = Z2;
+523          }
+524
+525          // layer 2
+526          mm_tiled_BT<<<g2(Nb,H2), dim3(TS,TS)>>>(dZ3, W3, dZ2, Nb, H3, H2);
+527          k_relu_deriv<<<g1(n2),256>>>(z2, dZ2, n2);
+528          mm_tiled_AT<<<g2(H1,H2), dim3(TS,TS)>>>(a1, dZ2, dW2, H1, Nb, H2);
+529          k_bias_grad<<<g1(H2),256>>>(dZ2, db2, Nb, H2);
+530          // layer 1
+531          mm_tiled_BT<<<g2(Nb,H1), dim3(TS,TS)>>>(dZ2, W2, dZ1, Nb, H2, H1);
+532          k_relu_deriv<<<g1(n1),256>>>(z1, dZ1, n1);
+533          mm_tiled_AT<<<g2(IN,H1), dim3(TS,TS)>>>(X, dZ1, dW1, IN, Nb, H1);
+534          k_bias_grad<<<g1(H1),256>>>(dZ1, db1, Nb, H1);
+535          // SGD
+536          k_sgd<<<g1((size_t)IN*H1),256>>>(W1, dW1, lr, (size_t)IN*H1);
+537          k_sgd<<<g1((size_t)H1*H2),256>>>(W2, dW2, lr, (size_t)H1*H2);
+538          k_sgd<<<g1((size_t)H2*H3),256>>>(W3, dW3, lr, (size_t)H2*H3);
+539          k_sgd<<<g1((size_t)H3*OUT),256>>>(W4, dW4, lr, (size_t)H3*OUT);
+540          k_sgd<<<g1(H1),256>>>(b1, db1, lr, H1);
+541          k_sgd<<<g1(H2),256>>>(b2, db2, lr, H2);
+542          k_sgd<<<g1(H3),256>>>(b3, db3, lr, H3);
+543          k_sgd<<<g1(OUT),256>>>(b4, db4, lr, OUT);
+544      };
+545
+546      // Re-measure live memory now that the recompute scratch is allocated too,
+547      // so the comparison is apples-to-apples over the whole training step.
+548      CUDA_CHECK(cudaDeviceSynchronize());
+549      CUDA_CHECK(cudaMemGetInfo(&free_after, &total));
+550      peak = free_before - free_after;
+551
+552      // warmup
+553      for (int i = 0; i < 3; ++i) { forward(); backward(); }
+554      CUDA_CHECK(cudaDeviceSynchronize());
+555
+556      double fwd_total = 0.0, bwd_total = 0.0;
+557      for (int it = 0; it < iters; ++it) {
+558          CUDA_CHECK(cudaEventRecord(e0));
+559          forward();
+560          CUDA_CHECK(cudaEventRecord(e1));
+561          backward();
+562          CUDA_CHECK(cudaEventRecord(e2));
+563          CUDA_CHECK(cudaEventSynchronize(e2));
+564          float f = 0.f, b = 0.f;
+565          CUDA_CHECK(cudaEventElapsedTime(&f, e0, e1));
+566          CUDA_CHECK(cudaEventElapsedTime(&b, e1, e2));
+567          fwd_total += f; bwd_total += b;
+568      }
+569
+570      // Cheap fingerprint of the final weights, so the two modes can be shown to
+571      // have computed the same thing.
+572      double checksum = 0.0;
+573      {
+574          size_t n = (size_t)H3 * OUT;
+575          float* h = (float*)malloc(n * sizeof(float));
+576          CUDA_CHECK(cudaMemcpy(h, W4, n * sizeof(float), cudaMemcpyDeviceToHost));
+577          for (size_t i = 0; i < n; ++i) checksum += h[i];
+578          free(h);
+579      }
+580
+581      cudaFree(X); cudaFree(Yt);
+582      cudaFree(W1); cudaFree(W2); cudaFree(W3); cudaFree(W4);
+583      cudaFree(b1); cudaFree(b2); cudaFree(b3); cudaFree(b4);
+584      cudaFree(dW1);cudaFree(dW2);cudaFree(dW3);cudaFree(dW4);
+585      cudaFree(db1);cudaFree(db2);cudaFree(db3);cudaFree(db4);
+586      cudaFree(A2); cudaFree(Z4);
+587      if (Z1) { cudaFree(Z1); cudaFree(A1); cudaFree(Z2); cudaFree(Z3); cudaFree(A3); }
+588      if (arena) cudaFree(arena);
+589      cudaFree(dZ1);cudaFree(dZ2);cudaFree(dZ3);cudaFree(dZ4);
+590      cudaEventDestroy(e0); cudaEventDestroy(e1); cudaEventDestroy(e2);
+591
+592      return { fwd_total / iters, bwd_total / iters, peak, checksum };
+593  }
 ```
+
+**`part2()` (`mlp_bench.cu:595–633`)**: three configurations; this note's numbers are the third, N4096 = batch 4096, widths 1024 → 4096 → 4096 → 4096 → 1024.
+
+```cpp
+595  static void part2(FILE* out, int iters)
+596  {
+597      struct Cfg { int Nb, IN, H1, H2, H3, OUT; };
+598      std::vector<Cfg> cfgs = {
+599          { 1024,  512, 1024, 1024, 1024,  512 },
+600          { 2048, 1024, 2048, 2048, 2048, 1024 },
+601          { 4096, 1024, 4096, 4096, 4096, 1024 },
+602      };
+603
+604      fprintf(stderr, "\n=== Part 2: 4-layer MLP, %d iterations ===\n", iters);
+605      fprintf(stderr, "%-26s %10s %10s %12s %12s\n",
+606              "config", "fwd_ms", "bwd_ms", "peak_MB", "mode");
+607
+608      for (auto& c : cfgs) {
+609          char label[64];
+610          snprintf(label, sizeof(label), "N%d_%d-%d-%d-%d-%d",
+611                   c.Nb, c.IN, c.H1, c.H2, c.H3, c.OUT);
+612
+613          Part2Result base = part2_run(false, c.Nb, c.IN, c.H1, c.H2, c.H3, c.OUT, iters, 1e-4f);
+614          Part2Result ckpt = part2_run(true,  c.Nb, c.IN, c.H1, c.H2, c.H3, c.OUT, iters, 1e-4f);
+615
+616          fprintf(stderr, "%-26s %10.4f %10.4f %12.2f %12s\n",
+617                  label, base.fwd_ms, base.bwd_ms, base.peak_bytes / 1048576.0, "baseline");
+618          fprintf(stderr, "%-26s %10.4f %10.4f %12.2f %12s\n",
+619                  label, ckpt.fwd_ms, ckpt.bwd_ms, ckpt.peak_bytes / 1048576.0, "checkpointed");
+620          fprintf(stderr, "%-26s  saved %.2f MB   bwd overhead %+.4f ms (%+.1f%%)   checksum %.6g / %.6g\n\n",
+621                  label,
+622                  (double)(base.peak_bytes - ckpt.peak_bytes) / 1048576.0,
+623                  ckpt.bwd_ms - base.bwd_ms,
+624                  100.0 * (ckpt.bwd_ms - base.bwd_ms) / base.bwd_ms,
+625                  base.loss_check, ckpt.loss_check);
+626
+627          fprintf(out, "p2_baseline,%s,%.6f,%.6f,%zu,%.10g\n",
+628                  label, base.fwd_ms, base.bwd_ms, base.peak_bytes, base.loss_check);
+629          fprintf(out, "p2_checkpointed,%s,%.6f,%.6f,%zu,%.10g\n",
+630                  label, ckpt.fwd_ms, ckpt.bwd_ms, ckpt.peak_bytes, ckpt.loss_check);
+631          fflush(out);
+632      }
+633  }
+```
+
+**Every name in `part2_run()`**, with values for the N4096 config:
+
+| name | lines | what it is | N4096 |
+|---|---|---|---|
+| `checkpointed` | parameter | which mode this run is | false, then true |
+| `Nb`, `IN`, `H1`, `H2`, `H3`, `OUT` | parameters | batch size and the five layer widths | 4096, 1024, 4096, 4096, 4096, 1024 |
+| `n1 … n4` | 355–356 | floats in one activation of layer 1 … 4: `Nb × width` | 16.8 M (64 MiB) × 3, 4.2 M (16 MiB) |
+| `free_before`, `free_after`, `peak` | 358–360, 431–434, 548–550 | free device memory before and after every allocation; their difference is the footprint | 962 / 834 MiB |
+| `X`, `Yt` | 363, 365–366 | input batch [Nb × IN] and target [Nb × OUT] | |
+| `W1 … W4`, `b1 … b4` | 363, 367–374 | weights [in × out] and biases, scaled by 1/√fan_in (401–404) | |
+| `dW1 … dW4`, `db1 … db4` | 364, 375–382 | their gradients | |
+| `Z1, A1, Z2, A2, Z3, A3, Z4` | 411–420 | the seven activation buffers: **baseline allocates all seven, checkpointed only A2 and Z4** | |
+| `dZ1 … dZ4` | 423–427 | gradient w.r.t. each layer's Z, both modes | 208 MiB together |
+| `e0, e1, e2` | 436–439 | events: forward = e0→e1, backward = e1→e2 | |
+| `arena`, `rZ1, rA1, rZ2, rZ3, rA3` | 453–462 | the shared recompute buffer and the five pointers into it (checkpointed only) | 192 MiB |
+| `forward`, `backward` | 464–485, 487–544 | lambdas that enqueue the forward pass and the backward pass + SGD | |
+| `z1, a1, z2, z3, a3` | 465–469, 492 | which buffer each activation lives in for this mode: `checkpointed ? arena pointer : own buffer` | |
+| `checksum` | 572–579 | sum of W4 after training: the equality check between the modes (§3.5) | −379.7093289 |
+
+**Allocation (lines 410–420).** Both modes keep A2 and Z4. Only the baseline allocates the other five. That is the whole memory difference, apart from the arena.
+
+**The arena (lines 441–462).** `segA` = Z1 + A1 + Z2 = 192 MiB, `segB` = Z3 + A3 = 128 MiB.
 
 | line | what | why | what breaks if changed |
 |---|---|---|---|
@@ -462,43 +930,139 @@ if (checkpointed) {
 | `max(segA, segB)` | one allocation for both | they are never alive together | allocate `segA + segB` → 320 MiB, the five dropped buffers again: **0 MB saved** (the documented first-version bug, prep exercise 3) |
 | `rZ1 = arena` and `rZ3 = arena` | **the two layouts alias**: Z3 and Z1 start at the same address | that is the saving | any read of z3 after segment A is rebuilt sees Z1's numbers: silently wrong gradients |
 
-**Forward (`:464–485`)** writes z1, a1, z2 into the arena, A2 into its own buffer, then z3, a3 over the start of the arena, and Z4 into its own buffer: `z1 = checkpointed ? rZ1 : Z1` etc. at `:465–469`.
+**Forward (lines 464–485)** writes z1, a1, z2 into the arena, A2 into its own buffer, then z3, a3 over the start of the arena, and Z4 into its own buffer (`z1 = checkpointed ? rZ1 : Z1` etc. at 465–469).
 
-**Backward, segment B (`:493–501`)**
-```cpp
-if (checkpointed) {
-    // segment B, from the A2 checkpoint
-    mm_tiled<<<g2(Nb,H3), dim3(TS,TS)>>>(A2, W3, rZ3, Nb, H2, H3);
-    k_add_bias_relu<<<g1(n3),256>>>(rZ3, b3, Nb, H3, 0);
-    k_relu_into<<<g1(n3),256>>>(rZ3, rA3, n3);
-    z3 = rZ3; a3 = rA3;
-} else { z3 = Z3; a3 = A3; }
-```
-Then layer 4 (`k_mse_grad(Z4, …)`, `mm_tiled_AT(a3, dZ4, dW4)`) and layer 3 (`mm_tiled_BT(dZ4, W4, dZ3)`, `k_relu_deriv(z3, dZ3)`, `mm_tiled_AT(A2, dZ3, dW3)`) at `:503–511`.
+**Backward, segment B (lines 493–501)** recomputes Z3 and A3 from the A2 checkpoint into the arena (checkpointed mode). Then layer 4 (504–506: `k_mse_grad`, `mm_tiled_AT(a3, dZ4, dW4)`, `k_bias_grad`) and layer 3 (508–511: `mm_tiled_BT(dZ4, W4, dZ3)`, `k_relu_deriv(z3, dZ3)`, `mm_tiled_AT(A2, dZ3, dW3)`, `k_bias_grad`).
 
-**The ordering rule (`:513–523`)**
-```cpp
-// z3 / a3 are dead from here on: rebuild segment A over the same arena.
-if (checkpointed) {
-    mm_tiled<<<g2(Nb,H1), dim3(TS,TS)>>>(X, W1, rZ1, Nb, IN, H1);
-    k_add_bias_relu<<<g1(n1),256>>>(rZ1, b1, Nb, H1, 0);
-    k_relu_into<<<g1(n1),256>>>(rZ1, rA1, n1);
-    mm_tiled<<<g2(Nb,H2), dim3(TS,TS)>>>(rA1, W2, rZ2, Nb, H1, H2);
-    k_add_bias_relu<<<g1(n2),256>>>(rZ2, b2, Nb, H2, 0);
-    z1 = rZ1; a1 = rA1; z2 = rZ2;
-}
-```
-All these kernels run on the default stream, so "every use of z3/a3 before this line" is guaranteed by stream order on the GPU, but only because the **source order** is right. Nothing checks it. Then layer 2 and 1 gradients and SGD (`:525–543`).
+**The ordering rule (lines 513–523).** Segment A is rebuilt from X over the same arena only after the last use of z3 and a3. All these kernels run on the default stream, so "every use of z3/a3 before this line" is guaranteed by stream order on the GPU, but only because the **source order** is right. Nothing checks it. Then layer 2 (526–529), layer 1 (531–534) and SGD on every weight and bias (536–543).
 
-`mm_tiled` here (`:90–107`) is the same 32 × 32 1-to-1 tiled kernel as Day 5's `mm_tiled_1to1<32>`. Custom GEMMs are used everywhere, not cuBLAS, because cuBLAS keeps an internal workspace that would pollute `cudaMemGetInfo` (`:17–18`, documented).
+**Timing and the check (lines 552–579):** 3 warm-up steps, then `iters` = 100 steps, each bracketed by e0 → e1 (forward) and e1 → e2 (backward); finally the W4 checksum.
+
+`mm_tiled` (`:90–107`, listed below) is the same 32 × 32 1-to-1 tiled kernel as Day 5's `mm_tiled_1to1<32>`. Custom GEMMs are used everywhere, not cuBLAS, because cuBLAS keeps an internal workspace that would pollute `cudaMemGetInfo` (`:17–18`, documented).
 
 #### How the training-step kernels are called, on an example
 
-Every launch in the training step uses one of two shape helpers (`mlp_bench.cu:183–184`) **[IMPL]**:
+Every kernel the training step launches, and the two shape helpers, complete (`mlp_bench.cu:82–184`) **[IMPL]**:
+
 ```cpp
-static inline int  g1(size_t n, int tpb = 256) { return (int)((n + tpb - 1) / tpb); }   // ceil(n/256) blocks
-static inline dim3 g2(int M, int N) { return dim3((N + TS - 1) / TS, (M + TS - 1) / TS); }  // TS = 32
+82   // ─────────────────────────────────────────────────────────────────────────────
+83   // Square-tiled GEMM variants for Part 2, where all dimensions are large.
+84   //   mm_tiled     C[M,N] = A[M,K] * B[K,N]
+85   //   mm_tiled_AT  C[M,N] = A[K,M]^T * B[K,N]
+86   //   mm_tiled_BT  C[M,N] = A[M,K] * B[N,K]^T
+87   // ─────────────────────────────────────────────────────────────────────────────
+88   #define TS 32
+89
+90   __global__ void mm_tiled(const float* A, const float* B, float* C,
+91                            int M, int K, int N)
+92   {
+93       __shared__ float sA[TS][TS], sB[TS][TS];
+94       int tx = threadIdx.x, ty = threadIdx.y;
+95       int row = blockIdx.y * TS + ty, col = blockIdx.x * TS + tx;
+96       float acc = 0.f;
+97       for (int t = 0; t < (K + TS - 1) / TS; ++t) {
+98           int aC = t * TS + tx, bR = t * TS + ty;
+99           sA[ty][tx] = (row < M && aC < K) ? A[(size_t)row * K + aC] : 0.f;
+100          sB[ty][tx] = (bR < K && col < N) ? B[(size_t)bR * N + col] : 0.f;
+101          __syncthreads();
+102          #pragma unroll
+103          for (int k = 0; k < TS; ++k) acc = fmaf(sA[ty][k], sB[k][tx], acc);
+104          __syncthreads();
+105      }
+106      if (row < M && col < N) C[(size_t)row * N + col] = acc;
+107  }
+108
+109  __global__ void mm_tiled_AT(const float* A, const float* B, float* C,
+110                              int M, int K, int N)   // A is [K, M]
+111  {
+112      __shared__ float sA[TS][TS], sB[TS][TS];
+113      int tx = threadIdx.x, ty = threadIdx.y;
+114      int row = blockIdx.y * TS + ty, col = blockIdx.x * TS + tx;
+115      float acc = 0.f;
+116      for (int t = 0; t < (K + TS - 1) / TS; ++t) {
+117          int aR = t * TS + tx, bR = t * TS + ty;
+118          sA[tx][ty] = (aR < K && row < M) ? A[(size_t)aR * M + row] : 0.f;
+119          sB[ty][tx] = (bR < K && col < N) ? B[(size_t)bR * N + col] : 0.f;
+120          __syncthreads();
+121          #pragma unroll
+122          for (int k = 0; k < TS; ++k) acc = fmaf(sA[ty][k], sB[k][tx], acc);
+123          __syncthreads();
+124      }
+125      if (row < M && col < N) C[(size_t)row * N + col] = acc;
+126  }
+127
+128  __global__ void mm_tiled_BT(const float* A, const float* B, float* C,
+129                              int M, int K, int N)   // B is [N, K]
+130  {
+131      __shared__ float sA[TS][TS], sB[TS][TS];
+132      int tx = threadIdx.x, ty = threadIdx.y;
+133      int row = blockIdx.y * TS + ty, col = blockIdx.x * TS + tx;
+134      float acc = 0.f;
+135      for (int t = 0; t < (K + TS - 1) / TS; ++t) {
+136          int aC = t * TS + tx, bC = t * TS + ty;
+137          sA[ty][tx] = (row < M && aC < K) ? A[(size_t)row * K + aC] : 0.f;
+138          sB[ty][tx] = (col < N && bC < K) ? B[(size_t)col * K + bC] : 0.f;
+139          __syncthreads();
+140          #pragma unroll
+141          for (int k = 0; k < TS; ++k) acc = fmaf(sA[ty][k], sB[k][tx], acc);
+142          __syncthreads();
+143      }
+144      if (row < M && col < N) C[(size_t)row * N + col] = acc;
+145  }
+146
+147  __global__ void k_add_bias_relu(float* Z, const float* b, int M, int D, int relu)
+148  {
+149      size_t i = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
+150      if (i >= (size_t)M * D) return;
+151      float v = Z[i] + b[i % D];
+152      Z[i] = relu ? (v > 0.f ? v : 0.f) : v;
+153  }
+154  __global__ void k_relu_into(const float* Z, float* A, size_t n)
+155  {
+156      size_t i = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
+157      if (i < n) A[i] = Z[i] > 0.f ? Z[i] : 0.f;
+158  }
+159  __global__ void k_relu_deriv(const float* Z, float* dZ, size_t n)
+160  {
+161      size_t i = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
+162      if (i < n) dZ[i] = (Z[i] > 0.f) ? dZ[i] : 0.f;
+163  }
+164  __global__ void k_mse_grad(const float* Z, const float* Y, float* dZ, size_t n)
+165  {
+166      size_t i = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
+167      if (i < n) dZ[i] = (Z[i] - Y[i]) * 2.0f / (float)n;
+168  }
+169  __global__ void k_bias_grad(const float* dZ, float* db, int M, int D)
+170  {
+171      int j = blockIdx.x * blockDim.x + threadIdx.x;
+172      if (j >= D) return;
+173      float s = 0.f;
+174      for (int i = 0; i < M; ++i) s += dZ[(size_t)i * D + j];
+175      db[j] = s;
+176  }
+177  __global__ void k_sgd(float* p, const float* g, float lr, size_t n)
+178  {
+179      size_t i = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
+180      if (i < n) p[i] -= lr * g[i];
+181  }
+182
+183  static inline int g1(size_t n, int tpb = 256) { return (int)((n + tpb - 1) / tpb); }
+184  static inline dim3 g2(int M, int N) { return dim3((N + TS - 1) / TS, (M + TS - 1) / TS); }
 ```
+
+| kernel | lines | one thread does |
+|---|---|---|
+| `mm_tiled` | 90–107 | one entry C[row][col] of C = A·B, via 32 × 32 shared tiles (Day 5 §4.4, with M, K, N instead of one N) |
+| `mm_tiled_AT` | 109–126 | one entry of what should be Aᵀ·B (A stored [K × M]); see the warning below |
+| `mm_tiled_BT` | 128–145 | one entry of A·Bᵀ (B stored [N × K]) |
+| `k_add_bias_relu` | 147–153 | one element: Z[i] += b[i mod D], optional ReLU |
+| `k_relu_into` | 154–158 | A[i] = max(Z[i], 0) |
+| `k_relu_deriv` | 159–163 | dZ[i] = 0 where Z[i] ≤ 0 |
+| `k_mse_grad` | 164–168 | dZ[i] = 2(Z[i] − Y[i]) / n |
+| `k_bias_grad` | 169–176 | one **column** j: db[j] = Σᵢ dZ[i][j] |
+| `k_sgd` | 177–181 | p[i] −= lr·g[i] |
+| `g1`, `g2` | 183–184 | grid sizes (below) |
+
 - `g2(M, N)` takes C's shape as (rows, columns) but returns `dim3(columns, rows)`: grid.x walks C's columns so that `tx → col` and loads coalesce (Day 5 §3). Used with `dim3(TS, TS)` = 32 × 32 blocks: **one thread per entry of C**, Day 5's 1-to-1 tiling.
 - `g1(n)` with 256-thread blocks: **one thread per element** of a flat array of n floats, thread i = `blockIdx.x·256 + threadIdx.x`.
 
@@ -634,31 +1198,49 @@ Multiplying the old sums by $e^{m - m'}$ turns every $e^{s_j - m}$ into $e^{s_j 
 
 ![[d06i-flash-tiles.svg]] [[d06i-flash-tiles.html|▶ Step through it]]
 
-### 4.4 The host launch, line by line (`flash_lib.cu:189–214`)
+### 4.4 The host launch, line by line (`flash_lib.cu:186–222`)
 
 ```cpp
+186  extern "C" {
+187
+188  // Q, K, V, O are DEVICE pointers to contiguous [B, NH, N, D] float32 tensors.
 189  int flash_attention_forward(const float* Q, const float* K, const float* V,
 190                              float* O, int B, int NH, int N, int D)
 191  {
 192      if (D > 128) return -1;      // o_acc holds ceil(D/32) <= 4 feature slots
+193
 194      const int Tr = (N + BR - 1) / BR;
 195      const int Tc = (N + BC - 1) / BC;
 196      const float scale = 1.0f / sqrtf((float)D);
+197
 198      size_t shared = ((size_t)BR * D + (size_t)BC * (D + 1) + (size_t)BC * D
 199                       + (size_t)BR * BC) * sizeof(float);
+200
 201      static int configured = 0;
 202      if (shared > 48 * 1024 && !configured) {
-203          cudaError_t e = cudaFuncSetAttribute(flash_forward_kernel,
+203          cudaError_t e = cudaFuncSetAttribute(
+204              flash_forward_kernel,
 205              cudaFuncAttributeMaxDynamicSharedMemorySize, 200 * 1024);
 206          if (e != cudaSuccess) return (int)e;
 207          configured = 1;
 208      }
+209
 210      dim3 grid(Tr, NH, B);
 211      dim3 block(WARP, WPB);
 212      flash_forward_kernel<<<grid, block, shared>>>(Q, K, V, O, B, NH, N, D, Tc, scale);
 213      return (int)cudaGetLastError();
 214  }
+215
+216  int flash_shared_bytes(int D)
+217  {
+218      return (int)(((size_t)BR * D + (size_t)BC * (D + 1) + (size_t)BC * D
+219                    + (size_t)BR * BC) * sizeof(float));
+220  }
+221
+222  } // extern "C"
 ```
+
+`flash_shared_bytes` (216–220) is the same size formula, exported so Python can print it. (`flash_kernel_info`, 224–257, reads register and occupancy numbers for the report; it is not on the benchmark path.)
 
 | line | what | value at N = 8192, D = 64 |
 |---|---|---|
@@ -674,19 +1256,231 @@ Multiplying the old sums by $e^{m - m'}$ turns every $e^{s_j - m}$ into $e^{s_j 
 
 #### How it is called, on an example
 
-**The real call chain** (Python → C → kernel) **[IMPL]**:
-```python
-q = torch.randn(B, NH, N, D, device=dev, dtype=torch.float32)    # bench_attention.py:135  (8, 16, 8192, 64)
-got = custom_flash(lib, q, k, v)                                  # :147
+**The real call chain** (Python → C → kernel) **[IMPL]**: the whole benchmark script, `bench_attention.py` (204 lines):
 
-def custom_flash(lib, q, k, v):                                   # :46–55
-    B, NH, N, D = q.shape
-    o = torch.empty_like(q)
-    rc = lib.flash_attention_forward(
-        ctypes.c_void_p(q.data_ptr()), ctypes.c_void_p(k.data_ptr()),
-        ctypes.c_void_p(v.data_ptr()), ctypes.c_void_p(o.data_ptr()),
-        B, NH, N, D)
+```python
+1    #!/usr/bin/env python
+2    """
+3    PA4 — FlashAttention benchmark.
+4
+5    Compares three implementations of scaled dot-product attention on identical
+6    inputs, at fixed B=8, N_H=16, D=64, over sequence lengths 32 .. 8192:
+7
+8      1. pytorch_standard  explicit N x N materialisation (matmul + softmax + matmul)
+9      2. custom_flash      our CUDA kernel (build/libflash.so), tiled Br=Bc=32,
+10                          on-register online softmax
+11     3. pytorch_fused     torch.nn.functional.scaled_dot_product_attention
+12
+13   The standard path allocates a B*NH*N*N score tensor, which is 34 GB at N=8192.
+14   It is therefore run in batch chunks, and the chunk boundary is recorded so the
+15   plot can say where the quadratic memory actually bites.
+16
+17   Writes results/pa4_attention.csv.
+18   """
+19
+20   import argparse
+21   import ctypes
+22   import csv
+23   import os
+24   import sys
+25   import time
+26
+27   import torch
+28
+29   HERE = os.path.dirname(os.path.abspath(__file__))
+30   ROOT = os.path.dirname(HERE)
+31   LIB = os.path.join(ROOT, "build", "libflash.so")
+32
+33
+34   def load_flash():
+35       lib = ctypes.CDLL(LIB)
+36       lib.flash_attention_forward.restype = ctypes.c_int
+37       lib.flash_attention_forward.argtypes = [
+38           ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,
+39           ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+40       ]
+41       lib.flash_shared_bytes.restype = ctypes.c_int
+42       lib.flash_shared_bytes.argtypes = [ctypes.c_int]
+43       return lib
+44
+45
+46   def custom_flash(lib, q, k, v):
+47       B, NH, N, D = q.shape
+48       o = torch.empty_like(q)
+49       rc = lib.flash_attention_forward(
+50           ctypes.c_void_p(q.data_ptr()), ctypes.c_void_p(k.data_ptr()),
+51           ctypes.c_void_p(v.data_ptr()), ctypes.c_void_p(o.data_ptr()),
+52           B, NH, N, D)
+53       if rc != 0:
+54           raise RuntimeError(f"flash kernel returned CUDA error {rc}")
+55       return o
+56
+57
+58   def pytorch_standard(q, k, v, chunk=None):
+59       """Explicit N x N attention. `chunk` limits how many batch items are
+60       materialised at once; None means the whole batch in one go."""
+61       B, NH, N, D = q.shape
+62       scale = 1.0 / (D ** 0.5)
+63       if chunk is None or chunk >= B:
+64           att = torch.matmul(q, k.transpose(-2, -1)) * scale
+65           att = torch.softmax(att, dim=-1)
+66           return torch.matmul(att, v)
+67
+68       out = torch.empty_like(q)
+69       for i in range(0, B, chunk):
+70           j = min(i + chunk, B)
+71           att = torch.matmul(q[i:j], k[i:j].transpose(-2, -1)) * scale
+72           att = torch.softmax(att, dim=-1)
+73           out[i:j] = torch.matmul(att, v[i:j])
+74       return out
+75
+76
+77   def pytorch_fused(q, k, v):
+78       return torch.nn.functional.scaled_dot_product_attention(q, k, v)
+79
+80
+81   def timeit(fn, iters, warmup=3):
+82       for _ in range(warmup):
+83           fn()
+84       torch.cuda.synchronize()
+85       start = torch.cuda.Event(enable_timing=True)
+86       end = torch.cuda.Event(enable_timing=True)
+87       start.record()
+88       for _ in range(iters):
+89           fn()
+90       end.record()
+91       torch.cuda.synchronize()
+92       return start.elapsed_time(end) / iters
+93
+94
+95   def score_bytes(B, NH, N):
+96       return B * NH * N * N * 4
+97
+98
+99   def main():
+100      ap = argparse.ArgumentParser()
+101      ap.add_argument("--B", type=int, default=8)
+102      ap.add_argument("--NH", type=int, default=16)
+103      ap.add_argument("--D", type=int, default=64)
+104      ap.add_argument("--iters", type=int, default=10)
+105      ap.add_argument("--max-n", type=int, default=8192)
+106      ap.add_argument("--out", default=os.path.join(ROOT, "results", "pa4_attention.csv"))
+107      ap.add_argument("--budget-gb", type=float, default=40.0,
+108                      help="largest score tensor to materialise in one chunk")
+109      args = ap.parse_args()
+110
+111      if not torch.cuda.is_available():
+112          sys.exit("no CUDA device visible")
+113
+114      lib = load_flash()
+115      dev = torch.device("cuda")
+116      torch.manual_seed(0)
+117
+118      B, NH, D = args.B, args.NH, args.D
+119      free, total = torch.cuda.mem_get_info()
+120      print(f"device      : {torch.cuda.get_device_name(0)}")
+121      print(f"free memory : {free/1e9:.1f} / {total/1e9:.1f} GB")
+122      print(f"config      : B={B} NH={NH} D={D}  shared/block={lib.flash_shared_bytes(D)} B\n")
+123
+124      ns = []
+125      n = 32
+126      while n <= args.max_n:
+127          ns.append(n)
+128          n *= 2
+129
+130      rows = []
+131      print(f"{'N':>6} {'standard_ms':>13} {'flash_ms':>11} {'fused_ms':>11} "
+132            f"{'maxdiff':>10} {'chunk':>6} {'scoreGB':>8}")
+133
+134      for N in ns:
+135          q = torch.randn(B, NH, N, D, device=dev, dtype=torch.float32)
+136          k = torch.randn(B, NH, N, D, device=dev, dtype=torch.float32)
+137          v = torch.randn(B, NH, N, D, device=dev, dtype=torch.float32)
+138
+139          sb = score_bytes(B, NH, N)
+140          chunk = B
+141          while chunk > 1 and score_bytes(chunk, NH, N) > args.budget_gb * 1e9:
+142              chunk //= 2
+143          chunked = chunk < B
+144
+145          # correctness: custom kernel vs the explicit reference
+146          ref = pytorch_standard(q, k, v, chunk=chunk)
+147          got = custom_flash(lib, q, k, v)
+148          torch.cuda.synchronize()
+149          maxdiff = (ref - got).abs().max().item()
+150
+151          fused_ref = pytorch_fused(q, k, v)
+152          fused_diff = (ref - fused_ref).abs().max().item()
+153
+154          t_std   = timeit(lambda: pytorch_standard(q, k, v, chunk=chunk), args.iters)
+155          t_flash = timeit(lambda: custom_flash(lib, q, k, v), args.iters)
+156          t_fused = timeit(lambda: pytorch_fused(q, k, v), args.iters)
+157
+158          print(f"{N:>6} {t_std:>13.4f} {t_flash:>11.4f} {t_fused:>11.4f} "
+159                f"{maxdiff:>10.2e} {chunk:>6} {sb/1e9:>8.2f}")
+160
+161          rows.append(dict(N=N, pytorch_standard_ms=f"{t_std:.6f}",
+162                           custom_flash_ms=f"{t_flash:.6f}",
+163                           pytorch_fused_ms=f"{t_fused:.6f}",
+164                           max_abs_diff_flash=f"{maxdiff:.3e}",
+165                           max_abs_diff_fused=f"{fused_diff:.3e}",
+166                           standard_batch_chunk=chunk,
+167                           standard_chunked=int(chunked),
+168                           score_tensor_bytes=sb,
+169                           shared_bytes_per_block=lib.flash_shared_bytes(D)))
+170
+171          del q, k, v, ref, got, fused_ref
+172          torch.cuda.empty_cache()
+173
+174      os.makedirs(os.path.dirname(args.out), exist_ok=True)
+175      with open(args.out, "w", newline="") as f:
+176          w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+177          w.writeheader()
+178          w.writerows(rows)
+179      print(f"\nwrote {args.out}")
+180
+181      # Crossover analysis. There are two distinct regimes and reporting only the
+182      # first N where the custom kernel is faster would be misleading: at tiny N
+183      # PyTorch is dominated by kernel-launch overhead, not by attention work.
+184      wins = [r["N"] for r in rows
+185              if float(r["custom_flash_ms"]) < float(r["pytorch_standard_ms"])]
+186      losses = [r["N"] for r in rows
+187                if float(r["custom_flash_ms"]) >= float(r["pytorch_standard_ms"])]
+188
+189      print()
+190      if wins:
+191          print(f"custom flash is FASTER than pytorch_standard at N = {wins}")
+192      if losses:
+193          print(f"custom flash is SLOWER than pytorch_standard at N = {losses}")
+194      if wins and losses and max(wins) < min(losses):
+195          print(f"  -> single crossover: PyTorch takes the lead from N = {min(losses)} onward.")
+196          print(f"     Below that, PyTorch is launch-overhead bound "
+197                f"(~{min(float(r['pytorch_standard_ms']) for r in rows):.3f} ms floor), "
+198                f"not attention bound.")
+199      elif not wins:
+200          print("  -> custom flash never overtakes pytorch_standard in this range")
+201
+202
+203  if __name__ == "__main__":
+204      main()
 ```
+
+| lines | what |
+|---|---|
+| 29–31 | path of the compiled library `build/libflash.so` |
+| 34–43 | `load_flash`: open the library with ctypes and declare the C signatures: four pointers (`c_void_p`) and four ints, returning an int |
+| 46–55 | `custom_flash`: read B, NH, N, D from the tensor shape, allocate the output `o`, call the C function with the four tensors' GPU addresses, raise on a non-zero return |
+| 58–74 | `pytorch_standard`: the explicit reference, QKᵀ·scale → softmax → ·V, in batch chunks when the N × N scores would be too big |
+| 77–78 | `pytorch_fused`: PyTorch's fused SDPA |
+| 81–92 | `timeit`: 3 warm-ups, then `iters` runs between two CUDA events, mean ms |
+| 99–122 | arguments (B = 8, NH = 16, D = 64, 10 iterations, N up to 8192), load the library, seed |
+| 134–137 | per N: random q, k, v of shape (B, NH, N, D), float32, on the GPU |
+| 139–143 | pick the batch chunk for the explicit path so its score tensor fits the budget |
+| 145–152 | correctness: max |reference − custom| and |reference − fused| |
+| 154–156 | time all three |
+| 158–179 | print and write `results/pa4_attention.csv` |
+| 181–200 | report where the custom kernel is faster or slower |
+
 `data_ptr()` is the GPU address of the tensor's first float. ctypes hands the four addresses and four ints to the C function above, which computes the launch shape and launches. The tensors must be contiguous float32 [B, NH, N, D] on the GPU, so element (b, h, n, x) is at flat index `((b·NH + h)·N + n)·D + x`; nothing checks it.
 
 **The maths:** for each (b, h) independently, O[b, h] = softmax(Q[b, h]·K[b, h]ᵀ / √D)·V[b, h], each an N × D matrix. Block (qt, h, b) computes **rows 32·qt … 32·qt + 31** of O[b, h]; warp w of the block computes 4 of those rows (4w … 4w + 3).
@@ -725,57 +1519,227 @@ $$Q = \begin{bmatrix}1&0\\0&1\\1&1\\0&0\end{bmatrix},\quad K = \begin{bmatrix}1&
 
 At the real size, `flash_attention_forward(…, 8, 16, 8192, 64)` gives Tr = Tc = 256, grid (256, 16, 8) = 32,768 blocks, and the same per-block roles, with 256 key tiles per block instead of 1.
 
-### 4.5 The kernel, part by part (`flash_lib.cu:47–184`)
+### 4.5 The kernel, part by part (`flash_lib.cu:1–184`)
 
-**Setup (`:55–78`)**
+**The file up to the end of the kernel, complete**: the design notes, the tile constants (`BR`, `BC`, `WARP`, `RPW`, `WPB`, `NTHREADS`) and `flash_forward_kernel`. The parts below refer to its line numbers.
+
 ```cpp
-const int KS = D + 1;             // padded Kj row stride, see header
-extern __shared__ float smem[];
-float* Qi = smem;                 // BR * D
-float* Kj = Qi + BR * D;          // BC * KS
-float* Vj = Kj + BC * KS;         // BC * D
-float* S  = Vj + BC * D;          // BR * BC
-const int lane = threadIdx.x;     // 0..31
-const int w    = threadIdx.y;     // warp index within block, 0..7
-const int tid  = w * WARP + lane;
-const int qt = blockIdx.x, h = blockIdx.y, b = blockIdx.z;
-const size_t base = ((size_t)b * NH + h) * N * D;
-const int r0 = w * RPW;           // first query row of this warp
-const int qbase = qt * BR;
-bool live[RPW]; for (r) live[r] = (qbase + r0 + r) < N;   // ragged last tile
+1    // ============================================================================
+2    // PA4 — custom FlashAttention forward kernel, exposed as a C entry point so the
+3    // PyTorch benchmark can call it on the same tensors it feeds to the reference
+4    // implementations.
+5    //
+6    // Tiling is Br = Bc = 32 as the assignment specifies. The mapping of work to
+7    // threads is NOT the quiz's "one thread per query row" — three rounds of
+8    // tuning, each with the measurement that motivated it (B=8, NH=16, D=64,
+9    // N=8192, H200):
+10   //
+11   //   1. Quiz layout: grid(B, NH), 32 threads, query loop inside the kernel.
+12   //      128 blocks of one warp on a 132-SM GPU.                    3358 ms
+13   //
+14   //   2. grid(Tr, NH, B) + one warp per query row. The query loop becomes grid
+15   //      parallelism: 32768 blocks instead of 128.                  2377 ms
+16   //      Barely helped, because of (3).
+17   //
+18   //   3. Pad the Kj row stride to D+1. In the score phase lane c reads
+19   //      Kj[c*stride + x] at fixed x; stride D=64 puts every lane on bank
+20   //      (c*64 mod 32) = 0, a 32-way conflict on the hottest loop.   339 ms
+21   //
+22   //   4. Four query rows per warp (this version). At one row per warp the inner
+23   //      loops issue 2 shared loads per FMA, which pins the kernel to the shared
+24   //      -memory roofline (~8 TFLOP/s on this part) — and measured throughput was
+25   //      6.5 TFLOP/s, i.e. already there. Giving each warp 4 rows lets one Kj/Vj
+26   //      load feed 4 FMAs, cutting shared traffic per FMA by ~1.6x.
+27   //
+28   // Remaining gap to PyTorch: that path is cuBLAS SGEMM, which is register-blocked
+29   // far more aggressively and is not bound by shared bandwidth. This kernel uses
+30   // no tensor cores and reads both GEMM operands from shared memory.
+31   //
+32   // Shared layout: Qi[Br*D] | Kj[Bc*(D+1)] | Vj[Bc*D] | S[Br*Bc]
+33   // ============================================================================
+34
+35   #include <cuda_runtime.h>
+36   #include <cstdio>
+37   #include <cmath>
+38
+39   #define BR   32     // query rows per block (tile height)
+40   #define BC   32     // key/value rows per tile
+41   #define WARP 32
+42   #define RPW  4      // query rows per warp
+43   #define WPB  (BR / RPW)   // warps per block = 8
+44   #define NTHREADS (WARP * WPB)   // 256
+45
+46   __global__ __launch_bounds__(NTHREADS)
+47   void flash_forward_kernel(
+48       const float* __restrict__ Q,
+49       const float* __restrict__ K,
+50       const float* __restrict__ V,
+51       float* __restrict__ O,
+52       int B, int NH, int N, int D,
+53       int Tc, float softmax_scale)
+54   {
+55       const int KS = D + 1;             // padded Kj row stride, see header
+56
+57       extern __shared__ float smem[];
+58       float* Qi = smem;
+59       float* Kj = Qi + BR * D;
+60       float* Vj = Kj + BC * KS;
+61       float* S  = Vj + BC * D;          // BR * BC
+62
+63       const int lane = threadIdx.x;     // 0..31
+64       const int w    = threadIdx.y;     // warp index within block, 0..WPB-1
+65       const int tid  = w * WARP + lane;
+66
+67       const int qt = blockIdx.x;
+68       const int h  = blockIdx.y;
+69       const int b  = blockIdx.z;
+70
+71       const size_t base = ((size_t)b * NH + h) * N * D;
+72       const int r0 = w * RPW;                    // first query row of this warp
+73       const int qbase = qt * BR;
+74
+75       // Which of this warp's RPW rows actually exist (ragged final tile).
+76       bool live[RPW];
+77       #pragma unroll
+78       for (int r = 0; r < RPW; ++r) live[r] = (qbase + r0 + r) < N;
+79
+80       // ── stage the query tile ──
+81       for (int idx = tid; idx < BR * D; idx += NTHREADS) {
+82           int rr = idx / D, x = idx - rr * D;
+83           int g = qbase + rr;
+84           Qi[idx] = (g < N) ? Q[base + (size_t)g * D + x] : 0.0f;
+85       }
+86
+87       // Output accumulators: RPW rows x ceil(D/32) feature slots per lane.
+88       float o_acc[RPW][4];
+89       float m_run[RPW], l_run[RPW];
+90       #pragma unroll
+91       for (int r = 0; r < RPW; ++r) {
+92           #pragma unroll
+93           for (int j = 0; j < 4; ++j) o_acc[r][j] = 0.0f;
+94           m_run[r] = -INFINITY;
+95           l_run[r] = 0.0f;
+96       }
+97
+98       for (int j = 0; j < Tc; ++j) {
+99           const int kv_base = j * BC;
+100          int kv_len = N - kv_base;
+101          if (kv_len > BC) kv_len = BC;
+102
+103          __syncthreads();
+104          for (int idx = tid; idx < kv_len * D; idx += NTHREADS) {
+105              int r = idx / D, x = idx - r * D;
+106              const size_t g = base + (size_t)(kv_base + r) * D + x;
+107              Kj[r * KS + x] = K[g];
+108              Vj[r * D  + x] = V[g];
+109          }
+110          __syncthreads();
+111
+112          // ── scores: lane c owns key c; x is the outer loop so one Kj load
+113          //    feeds all RPW rows ──
+114          float a[RPW];
+115          #pragma unroll
+116          for (int r = 0; r < RPW; ++r) a[r] = 0.0f;
+117
+118          if (lane < kv_len) {
+119              const float* kptr = Kj + lane * KS;
+120              for (int x = 0; x < D; ++x) {
+121                  const float kv = kptr[x];
+122                  #pragma unroll
+123                  for (int r = 0; r < RPW; ++r)
+124                      a[r] = fmaf(Qi[(r0 + r) * D + x], kv, a[r]);
+125              }
+126          }
+127
+128          float e_run[RPW], e_tile[RPW];
+129          #pragma unroll
+130          for (int r = 0; r < RPW; ++r) {
+131              float s = (lane < kv_len) ? a[r] * softmax_scale : -INFINITY;
+132
+133              float m_tile = s;
+134              #pragma unroll
+135              for (int off = 16; off > 0; off >>= 1)
+136                  m_tile = fmaxf(m_tile, __shfl_xor_sync(0xffffffff, m_tile, off));
+137
+138              float p = (lane < kv_len) ? __expf(s - m_tile) : 0.0f;
+139
+140              float l_tile = p;
+141              #pragma unroll
+142              for (int off = 16; off > 0; off >>= 1)
+143                  l_tile += __shfl_xor_sync(0xffffffff, l_tile, off);
+144
+145              S[(r0 + r) * BC + lane] = p;
+146
+147              const float m_new = fmaxf(m_run[r], m_tile);
+148              e_run[r]  = __expf(m_run[r] - m_new);   // 0 on the first tile
+149              e_tile[r] = __expf(m_tile   - m_new);
+150              l_run[r]  = e_run[r] * l_run[r] + e_tile[r] * l_tile;
+151              m_run[r]  = m_new;
+152          }
+153          __syncwarp();
+154
+155          // ── PV: lane owns feature coordinates lane, lane+32, ...; c is the
+156          //    inner loop so one Vj load feeds all RPW rows ──
+157          int jj = 0;
+158          for (int x = lane; x < D; x += WARP, ++jj) {
+159              float pv[RPW];
+160              #pragma unroll
+161              for (int r = 0; r < RPW; ++r) pv[r] = 0.0f;
+162
+163              for (int c = 0; c < kv_len; ++c) {
+164                  const float vv = Vj[c * D + x];
+165                  #pragma unroll
+166                  for (int r = 0; r < RPW; ++r)
+167                      pv[r] = fmaf(S[(r0 + r) * BC + c], vv, pv[r]);
+168              }
+169              #pragma unroll
+170              for (int r = 0; r < RPW; ++r)
+171                  o_acc[r][jj] = o_acc[r][jj] * e_run[r] + pv[r] * e_tile[r];
+172          }
+173      }
+174
+175      #pragma unroll
+176      for (int r = 0; r < RPW; ++r) {
+177          if (!live[r]) continue;
+178          const int qrow = qbase + r0 + r;
+179          const float inv = 1.0f / l_run[r];
+180          int jj = 0;
+181          for (int x = lane; x < D; x += WARP, ++jj)
+182              O[base + (size_t)qrow * D + x] = o_acc[r][jj] * inv;
+183      }
+184  }
 ```
-With block (qt = 10, h = 3, b = 0), warp 2, lane 7: `base = 3 · 8192 · 64 = 1,572,864` (where head 3's Q, K, V start), `r0 = 8`, `qbase = 320`, so this warp owns query rows **328–331**. One dynamic buffer is carved into four arrays by pointer offsets.
+
+| constant / name | line | value | meaning |
+|---|---|---|---|
+| `BR` | 39 | 32 | query rows per block (one query tile) |
+| `BC` | 40 | 32 | keys per key tile |
+| `WARP` | 41 | 32 | lanes per warp |
+| `RPW` | 42 | 4 | query rows per warp |
+| `WPB` | 43 | 8 | warps per block = BR / RPW |
+| `NTHREADS` | 44 | 256 | threads per block |
+| `KS` | 55 | D + 1 = 65 | padded row stride of `Kj` (§4.6) |
+| `Qi`, `Kj`, `Vj`, `S` | 57–61 | | four arrays carved out of one dynamic shared buffer |
+| `lane`, `w`, `tid` | 63–65 | 0–31, 0–7, 0–255 | lane in warp, warp in block, thread in block |
+| `qt`, `h`, `b` | 67–69 | | query tile, head, batch item = the block's coordinates |
+| `base` | 71 | | flat index where this (b, h)'s N × D slice of Q, K, V, O starts |
+| `r0`, `qbase` | 72–73 | | this warp's first row within the tile; the tile's first query row |
+| `live[r]` | 76–78 | | whether row qbase + r0 + r exists (ragged last tile) |
+| `o_acc[RPW][4]`, `m_run`, `l_run` | 88–96 | | per row: output accumulators (up to 4 features per lane), running max, running sum |
+| `j`, `kv_base`, `kv_len` | 98–101 | | key tile index, its first key, how many keys it really has |
+| `a[RPW]` | 114–116 | | this lane's scores against the warp's 4 rows |
+| `e_run`, `e_tile` | 128 | | the online-softmax rescale factors (§4.2) |
+| `jj`, `pv[RPW]` | 157–163 | | feature slot of this lane; this tile's P·V for the 4 rows |
+
+
+**Setup (lines 55–78)** names the shared arrays and this thread's coordinates (table above). With block (qt = 10, h = 3, b = 0), warp 2, lane 7: `base = 3 · 8192 · 64 = 1,572,864` (where head 3's Q, K, V start), `r0 = 8`, `qbase = 320`, so this warp owns query rows **328–331**. One dynamic buffer is carved into four arrays by pointer offsets.
 
 **Stage Q and initialise (`:81–96`)**: all 256 threads copy the 32 × 64 Q tile (`idx = tid; idx < 2048; idx += 256`, 8 elements each, consecutive threads → consecutive addresses: coalesced). Then per row: `o_acc[r][0..3] = 0`, `m_run[r] = −INFINITY`, `l_run[r] = 0`.
 
-**Loop over key tiles (`:98–110`)**
-```cpp
-for (int j = 0; j < Tc; ++j) {
-    const int kv_base = j * BC;
-    int kv_len = N - kv_base;  if (kv_len > BC) kv_len = BC;     // ragged last tile
-    __syncthreads();                                            // nobody still reads the old tile
-    for (int idx = tid; idx < kv_len * D; idx += NTHREADS) {
-        int r = idx / D, x = idx - r * D;
-        const size_t g = base + (size_t)(kv_base + r) * D + x;
-        Kj[r * KS + x] = K[g];                                  // padded stride 65
-        Vj[r * D  + x] = V[g];
-    }
-    __syncthreads();                                            // tile complete
-```
-The two barriers have the same two jobs as in the matmul tile loop (Day 5 §4.5). A warp's 32 consecutive `idx` share r and have consecutive x: consecutive global addresses (coalesced) and consecutive shared words (no store conflict, even with stride 65).
+**Loop over key tiles (lines 98–110):** for each key tile j, compute how many keys it has (`kv_len`, ragged last tile), wait at a barrier, copy the tile's K rows into `Kj` with the padded stride 65 and its V rows into `Vj`, wait again. The two barriers have the same two jobs as in the matmul tile loop (Day 5 §4.5). A warp's 32 consecutive `idx` share r and have consecutive x: consecutive global addresses (coalesced) and consecutive shared words (no store conflict, even with stride 65).
 
-**Scores (`:114–126`)**: lane c owns **key c**; x is the outer loop so one Kj load feeds all 4 rows:
-```cpp
-float a[RPW] = {0};
-if (lane < kv_len) {
-    const float* kptr = Kj + lane * KS;
-    for (int x = 0; x < D; ++x) {
-        const float kv = kptr[x];                                   // Kj[c·65 + x]
-        for (int r = 0; r < RPW; ++r)
-            a[r] = fmaf(Qi[(r0 + r) * D + x], kv, a[r]);            // Qi: same address for all lanes
-    }
-}
-```
+**Scores (lines 113–126)**: lane c owns **key c**. Only lanes c < `kv_len` work: for each feature x (outer loop) the lane loads `kv = Kj[c·65 + x]` once and adds `Qi[row][x]·kv` to the score of each of the warp's 4 rows (`a[r]`, inner loop). So one Kj load feeds 4 FMAs, and `Qi[row][x]` is the same address for all 32 lanes (a broadcast).
+
 **Online softmax (`:130–152`)**, per row r: `s = a[r]·scale` (or −∞ past `kv_len`); tile max by 5 `__shfl_xor_sync` steps; `p = __expf(s − m_tile)`; tile sum by 5 more shuffles; `S[(r0 + r)·32 + lane] = p`; then `m_new`, `e_run`, `e_tile`, `l_run`, `m_run` exactly as in §4.2.
 
 ![[d6-8-shuffle.svg]] [[d6-8-shuffle.html|▶ Step through it]]
@@ -784,21 +1748,9 @@ if (lane < kv_len) {
 
 **`__syncwarp()` (`:153`)**: each warp writes and later reads only **its own 4 rows** of S, so only its 32 lanes need to agree; a block-wide `__syncthreads()` would make warps wait for each other for nothing.
 
-**PV (`:157–172`)**: lane x now owns **features** x and x + 32:
-```cpp
-int jj = 0;
-for (int x = lane; x < D; x += WARP, ++jj) {
-    float pv[RPW] = {0};
-    for (int c = 0; c < kv_len; ++c) {
-        const float vv = Vj[c * D + x];                             // adjacent x → adjacent banks
-        for (int r = 0; r < RPW; ++r)
-            pv[r] = fmaf(S[(r0 + r) * BC + c], vv, pv[r]);           // S: broadcast
-    }
-    for (int r = 0; r < RPW; ++r)
-        o_acc[r][jj] = o_acc[r][jj] * e_run[r] + pv[r] * e_tile[r];
-}
-```
-**Finish (`:175–183`)**: for each live row, `O[base + qrow·D + x] = o_acc[r][jj] · (1 / l_run[r])`: divide once, at the end.
+**PV (lines 157–172)**: lane x now owns **features** x and x + 32 (`jj` = 0, 1 is the slot). For each feature, the lane walks the tile's keys c, loads `vv = Vj[c·64 + x]` once and adds `S[row][c]·vv` into `pv[r]` for each of the 4 rows (`S[row][c]` is a broadcast: same address for all lanes; `Vj` reads are adjacent words: no conflict). Then `o_acc[r][jj] = o_acc[r][jj]·e_run[r] + pv[r]·e_tile[r]`: the online-softmax update of §4.2.
+
+**Finish (lines 175–183)**: for each live row, `O[base + qrow·D + x] = o_acc[r][jj] · (1 / l_run[r])`: divide once, at the end.
 
 **The role switch** is the design's key idea: in the score phase lanes own keys (so the 32 scores of a tile row are spread across lanes, ready for a warp reduction); in the PV phase lanes own output features (so each lane accumulates its own output columns with no reduction). S in shared memory is the hand-off between the two roles.
 
