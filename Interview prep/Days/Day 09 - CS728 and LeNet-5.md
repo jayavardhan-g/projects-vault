@@ -8,6 +8,9 @@ tags: [interview, day, cs728, lenet, retrieval-heads, pruning]
 
 Part of [[Interview plan (Nov 2026)]]. Two course projects, half a day each. About 7 h.
 
+> [!tip] Interview edition (added 2026-11-17): use this instead
+> [[Day 09 - CS728 and LeNet-5 (interview)]]: both projects rebuilt from zero (attention and heads; convolution and LeNet-5), the real code line by line (your `LongContext_RAG` retrieval-head code; the LeNet repo `interview_materials/lenet`), 12 step animations (`d09i-*`) and 4 Manim videos (`d09m-*`), question banks after every part, speaking scripts, claims to avoid, and an 80-question mock. **Read its §0 first**: the LeNet extension's repo and report carry Harshith Matta's name, and several resume lines need new wording. Corrections to this older note are in its §0.3 (the p = 0.83 test is Welch's, not paired; INT8 was QAT, not PTQ; the lottery ticket resets to step 0).
+
 **Code, explained:** the figures, the code to read and what each snippet does are in [[#Code, explained]], right after section B.
 
 > [!warning] Your code is not on the server yet

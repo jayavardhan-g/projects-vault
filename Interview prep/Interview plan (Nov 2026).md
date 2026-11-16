@@ -31,7 +31,7 @@ to a second CUDA day and a full BountyBrain day. The older day sections further 
 | **6** | Fri Nov 13 | CUDA II: MLP streams and checkpointing (PA3), FlashAttention | [[Day 06 - CUDA II]] |
 | **7** | Sat Nov 14 | Seminar and speech basics | [[Day 07 - Seminar and speech basics]] |
 | **8** | Sun Nov 15 | CosyVoice | [[Day 08 - CosyVoice]] |
-| **9** | Mon Nov 16 | CS728 and LeNet-5 | [[Day 09 - CS728 and LeNet-5]] |
+| **9** | Mon Nov 16 | CS728 and LeNet-5 | [[Day 09 - CS728 and LeNet-5]] · interview edition: [[Day 09 - CS728 and LeNet-5 (interview)]] |
 | **10** | Tue Nov 17 | Photo-Seek I: retrieval and router | [[Day 10 - Photo-Seek I]] |
 | **11** | Wed Nov 18 | Photo-Seek II: faces; emotion steering | [[Day 11 - Photo-Seek II and emotion steering]] |
 | **12** | Thu Nov 19 | BountyBrain (full day) | [[Day 12 - BountyBrain]] |
@@ -73,6 +73,7 @@ Each project day has a **rebuild block**: rewrite the core mechanism yourself in
   - Emotion steering: 90% is the best cell (18/20); the mean is 36%.
   - CosyVoice: why WER can be above 1.
 - [ ] Copy the CS728 and LeNet-5 code and reports into `/data/jayavardhan/projects/interview_materials/{cs728,lenet}/` before Day 7.
+  - 2026-11-17: **LeNet-5 done**: `interview_materials/lenet/` = `harshith2302/cs725_Project` (`main`, `3b2584b`) + `fml_report.pdf`. The compression branch was never pushed. **CS728 still missing.**
 
 ---
 
