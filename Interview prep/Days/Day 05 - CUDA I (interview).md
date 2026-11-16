@@ -127,167 +127,94 @@ All at N = 32768, FP32, H200, kernel time by CUDA events **[MEAS]**:
 
 Check it on the whiteboard: 1024 × 32 = 32,768 ✓; 512 × 16 × 4 = 32,768 ✓.
 
+#### Reading the code: every C++ / CUDA construct in these kernels
+
+Code in this note is quoted with its **real line numbers** from the repo, cut down to the lines that matter. A line starting `⋮` stands for lines left out, and says what they do. Notes in plain English are marked `◀` (at the end of the line) or `▼` (on the line above, when the code line is long); they are not in the source.
+
+| you see | what it means |
+|---|---|
+| `__global__ void k(…)` | a **kernel**: a function the CPU launches and every GPU thread runs, each with its own `blockIdx`/`threadIdx` |
+| `k<<<grid, block>>>(args)` | **launch** `grid` blocks of `block` threads each. Optional 3rd and 4th values: bytes of dynamic shared memory, and the stream |
+| `dim3 g(x, y)` | a size with up to 3 parts (x, y, z); unspecified parts are 1. `dim3 b32(32, 32)` = 32 × 32 = 1,024 threads |
+| `blockIdx`, `threadIdx`, `blockDim` | built-in variables: which block this is, which thread inside its block, how many threads per block. Each has `.x`, `.y`, `.z` |
+| `template<int TILE, int BLK>` and `k<64,32>` | **compile-time constants**. The compiler builds a separate copy of the kernel for every value pair used, with TILE = 64 written in, so TILE can size arrays and loops can be unrolled |
+| `constexpr int F = TILE / BLK;` | a constant computed by the compiler (here 2), not at run time |
+| `__shared__ float sA[64][64];` | an array in the SM's on-chip **shared memory**: one copy per block, read and written by all of that block's threads, discarded when the block finishes |
+| `float acc[2][2];` (plain, inside a kernel) | a **per-thread** variable. Small and indexed by constants → kept in **registers** |
+| `__syncthreads()` | a **barrier**: no thread of the block goes past it until every thread of the block has reached it |
+| `#pragma unroll` | an instruction to the compiler about the **next loop**: "write the body out once per iteration instead of looping". It needs a trip count known at compile time (like `F` or `TILE`). It removes the loop counter and branch, and turns `acc[i][j]` into fixed register names (`acc[0][1]` …). **It does not change what is computed.** Excerpts leave these lines out |
+| `fmaf(a, b, c)` | **fused multiply-add**: a·b + c as one instruction with one rounding. Counts as 2 FLOPs |
+| `cond ? x : y` | "x if cond is true, else y", as a value |
+| `A[(size_t)r * N + c]` | element (r, c) of an N × N matrix stored **row-major** in one flat array (row r starts at r·N). `(size_t)` does the multiply in 64 bits so a large index can't overflow a 32-bit `int` |
+| `const float* A` | pointer to floats this function only reads |
+| `[&]{ … }` | a **lambda**: an unnamed function written in place. `[&]` lets it use the surrounding variables (`dA`, `N`, …) directly |
+| `auto` | "let the compiler work out the type" |
+| `CUDA_CHECK(call)` | a macro defined in the file: runs `call`, and if it returns an error prints file, line and message and exits |
+| `cudaMalloc` / `cudaMemcpy` / `cudaFree` | reserve GPU memory / copy CPU ↔ GPU / release GPU memory |
+| `i += BLK`, `++i`, `x >>= 1` | add BLK to i / add 1 to i / halve x (shift right one bit) |
+| `continue`, `return` | skip to the next loop iteration / leave the function (in a kernel: this thread stops) |
+
 #### From the launch line to the maths (how to read every "How it is called" box below)
 
-Every kernel is launched from `main()` of the harness. Here it is complete (`matmul_bench.cu:365–506`) **[IMPL]**; every "Real call" line quoted later in this note is one of its lines.
+Every kernel is launched from `main()` of the harness (`matmul_bench.cu:365–506`). The lines that matter for the launches **[IMPL]**:
 
 ```cpp
-365  int main(int argc, char** argv)
-366  {
-367      std::vector<int> sizes = { 1024, 2048, 4096, 8192, 16384, 32768 };
-368      int  cpu_max   = 4096;      // largest N actually measured on the CPU
-369      double budget  = 30.0;      // per-config time budget, seconds
-370      int  iters     = 10;
-371      const char* out_path = nullptr;
-372
-373      for (int i = 1; i < argc; ++i) {
-374          if (!strcmp(argv[i], "--out") && i + 1 < argc)      out_path = argv[++i];
-375          else if (!strcmp(argv[i], "--cpu-max") && i+1<argc) cpu_max = atoi(argv[++i]);
-376          else if (!strcmp(argv[i], "--budget") && i+1<argc)  budget  = atof(argv[++i]);
-377          else if (!strcmp(argv[i], "--iters") && i+1<argc)   iters   = atoi(argv[++i]);
-378          else if (!strcmp(argv[i], "--sizes") && i + 1 < argc) {
-379              sizes.clear();
-380              char* tok = strtok(argv[++i], ",");
-381              while (tok) { sizes.push_back(atoi(tok)); tok = strtok(nullptr, ","); }
-382          }
-383      }
-384
-385      cudaDeviceProp prop;
-386      CUDA_CHECK(cudaGetDeviceProperties(&prop, 0));
-387      // cudaDeviceProp::clockRate was removed in CUDA 13; query the attribute.
-388      int clock_khz = 0;
-389      CUDA_CHECK(cudaDeviceGetAttribute(&clock_khz, cudaDevAttrClockRate, 0));
-390      // FP32 FMA peak: 128 FP32 lanes/SM on sm_80/86/90, 2 flops per FMA.
-391      double peak = (double)prop.multiProcessorCount * 128.0 * 2.0
-392                    * ((double)clock_khz * 1e3) / 1e12;
-393
-394      fprintf(stderr, "Device      : %s\n", prop.name);
-395      fprintf(stderr, "SMs         : %d\n", prop.multiProcessorCount);
-396      fprintf(stderr, "Clock       : %.0f MHz\n", clock_khz / 1000.0);
-397      fprintf(stderr, "Global mem  : %.1f GB\n", prop.totalGlobalMem / 1e9);
-398      fprintf(stderr, "Peak FP32   : %.2f TFLOP/s (non-tensor)\n\n", peak);
-399
-400      FILE* out = out_path ? fopen(out_path, "w") : stdout;
-401      if (!out) { perror(out_path); return 1; }
-402      fprintf(out, "impl,N,time_ms,tflops,iters,max_rel_err,note\n");
-403      fprintf(out, "#peak_fp32_tflops,%.4f,,,,,\n", peak);
-404
-405      cublasHandle_t handle;
-406      cublasCreate(&handle);
-407
-408      for (int N : sizes) {
-409          size_t elems = (size_t)N * N;
-410          size_t bytes = elems * sizeof(float);
-411          fprintf(stderr, "── N = %d (%.2f GB per matrix) ──────────────────\n",
-412                  N, bytes / 1e9);
-413
-414          float* hA = (float*)malloc(bytes);
-415          float* hB = (float*)malloc(bytes);
-416          float* hC = (float*)malloc(bytes);
-417          float* hRef = (float*)malloc(bytes);
-418          if (!hA || !hB || !hC || !hRef) { fprintf(stderr, "  host OOM, skipping\n"); return 1; }
-419
-420          for (size_t i = 0; i < elems; ++i) {
-421              hA[i] = (float)((i * 1103515245u + 12345u) % 1000) / 1000.0f - 0.5f;
-422              hB[i] = (float)((i * 1664525u + 1013904223u) % 1000) / 1000.0f - 0.5f;
-423          }
-424
-425          float *dA, *dB, *dC;
-426          CUDA_CHECK(cudaMalloc(&dA, bytes));
+365  int main(int argc, char** argv)   // ◀ the program starts here
+⋮    // 366–407 left out: default sizes 1024 … 32768, 10 iterations, a 30 s budget per kernel; command-line flags; GPU peak; CSV file; cuBLAS handle
+408      for (int N : sizes) {   // ◀ one pass per matrix size N
+409          size_t elems = (size_t)N * N;   // ◀ N² numbers per matrix
+410          size_t bytes = elems * sizeof(float);   // ◀ 4 bytes each
+⋮    // 411–424 left out: allocate host arrays hA, hB, hC, hRef and fill A, B with a fixed pseudo-random pattern
+425          float *dA, *dB, *dC;   // ◀ d… = pointers to GPU memory
+426          CUDA_CHECK(cudaMalloc(&dA, bytes));   // ◀ reserve one N × N matrix on the GPU
 427          CUDA_CHECK(cudaMalloc(&dB, bytes));
 428          CUDA_CHECK(cudaMalloc(&dC, bytes));
+             // ▼ copy A from the CPU to the GPU
 429          CUDA_CHECK(cudaMemcpy(dA, hA, bytes, cudaMemcpyHostToDevice));
 430          CUDA_CHECK(cudaMemcpy(dB, hB, bytes, cudaMemcpyHostToDevice));
-431
-432          // ── cuBLAS first: it becomes the correctness reference for the rest.
-433          // cuBLAS is column-major; computing B*A in its layout yields row-major A*B.
-434          const float alpha = 1.0f, beta = 0.0f;
-435          auto cublas_launch = [&] {
-436              cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, N, N,
-437                          &alpha, dB, N, dA, N, &beta, dC, N);
-438          };
-439          Timing tb = time_kernel(cublas_launch, 2, iters, budget);
-440          CUDA_CHECK(cudaMemcpy(hRef, dC, bytes, cudaMemcpyDeviceToHost));
-441          fprintf(out, "cublas,%d,%.4f,%.4f,%d,0,\n", N, tb.ms, tflops(N, tb.ms), tb.iters);
-442          fprintf(stderr, "  %-18s %10.3f ms  %8.2f TFLOP/s\n", "cublas", tb.ms, tflops(N, tb.ms));
-443          fflush(out);
-444
-445          auto record = [&](const char* name, Timing t) {
-446              CUDA_CHECK(cudaMemcpy(hC, dC, bytes, cudaMemcpyDeviceToHost));
-447              double err = max_rel_err((int)std::min(elems, (size_t)4000000), hRef, hC);
-448              fprintf(out, "%s,%d,%.4f,%.4f,%d,%.3e,\n", name, N, t.ms, tflops(N, t.ms), t.iters, err);
-449              fprintf(stderr, "  %-18s %10.3f ms  %8.2f TFLOP/s   relerr %.1e\n",
-450                      name, t.ms, tflops(N, t.ms), err);
-451              fflush(out);
-452          };
-453
-454          dim3 b32(32, 32);
-455          dim3 g32((N + 31) / 32, (N + 31) / 32);
-456
-457          // Naive is ~100x slower than cuBLAS; skip it once that gets absurd.
-458          double naive_projected = tb.ms * 150.0 / 1000.0;
-459          if (naive_projected < 400.0) {
+⋮    // 431–453 left out: cuBLAS runs first and its answer is kept in hRef (§7.3); the lambda `record` copies dC back, checks it against hRef (§7.4) and writes a CSV row
+454          dim3 b32(32, 32);   // ◀ a block = 32 × 32 = 1,024 threads
+455          dim3 g32((N + 31) / 32, (N + 31) / 32);   // ◀ ⌈N/32⌉ × ⌈N/32⌉ blocks (+31 rounds up)
+⋮    // 456–459 left out: skip naive if it would take longer than the budget
+                 // ▼ naive: one thread per C entry (§2)
 460              record("gpu_naive", time_kernel([&]{ mm_naive<<<g32,b32>>>(dA,dB,dC,N); }, 1, iters, budget));
-461          } else {
-462              fprintf(out, "gpu_naive,%d,,,,,skipped: projected %.0f s exceeds budget\n", N, naive_projected);
-463              fprintf(stderr, "  %-18s skipped (projected %.0f s)\n", "gpu_naive", naive_projected);
-464          }
-465
+⋮    // 461–465 left out: otherwise write "skipped"
+             // ▼ §3
 466          record("gpu_coalesced", time_kernel([&]{ mm_coalesced<<<g32,b32>>>(dA,dB,dC,N); }, 1, iters, budget));
+             // ▼ §4
 467          record("tiled_1to1",    time_kernel([&]{ mm_tiled_1to1<32><<<g32,b32>>>(dA,dB,dC,N); }, 1, iters, budget));
-468
-469          {   // 64x64 tile, 32x32 block -> F = 2
+
+469          {   // 64x64 tile, 32x32 block -> F = 2  ◀ §5: 64 × 64 tiles, so half as many blocks per side
 470              dim3 g64((N + 63) / 64, (N + 63) / 64);
+                 // ▼ §5
 471              record("tiled_strided",    time_kernel([&]{ mm_tiled_strided<64,32><<<g64,b32>>>(dA,dB,dC,N); }, 1, iters, budget));
 472              record("tiled_contiguous", time_kernel([&]{ mm_tiled_contiguous<64,32><<<g64,b32>>>(dA,dB,dC,N); }, 1, iters, budget));
 473          }
-474
-475          {   // TILE = 64, R = 2 -> 32x32 threads, 4 outputs each
+
+475          {   // TILE = 64, R = 2 -> 32x32 threads, 4 outputs each  ◀ §6
 476              dim3 gb((N + 63) / 64, (N + 63) / 64);
+                 // ▼ §6, 2 × 2 outputs per thread
 477              record("block2d_t64r2", time_kernel([&]{ mm_block2d<64,2><<<gb,b32>>>(dA,dB,dC,N); }, 1, iters, budget));
 478          }
 479          {   // TILE = 64, R = 4 -> 16x16 threads, 16 outputs each
 480              dim3 gb((N + 63) / 64, (N + 63) / 64);
-481              dim3 bb(16, 16);
+481              dim3 bb(16, 16);   // ◀ 16 × 16 threads per block
+                 // ▼ §6, 4 × 4 outputs per thread
 482              record("block2d_t64r4", time_kernel([&]{ mm_block2d<64,4><<<gb,bb>>>(dA,dB,dC,N); }, 1, iters, budget));
 483          }
-484
-485          // ── CPU baseline, measured only up to cpu_max
-486          if (N <= cpu_max) {
-487              fprintf(stderr, "  %-18s running...\n", "cpu_naive");
-488              double ms = cpu_naive_matmul(N, hA, hB, hC);
-489              double err = max_rel_err((int)std::min(elems, (size_t)4000000), hRef, hC);
-490              fprintf(out, "cpu_naive,%d,%.4f,%.6f,1,%.3e,measured\n", N, ms, tflops(N, ms), err);
-491              fprintf(stderr, "  %-18s %10.3f ms  %8.4f TFLOP/s   relerr %.1e\n",
-492                      "cpu_naive", ms, tflops(N, ms), err);
-493              fflush(out);
-494          } else {
-495              fprintf(out, "cpu_naive,%d,,,,,not measured (extrapolated in analysis)\n", N);
-496          }
-497
-498          cudaFree(dA); cudaFree(dB); cudaFree(dC);
-499          free(hA); free(hB); free(hC); free(hRef);
-500          fprintf(stderr, "\n");
-501      }
-502
-503      cublasDestroy(handle);
-504      if (out_path) fclose(out);
-505      return 0;
-506  }
+⋮    // 484–506 left out: CPU baseline (only up to N = 4096), free everything, next N
 ```
 
-| lines | what `main()` does |
-|---|---|
-| 365–383 | defaults (sizes 1024 … 32768, CPU up to 4096, 30 s budget, 10 iterations) and command-line overrides |
-| 385–398 | read the GPU's SM count and clock; FP32 peak = SMs × 128 lanes × 2 FLOPs × clock = 66.9 TFLOP/s on the H200 (§8.3) |
-| 400–406 | open the CSV, create the cuBLAS handle |
-| 408–430 | per N: allocate host arrays `hA`, `hB`, `hC`, `hRef` (N² floats each), fill A and B with a fixed pseudo-random pattern in [−0.5, 0.5), allocate `dA`, `dB`, `dC` on the GPU and copy A, B over |
-| 432–443 | cuBLAS first: time it, copy its answer to `hRef` (the reference for every other kernel, §7.3) |
-| 445–452 | `record`: copy `dC` back, compute the error against `hRef` on the first 4M elements (§7.4), write a CSV row |
-| 454–455 | `b32` = 32 × 32 threads, `g32` = ⌈N/32⌉ × ⌈N/32⌉ blocks |
-| 457–483 | **the launches**: each `time_kernel([&]{ kernel<<<grid, block>>>(dA, dB, dC, N); }, …)` (§7.2); all kernels write into the same `dC` |
-| 485–496 | CPU triple loop, only up to N = 4096 |
-| 498–500 | free everything before the next N |
+| name in the launch lines | what it is | defined at |
+|---|---|---|
+| `dA`, `dB`, `dC` | GPU copies of A, B and the output C: flat row-major N × N float arrays. Every kernel writes into the same `dC` | 425–430 |
+| `N` | the matrix size of this pass: 1024, 2048, …, 32768 | 408 |
+| `b32`, `g32` | block shape (32 × 32 threads) and grid shape (⌈N/32⌉ × ⌈N/32⌉ blocks) | 454–455 |
+| `g64`, `gb` | grids of ⌈N/64⌉ × ⌈N/64⌉ blocks, for kernels whose block covers a 64 × 64 piece of C | 470, 476, 480 |
+| `bb` | a 16 × 16 block | 481 |
+| `time_kernel(lambda, warm-ups, iters, budget)` | runs the lambda once or twice untimed, then times it with CUDA events (§7.2) | 311–345 |
+| `record(name, timing)` | copies `dC` back, checks it against cuBLAS, writes a CSV row (§7.4) | 445–452 |
+| `iters`, `budget` | 10 timed runs if they fit in 30 s, else 1 | 369–370 |
 
 Read one launch, line 467, piece by piece:
 
@@ -374,16 +301,17 @@ $$A = \begin{bmatrix}1&2&0&1\\0&1&2&1\\2&0&1&0\\1&1&0&2\end{bmatrix}\quad B = \b
 ### 2.2 The code, line by line (`matmul_bench.cu:44–54`)
 
 ```cpp
+    // ▼ a kernel: every GPU thread runs this body
 44  __global__ void mm_naive(const float* A, const float* B, float* C, int N)
 45  {
-46      int row = blockIdx.x * blockDim.x + threadIdx.x;
-47      int col = blockIdx.y * blockDim.y + threadIdx.y;
-48      if (row >= N || col >= N) return;
-49
-50      float acc = 0.0f;
-51      for (int k = 0; k < N; ++k)
-52          acc = fmaf(A[(size_t)row * N + k], B[(size_t)k * N + col], acc);
-53      C[(size_t)row * N + col] = acc;
+46      int row = blockIdx.x * blockDim.x + threadIdx.x;   // ◀ global thread number along x → a row of C
+47      int col = blockIdx.y * blockDim.y + threadIdx.y;   // ◀ along y → a column of C
+48      if (row >= N || col >= N) return;   // ◀ threads past the matrix edge stop
+
+50      float acc = 0.0f;   // ◀ running sum, in a register
+51      for (int k = 0; k < N; ++k)   // ◀ walk along row `row` of A and column `col` of B
+52          acc = fmaf(A[(size_t)row * N + k], B[(size_t)k * N + col], acc);   // ◀ acc += A[row][k] · B[k][col]
+53      C[(size_t)row * N + col] = acc;   // ◀ write C[row][col] once
 54  }
 ```
 
@@ -494,36 +422,8 @@ $$\text{lines fetched} = \#\{\lfloor 4 \cdot \text{index}_\ell / 128 \rfloor : \
 
 ### 3.3 The diff and one warp's addresses
 
-**`mm_coalesced`, complete (`matmul_bench.cu:56–70`)**. `mm_naive` is in full in §2.2; the two kernels are identical except lines 62–63.
+`mm_coalesced` (`matmul_bench.cu:60–70`) is `mm_naive` (§2.2) with two lines changed: which index, x or y, gives the row and which gives the column. Everything else, including the dot-product loop, is identical.
 
-```cpp
-56  // ─────────────────────────────────────────────────────────────────────────────
-57  // 2. Coalesced: the mapping is transposed so consecutive lanes hit consecutive
-58  //    columns. B and C are then read/written one 128-byte transaction per warp.
-59  // ─────────────────────────────────────────────────────────────────────────────
-60  __global__ void mm_coalesced(const float* A, const float* B, float* C, int N)
-61  {
-62      int col = blockIdx.x * blockDim.x + threadIdx.x;
-63      int row = blockIdx.y * blockDim.y + threadIdx.y;
-64      if (row >= N || col >= N) return;
-65
-66      float acc = 0.0f;
-67      for (int k = 0; k < N; ++k)
-68          acc = fmaf(A[(size_t)row * N + k], B[(size_t)k * N + col], acc);
-69      C[(size_t)row * N + col] = acc;
-70  }
-```
-
-| line | what | toy `<<<(2,2),(2,2)>>>`, block (1, 0), thread (0, 1) | real: block (2, 1), thread (5, 3) |
-|---|---|---|---|
-| 60 | same signature as every kernel | | |
-| 62 | **column** from the x indices: `col = blockIdx.x·blockDim.x + threadIdx.x` | 1·2 + 0 = 2 | 2·32 + 5 = 69 |
-| 63 | **row** from the y indices | 0·2 + 1 = 1 | 1·32 + 3 = 35 |
-| 64 | edge guard; early `return` is safe (no barriers) | | |
-| 66–68 | the same dot product as naive: `acc = Σₖ A[row][k]·B[k][col]` | C[1][2] = 2 | C[35][69] |
-| 69 | one store; consecutive lanes → consecutive columns → one line per warp | | |
-
-The diff, side by side (both kernels are complete above: `mm_naive` in §2.2, `mm_coalesced` here):
 
 ```cpp
 // mm_naive :46–47                                  // mm_coalesced :62–63
@@ -633,32 +533,34 @@ Each of the TILE² threads loads **one** element of each tile per step: thread (
 ![[d05i-tiled-dbg.svg]] [[d05i-tiled-dbg.html|▶ Step through it]]
 
 ```cpp
-77  template<int TILE>
-78  __global__ void mm_tiled_1to1(const float* A, const float* B, float* C, int N)
-79  {
-80      __shared__ float sA[TILE][TILE];
-81      __shared__ float sB[TILE][TILE];
-82
-83      const int tx = threadIdx.x, ty = threadIdx.y;
-84      const int row = blockIdx.y * TILE + ty;
-85      const int col = blockIdx.x * TILE + tx;
-86
-87      float acc = 0.0f;
-88      for (int t = 0; t < (N + TILE - 1) / TILE; ++t) {
-89          int aCol = t * TILE + tx;
-90          int bRow = t * TILE + ty;
-91          sA[ty][tx] = (row < N && aCol < N) ? A[(size_t)row * N + aCol] : 0.0f;
-92          sB[ty][tx] = (bRow < N && col < N) ? B[(size_t)bRow * N + col] : 0.0f;
-93          __syncthreads();
-94
-95          #pragma unroll
-96          for (int k = 0; k < TILE; ++k)
-97              acc = fmaf(sA[ty][k], sB[k][tx], acc);
-98          __syncthreads();
-99      }
-100     if (row < N && col < N) C[(size_t)row * N + col] = acc;
-101 }
+77   template<int TILE>   // ◀ TILE = 32 in the launch <32>
+78   __global__ void mm_tiled_1to1(const float* A, const float* B, float* C, int N)
+79   {
+80       __shared__ float sA[TILE][TILE];   // ◀ the block's copy of one A tile, on chip
+81       __shared__ float sB[TILE][TILE];   // ◀ … and of one B tile
+
+83       const int tx = threadIdx.x, ty = threadIdx.y;   // ◀ my position inside the block
+84       const int row = blockIdx.y * TILE + ty;   // ◀ the C row I own
+85       const int col = blockIdx.x * TILE + tx;   // ◀ the C column I own
+
+87       float acc = 0.0f;   // ◀ my running sum, in a register
+         // ▼ one step per 32-wide slice of K (+TILE−1 rounds up)
+88       for (int t = 0; t < (N + TILE - 1) / TILE; ++t) {
+89           int aCol = t * TILE + tx;   // ◀ the A column I copy this step
+90           int bRow = t * TILE + ty;   // ◀ the B row I copy this step
+             // ▼ copy one A element (0 if outside)
+91           sA[ty][tx] = (row < N && aCol < N) ? A[(size_t)row * N + aCol] : 0.0f;
+92           sB[ty][tx] = (bRow < N && col < N) ? B[(size_t)bRow * N + col] : 0.0f;   // ◀ copy one B element
+93           __syncthreads();   // ◀ wait: the whole tile is loaded
+
+96           for (int k = 0; k < TILE; ++k)   // ◀ walk the slice
+97               acc = fmaf(sA[ty][k], sB[k][tx], acc);   // ◀ acc += A-tile[ty][k] · B-tile[k][tx]
+98           __syncthreads();   // ◀ wait: nobody overwrites a tile still in use
+99       }
+100      if (row < N && col < N) C[(size_t)row * N + col] = acc;   // ◀ store C[row][col]
+101  }
 ```
+*Lines that only say `#pragma unroll` are left out (what it does: the **Reading the code** box).*
 
 | line | what | why | what breaks if changed or removed |
 |---|---|---|---|
@@ -779,68 +681,60 @@ Every FMA in line 97 reads **two** floats from shared memory. **[THEORY]**
 
 ![[d05s-loaders.svg]] [[d05s-loaders.html|▶ Step through it]]
 
-### 5.2 The code, in full, and exactly what differs
+### 5.2 The code, and exactly what differs
 
 Both kernels are launched by the harness as `mm_tiled_strided<64,32><<<g64, b32>>>(dA, dB, dC, N)` and `mm_tiled_contiguous<64,32><<<g64, b32>>>(dA, dB, dC, N)` (`:471–472`, with `g64` = ⌈N/64⌉ × ⌈N/64⌉ blocks and `b32` = 32 × 32 threads). The "How it is called" box at the end of this section works through a 4 × 4 call by hand.
 
-**`mm_tiled_strided`, complete (`matmul_bench.cu:117–170`)**
+**`mm_tiled_strided` (`matmul_bench.cu:117–170`)**
 
 ```cpp
-117  template<int TILE, int BLK>
+117  template<int TILE, int BLK>   // ◀ real launch <64,32>: TILE = 64, BLK = 32
 118  __global__ void mm_tiled_strided(const float* A, const float* B, float* C, int N)
 119  {
-120      constexpr int F = TILE / BLK;
-121      __shared__ float sA[TILE][TILE];
-122      __shared__ float sB[TILE][TILE];
-123
-124      const int tx = threadIdx.x, ty = threadIdx.y;
-125      const int row0 = blockIdx.y * TILE;
-126      const int col0 = blockIdx.x * TILE;
-127
-128      float acc[F][F];
-129      #pragma unroll
-130      for (int i = 0; i < F; ++i)
-131          #pragma unroll
-132          for (int j = 0; j < F; ++j) acc[i][j] = 0.0f;
-133
-134      for (int t = 0; t < (N + TILE - 1) / TILE; ++t) {
-135          #pragma unroll
-136          for (int s = 0; s < F; ++s) {
-137              #pragma unroll
-138              for (int u = 0; u < F; ++u) {
+120      constexpr int F = TILE / BLK;   // ◀ F = 2: I own 2 rows × 2 columns of outputs
+121      __shared__ float sA[TILE][TILE];   // ◀ 64 × 64 floats = 16 KB of shared memory
+122      __shared__ float sB[TILE][TILE];   // ◀ same for B
+
+124      const int tx = threadIdx.x, ty = threadIdx.y;   // ◀ my column and row inside the 32 × 32 block
+125      const int row0 = blockIdx.y * TILE;   // ◀ first C row this block owns
+126      const int col0 = blockIdx.x * TILE;   // ◀ first C column this block owns
+128      float acc[F][F];   // ◀ my F × F = 4 running sums, in registers
+⋮    // 129–132 left out: set every acc[i][j] to 0
+134      for (int t = 0; t < (N + TILE - 1) / TILE; ++t) {   // ◀ one step per 64-wide slice of K
+136          for (int s = 0; s < F; ++s) {   // ◀ load slot s (which of my 2 tile rows)
+138              for (int u = 0; u < F; ++u) {   // ◀ load slot u (which of my 2 tile columns)
+                     // ▼ tile row: 32 apart between slots
 139                  int r = ty + s * BLK;           // strided within the tile
-140                  int c = tx + u * BLK;
-141                  int aR = row0 + r,      aC = t * TILE + c;
-142                  int bR = t * TILE + r,  bC = col0 + c;
+140                  int c = tx + u * BLK;   // ◀ tile column: lanes tx = 0…31 → 32 adjacent columns
+141                  int aR = row0 + r,      aC = t * TILE + c;   // ◀ the A element: my block's rows, slice t
+142                  int bR = t * TILE + r,  bC = col0 + c;   // ◀ the B element: slice t, my block's columns
+                     // ▼ copy into shared (0 if outside)
 143                  sA[r][c] = (aR < N && aC < N) ? A[(size_t)aR * N + aC] : 0.0f;
 144                  sB[r][c] = (bR < N && bC < N) ? B[(size_t)bR * N + bC] : 0.0f;
 145              }
 146          }
-147          __syncthreads();
-148
-149          #pragma unroll
-150          for (int k = 0; k < TILE; ++k) {
-151              #pragma unroll
-152              for (int i = 0; i < F; ++i) {
-153                  float a = sA[ty + i * BLK][k];
-154                  #pragma unroll
-155                  for (int j = 0; j < F; ++j)
-156                      acc[i][j] = fmaf(a, sB[k][tx + j * BLK], acc[i][j]);
+147          __syncthreads();   // ◀ wait: all 64 × 64 cells of both tiles loaded
+
+150          for (int k = 0; k < TILE; ++k) {   // ◀ walk the slice
+152              for (int i = 0; i < F; ++i) {   // ◀ each of my 2 output rows
+153                  float a = sA[ty + i * BLK][k];   // ◀ read one A value from shared …
+155                  for (int j = 0; j < F; ++j)   // ◀ each of my 2 output columns
+156                      acc[i][j] = fmaf(a, sB[k][tx + j * BLK], acc[i][j]);   // ◀ … and use it in 2 FMAs
 157              }
 158          }
-159          __syncthreads();
+159          __syncthreads();   // ◀ wait before the next t overwrites the tiles
 160      }
-161
-162      #pragma unroll
-163      for (int i = 0; i < F; ++i) {
-164          #pragma unroll
+
+163      for (int i = 0; i < F; ++i) {   // ◀ store my 4 outputs
 165          for (int j = 0; j < F; ++j) {
+                 // ▼ global C row and column of output (i, j)
 166              int r = row0 + ty + i * BLK, c = col0 + tx + j * BLK;
-167              if (r < N && c < N) C[(size_t)r * N + c] = acc[i][j];
+167              if (r < N && c < N) C[(size_t)r * N + c] = acc[i][j];   // ◀ write it if inside the matrix
 168          }
 169      }
 170  }
 ```
+*Lines that only say `#pragma unroll` are left out (what it does: the **Reading the code** box).*
 
 **Every name in it.** Two examples throughout: the hand-sized call `<4,2>` on the 4 × 4 toy (one block, thread tx = 1, ty = 0), and the real `<64,32>` run at N = 32768 (block bx = 2, by = 1, thread tx = 3, ty = 5).
 
@@ -882,63 +776,19 @@ Both kernels are launched by the harness as `mm_tiled_strided<64,32><<<g64, b32>
 
 Note that the cells a thread **loads** (lines 139–144) are not the cells it later **computes with**: it reads whole rows of `sA` and columns of `sB`, filled mostly by other threads. That cooperation is the reuse, and it's why barrier 1 exists.
 
-**`mm_tiled_contiguous`, complete (`matmul_bench.cu:172–225`)**
+**`mm_tiled_contiguous` (`matmul_bench.cu:172–225`)** is the strided kernel line for line (172–193 = 117–138, and so on), except for the five lines below. Each one swaps `ty + s·BLK` (strided) for `ty·F + s` (contiguous), and the same for `tx`:
 
 ```cpp
-172  template<int TILE, int BLK>
-173  __global__ void mm_tiled_contiguous(const float* A, const float* B, float* C, int N)
-174  {
-175      constexpr int F = TILE / BLK;
-176      __shared__ float sA[TILE][TILE];
-177      __shared__ float sB[TILE][TILE];
-178
-179      const int tx = threadIdx.x, ty = threadIdx.y;
-180      const int row0 = blockIdx.y * TILE;
-181      const int col0 = blockIdx.x * TILE;
-182
-183      float acc[F][F];
-184      #pragma unroll
-185      for (int i = 0; i < F; ++i)
-186          #pragma unroll
-187          for (int j = 0; j < F; ++j) acc[i][j] = 0.0f;
-188
-189      for (int t = 0; t < (N + TILE - 1) / TILE; ++t) {
-190          #pragma unroll
-191          for (int s = 0; s < F; ++s) {
-192              #pragma unroll
-193              for (int u = 0; u < F; ++u) {
+                     // ▼ tile row: 2 consecutive rows per thread
 194                  int r = ty * F + s;             // contiguous run per thread
-195                  int c = tx * F + u;
-196                  int aR = row0 + r,      aC = t * TILE + c;
-197                  int bR = t * TILE + r,  bC = col0 + c;
-198                  sA[r][c] = (aR < N && aC < N) ? A[(size_t)aR * N + aC] : 0.0f;
-199                  sB[r][c] = (bR < N && bC < N) ? B[(size_t)bR * N + bC] : 0.0f;
-200              }
-201          }
-202          __syncthreads();
-203
-204          #pragma unroll
-205          for (int k = 0; k < TILE; ++k) {
-206              #pragma unroll
-207              for (int i = 0; i < F; ++i) {
-208                  float a = sA[ty * F + i][k];
-209                  #pragma unroll
-210                  for (int j = 0; j < F; ++j)
+195                  int c = tx * F + u;   // ◀ tile column: lanes 2 apart
+⋮    // 196–207 left out: identical to strided 141–152
+208                  float a = sA[ty * F + i][k];   // ◀ my rows are ty·2 and ty·2 + 1
+⋮    // 209–210 left out: identical
+                         // ▼ my columns are tx·2 and tx·2 + 1
 211                      acc[i][j] = fmaf(a, sB[k][tx * F + j], acc[i][j]);
-212              }
-213          }
-214          __syncthreads();
-215      }
-216
-217      #pragma unroll
-218      for (int i = 0; i < F; ++i) {
-219          #pragma unroll
-220          for (int j = 0; j < F; ++j) {
-221              int r = row0 + ty * F + i, c = col0 + tx * F + j;
-222              if (r < N && c < N) C[(size_t)r * N + c] = acc[i][j];
-223          }
-224      }
-225  }
+⋮    // 212–220 left out: identical
+221              int r = row0 + ty * F + i, c = col0 + tx * F + j;   // ◀ I own a 2 × 2 patch of C
 ```
 
 **Exactly what differs: three places, each the same change from `ty + s·BLK` / `tx + u·BLK` (strided) to `ty·F + s` / `tx·F + u` (contiguous):**
@@ -958,7 +808,7 @@ So the pair is **not** a one-variable experiment, as the code's own header comme
 
 #### How it is called, on an example
 
-**Real calls** (`:469–472`, lines of `main()`, which is complete in §1.2) **[IMPL]**:
+**Real calls** (`:469–472`, lines of `main()`, excerpted in §1.2) **[IMPL]**:
 ```cpp
 dim3 g64((N + 63) / 64, (N + 63) / 64);                          // :470  (512, 512) at N = 32768
 mm_tiled_strided<64,32><<<g64, b32>>>(dA, dB, dC, N);            // :471
@@ -1035,71 +885,57 @@ Per k: `av` is R × 1, `bv` is 1 × R, `reg += av · bv` is R × R. Each loaded 
 
 ### 6.3 The code, line by line
 
-**`mm_block2d`, complete (`matmul_bench.cu:227–287`)**
+**`mm_block2d` (`matmul_bench.cu:231–287`)**
 
 ```cpp
-227  // ─────────────────────────────────────────────────────────────────────────────
-228  // 6. 2D register blocking — the Lab Quiz 2 Q3 kernel, verbatim in structure,
-229  //    with TILE as a template parameter so the shared tiles can be static.
-230  // ─────────────────────────────────────────────────────────────────────────────
-231  template<int TILE, int R>
+231  template<int TILE, int R>   // ◀ real launch <64,4>: TILE = 64, R = 4
 232  __global__ void mm_block2d(const float* A, const float* B, float* C, int N)
 233  {
-234      __shared__ float sA[TILE][TILE];
+234      __shared__ float sA[TILE][TILE];   // ◀ 64 × 64 floats of shared memory each
 235      __shared__ float sB[TILE][TILE];
-236
-237      const int tx = threadIdx.x, ty = threadIdx.y;
-238      const int rowBase = blockIdx.y * TILE + ty * R;
-239      const int colBase = blockIdx.x * TILE + tx * R;
-240
-241      float reg[R][R];
-242      #pragma unroll
-243      for (int i = 0; i < R; ++i)
-244          #pragma unroll
-245          for (int j = 0; j < R; ++j) reg[i][j] = 0.0f;
-246
-247      for (int t = 0; t < (N + TILE - 1) / TILE; ++t) {
-248          const int kOff = t * TILE;
-249          #pragma unroll
-250          for (int i = 0; i < R; ++i) {
-251              #pragma unroll
+
+237      const int tx = threadIdx.x, ty = threadIdx.y;   // ◀ my position in the 16 × 16 block
+238      const int rowBase = blockIdx.y * TILE + ty * R;   // ◀ global row of my top-left output
+239      const int colBase = blockIdx.x * TILE + tx * R;   // ◀ global column of my top-left output
+241      float reg[R][R];   // ◀ my R × R = 16 running sums, in registers
+⋮    // 242–245 left out: set every reg[i][j] to 0
+247      for (int t = 0; t < (N + TILE - 1) / TILE; ++t) {   // ◀ one step per 64-wide slice of K
+248          const int kOff = t * TILE;   // ◀ first K index of this slice
+250          for (int i = 0; i < R; ++i) {   // ◀ my R × R load slots …
 252              for (int j = 0; j < R; ++j) {
+                     // ▼ … fill tile cell (sr, sc): a 4 × 4 patch per thread
 253                  int sr = ty * R + i, sc = tx * R + j;
-254                  int aR = rowBase + i, aC = kOff + sc;
-255                  int bR = kOff + sr,   bC = colBase + j;
+254                  int aR = rowBase + i, aC = kOff + sc;   // ◀ the A element for that cell
+255                  int bR = kOff + sr,   bC = colBase + j;   // ◀ the B element for that cell
 256                  sA[sr][sc] = (aR < N && aC < N) ? A[(size_t)aR * N + aC] : 0.0f;
 257                  sB[sr][sc] = (bR < N && bC < N) ? B[(size_t)bR * N + bC] : 0.0f;
 258              }
 259          }
-260          __syncthreads();
-261
-262          for (int k = 0; k < TILE; ++k) {
-263              float av[R], bv[R];
-264              #pragma unroll
-265              for (int i = 0; i < R; ++i) av[i] = sA[ty * R + i][k];
-266              #pragma unroll
-267              for (int j = 0; j < R; ++j) bv[j] = sB[k][tx * R + j];
-268              #pragma unroll
+260          __syncthreads();   // ◀ wait: both tiles loaded
+
+262          for (int k = 0; k < TILE; ++k) {   // ◀ walk the slice
+263              float av[R], bv[R];   // ◀ R values of A and R of B, in registers
+265              for (int i = 0; i < R; ++i) av[i] = sA[ty * R + i][k];   // ◀ a column piece of the A tile
+267              for (int j = 0; j < R; ++j) bv[j] = sB[k][tx * R + j];   // ◀ a row piece of the B tile
 269              for (int i = 0; i < R; ++i)
-270                  #pragma unroll
 271                  for (int j = 0; j < R; ++j)
+                         // ▼ outer product: R × R FMAs from 2R reads
 272                      reg[i][j] = fmaf(av[i], bv[j], reg[i][j]);
 273          }
-274          __syncthreads();
+274          __syncthreads();   // ◀ wait before the next t overwrites the tiles
 275      }
-276
-277      #pragma unroll
+
 278      for (int i = 0; i < R; ++i) {
-279          int r = rowBase + i;
-280          if (r >= N) continue;
-281          #pragma unroll
+279          int r = rowBase + i;   // ◀ global row of output i
+280          if (r >= N) continue;   // ◀ row outside the matrix: skip it
 282          for (int j = 0; j < R; ++j) {
 283              int c = colBase + j;
-284              if (c < N) C[(size_t)r * N + c] = reg[i][j];
+284              if (c < N) C[(size_t)r * N + c] = reg[i][j];   // ◀ store C[r][c]
 285          }
 286      }
 287  }
 ```
+*Lines that only say `#pragma unroll` are left out (what it does: the **Reading the code** box).*
 
 **Every name in it.** Toy: the hand-sized call `mm_block2d<4,2><<<dim3(1,1), dim3(2,2)>>>` on the 4 × 4 toy, thread (tx = 1, ty = 0). Real: `mm_block2d<64,4><<<(512,512), (16,16)>>>` at N = 32768, block (bx = 2, by = 1), thread (tx = 3, ty = 5).
 
@@ -1146,7 +982,7 @@ The toy trace (N = 4, R = 2, thread (1, 0) → C[0…1][2…3] = [[2, 2], [2, 5]
 
 #### How it is called, on an example
 
-**Real calls** (`:475–483`, lines of `main()`, which is complete in §1.2) **[IMPL]**:
+**Real calls** (`:475–483`, lines of `main()`, excerpted in §1.2) **[IMPL]**:
 ```cpp
 dim3 gb((N + 63) / 64, (N + 63) / 64);          // :476 / :480  (512, 512) at N = 32768
 mm_block2d<64,2><<<gb, b32>>>(dA, dB, dC, N);   // :477  block 32 × 32 = 64/2 per side
@@ -1252,55 +1088,45 @@ Without Nsight Compute you can't rank them. Your first experiment would be vecto
 | **Output [IMPL]** | one CSV row per kernel and N: `impl, N, time_ms, tflops, iters, max_rel_err`. |
 | **Known gaps [RECON]** | check covers only the first 4M outputs (whole matrix up to N = 2048, ~122 rows at 32768; the comment at `:352` claims a whole-matrix sample); `dC` is never cleared between kernels and `cudaGetLastError` is not called after launches, so a kernel that failed to launch would inherit the previous kernel's correct output; n = 1 for most kernels at N = 32768; no repeats, no error bars; clocks not locked. |
 
-### 7.2 Timing, line by line (`matmul_bench.cu:306–350`)
+### 7.2 Timing, line by line (`matmul_bench.cu:309–350`)
 
 ![[d05i-timing.svg]] [[d05i-timing.html|▶ Step through it]]
 
 ```cpp
-306  // ─────────────────────────────────────────────────────────────────────────────
-307  // Timing harness
-308  // ─────────────────────────────────────────────────────────────────────────────
-309  struct Timing { double ms; int iters; };
-310
-311  template<typename LaunchFn>
+309  struct Timing { double ms; int iters; };   // ◀ mean milliseconds, and how many runs
+311  template<typename LaunchFn>   // ◀ LaunchFn = any callable
 312  static Timing time_kernel(LaunchFn launch, int warmup, int iters, double budget_s)
-313  {
-314      cudaEvent_t beg, end;
-315      CUDA_CHECK(cudaEventCreate(&beg));
-316      CUDA_CHECK(cudaEventCreate(&end));
-317
-318      for (int i = 0; i < warmup; ++i) launch();
-319      CUDA_CHECK(cudaDeviceSynchronize());
-320
+⋮    // 314–316 left out: create two CUDA events, beg and end
+318      for (int i = 0; i < warmup; ++i) launch();   // ◀ untimed warm-up launches (1, or 2 for cuBLAS)
+319      CUDA_CHECK(cudaDeviceSynchronize());   // ◀ CPU waits until the GPU is idle
+
 321      // One timed iteration first, so a slow kernel doesn't commit to ten of them.
-322      CUDA_CHECK(cudaEventRecord(beg));
-323      launch();
+322      CUDA_CHECK(cudaEventRecord(beg));   // ◀ GPU timestamps beg when it reaches it
+323      launch();   // ◀ enqueue one run (returns at once)
 324      CUDA_CHECK(cudaEventRecord(end));
-325      CUDA_CHECK(cudaEventSynchronize(end));
+325      CUDA_CHECK(cudaEventSynchronize(end));   // ◀ CPU waits until the GPU passes end
 326      float first = 0.f;
-327      CUDA_CHECK(cudaEventElapsedTime(&first, beg, end));
-328
+327      CUDA_CHECK(cudaEventElapsedTime(&first, beg, end));   // ◀ milliseconds between the two stamps
+
 329      int extra = 0;
 330      double total = first;
-331      if (first / 1000.0 * iters < budget_s) {
+331      if (first / 1000.0 * iters < budget_s) {   // ◀ would `iters` runs fit in the budget?
 332          extra = iters - 1;
 333          CUDA_CHECK(cudaEventRecord(beg));
-334          for (int i = 0; i < extra; ++i) launch();
+334          for (int i = 0; i < extra; ++i) launch();   // ◀ 9 more runs, back to back
 335          CUDA_CHECK(cudaEventRecord(end));
 336          CUDA_CHECK(cudaEventSynchronize(end));
 337          float rest = 0.f;
 338          CUDA_CHECK(cudaEventElapsedTime(&rest, beg, end));
 339          total += rest;
 340      }
-341
-342      CUDA_CHECK(cudaEventDestroy(beg));
-343      CUDA_CHECK(cudaEventDestroy(end));
-344      return { total / (1 + extra), 1 + extra };
+⋮    // 342–343 left out: destroy the events
+344      return { total / (1 + extra), 1 + extra };   // ◀ mean over 1 + extra runs
 345  }
-346
+
 347  static double tflops(int N, double ms)
 348  {
-349      return (2.0 * (double)N * N * N) / (ms * 1e-3) / 1e12;
+349      return (2.0 * (double)N * N * N) / (ms * 1e-3) / 1e12;   // ◀ 2N³ FLOPs / seconds / 10¹²
 350  }
 ```
 
@@ -1325,21 +1151,21 @@ Without Nsight Compute you can't rank them. Your first experiment would be vecto
 
 `CUDA_CHECK(call)` is a macro in the file that prints file, line and the error string and exits if a call fails. Kernel launches themselves return nothing, so launch errors only show up at the next checked call: one reason `cudaGetLastError` after launches is on the fix list.
 
-### 7.3 The cuBLAS column-major trick (`:432–443`)
+### 7.3 The cuBLAS column-major trick (`:432–440`)
 
 ```cpp
 432          // ── cuBLAS first: it becomes the correctness reference for the rest.
 433          // cuBLAS is column-major; computing B*A in its layout yields row-major A*B.
-434          const float alpha = 1.0f, beta = 0.0f;
+434          const float alpha = 1.0f, beta = 0.0f;   // ◀ C = α·A·B + β·C with α = 1, β = 0
 435          auto cublas_launch = [&] {
-436              cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, N, N,
+436              cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, N, N,   // ◀ no transposes; m = n = k = N
+                             // ▼ B first, then A: the column-major trick below
 437                          &alpha, dB, N, dA, N, &beta, dC, N);
 438          };
-439          Timing tb = time_kernel(cublas_launch, 2, iters, budget);
+439          Timing tb = time_kernel(cublas_launch, 2, iters, budget);   // ◀ timed like any kernel (2 warm-ups)
+             // ▼ keep cuBLAS's answer as the reference
 440          CUDA_CHECK(cudaMemcpy(hRef, dC, bytes, cudaMemcpyDeviceToHost));
-441          fprintf(out, "cublas,%d,%.4f,%.4f,%d,0,\n", N, tb.ms, tflops(N, tb.ms), tb.iters);
-442          fprintf(stderr, "  %-18s %10.3f ms  %8.2f TFLOP/s\n", "cublas", tb.ms, tflops(N, tb.ms));
-443          fflush(out);
+⋮    // 441–443 left out: write the CSV row and print the time
 ```
 
 `cublasSgemm(handle, transA, transB, m, n, k, &alpha, A, lda, B, ldb, &beta, C, ldc)` computes C = α·op(A)·op(B) + β·C in **column-major** storage, with leading dimensions `lda`, `ldb`, `ldc` (the stride between columns). Here α = 1, β = 0, no transposes, all dimensions and strides N, and the two inputs passed **swapped** (`dB` first, then `dA`). Lines 439–440 time it like any kernel and keep its answer in `hRef`.
@@ -1350,20 +1176,21 @@ cuBLAS is column-major. A row-major buffer read as column-major is the transpose
 
 ```cpp
 352  // Max relative error against a reference, sampled over the whole matrix.
+     // ▼ n = how many elements to compare
 353  static double max_rel_err(int n, const float* ref, const float* got)
 354  {
 355      double worst = 0.0;
 356      for (int i = 0; i < n; ++i) {
-357          double r = std::fabs((double)ref[i]);
-358          double d = std::fabs((double)ref[i] - (double)got[i]);
-359          double e = d / (r > 1.0 ? r : 1.0);
-360          if (e > worst) worst = e;
+357          double r = std::fabs((double)ref[i]);   // ◀ size of the reference value
+358          double d = std::fabs((double)ref[i] - (double)got[i]);   // ◀ absolute difference
+359          double e = d / (r > 1.0 ? r : 1.0);   // ◀ relative if |ref| > 1, else absolute
+360          if (e > worst) worst = e;   // ◀ keep the worst
 361      }
 362      return worst;
 363  }
 ```
 
-It is called as `max_rel_err((int)std::min(elems, (size_t)4000000), hRef, hC)` (`:447`, full `main()` in §1.2): `n` is the first 4,000,000 elements, `ref` the cuBLAS answer, `got` the kernel's answer copied back. The comment on line 352 says "sampled over the whole matrix"; it is a prefix.
+It is called as `max_rel_err((int)std::min(elems, (size_t)4000000), hRef, hC)` (`:447`, inside `record`): `n` is the first 4,000,000 elements, `ref` the cuBLAS answer, `got` the kernel's answer copied back. The comment on line 352 says "sampled over the whole matrix"; it is a prefix.
 
 `e = |ref − got| / max(|ref|, 1)`: relative for big values, absolute for small ones (so near-zero outputs don't blow up the ratio). `worst` = the max over the first `min(N², 4,000,000)` elements. **[MEAS]:** 0.000e+00 for every GPU kernel up to N = 16384; **4.48 × 10⁻⁵** for all of them at N = 32768. The custom kernels all agree with each other, so the difference is on the cuBLAS side, most likely a different summation order (for example split-K) at that size: a hypothesis, not documented. **Don't say "bit-exact" without "up to N = 16384, on the first 4M outputs".**
 
