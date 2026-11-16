@@ -15,8 +15,8 @@ Part of [[Interview plan (Nov 2026)]]. Built from [[Day 09 - CS728 and LeNet-5]]
 | LeNet-5 code | `/data/jayavardhan/projects/interview_materials/lenet/` = GitHub `harshith2302/cs725_Project`, branch `main`, commit `3b2584b` | evaluation suite only; the pruning, distillation and quantisation code is on an **unpushed** branch `feat/compression-robustness` |
 | LeNet-5 report | same folder, `fml_report.pdf` (12 pages, Aug 2026) | every LeNet number on your resume is in it |
 | LeNet-5 Part 1 report | same folder, `legacy/docs/report.pdf` | the 5-person CS725 reproduction |
-| CS728 code and report | **not on the server** | the numbers on your resume can't be checked yet |
-| Retrieval-head code | `/data/jayavardhan/projects/LongContext_RAG/` (your repo, `main`, `bfb2ec9`) | the same machinery as CS728: the copy rule, head ranking, attention mass per span |
+| CS728 code and report | `/data/jayavardhan/projects/interview_materials/cs728/` (from your upload `PA3_CS728.zip`, 2026-11-17): `utils.py`, `run2.py`, `code3.py`, `run3.py`, `data/`, `Programming Assignment 3.pdf` | complete for Parts 2–3; the Part 1 code (BM25, MiniLM, UAE) is not in the zip |
+| Retrieval-head code (background only) | `/data/jayavardhan/projects/LongContext_RAG/` (your later repo, `main`, `bfb2ec9`) | Wu et al.'s strict copy rule, used in §3 as background |
 
 > [!important] What this note is for
 > In an interview you will be asked to explain each project from scratch, then pushed: *why heads and not an embedding model, what was the baseline, why global pruning, is the robustness gain real, why 3.27× and not 4×.* This note builds every idea from zero, on tiny numbers, then shows the real code, then gives the questions with answers. **Start with §0**: it lists the resume lines that need new wording, and one authorship question you must settle before any interview.
@@ -35,14 +35,14 @@ Part of [[Interview plan (Nov 2026)]]. Built from [[Day 09 - CS728 and LeNet-5]]
 | label | means | example |
 |---|---|---|
 | **[IMPL]** | in code on the server (path:line given) | `pgd()` clamps the change to ±ε at `attacks.py:75` |
-| **[REPORT]** | a number or statement in `fml_report.pdf` | 98.52 ± 0.14% clean at 3.75% of weights |
-| **[RAN]** | checked today by running or recomputing it | the p = 0.83 recomputed from the report's own means and standard deviations |
+| **[REPORT]** | a number or statement in a report: `fml_report.pdf` (LeNet) or `Programming Assignment 3.pdf` (CS728) | 98.52 ± 0.14% clean at 3.75% of weights |
+| **[RAN]** | checked by running or recomputing it | the p = 0.83 recomputed from the report's own numbers; the CS728 token spans checked with the real tokenizer |
 | **[THEORY]** | what the maths or a hand count predicts | a linear score can drop by at most ε‖w‖₁ |
-| **[RECON]** | reconstructed from the code or the docs; not documented | the per-head hit counter of CS728 |
-| **[MISSING]** | not on the server; get it before the interview | the definition of the 1.3% baseline |
-| **[FUTURE]** | not done; a possible next step | a per-position Recall@1 curve |
+| **[RECON]** | reconstructed from the code or the docs; not documented | the LeNet IMP outer loop (§11) |
+| **[MISSING]** | not on the server; get it before the interview | the LeNet compression branch, never pushed |
+| **[FUTURE]** | not done; a possible next step | the CS728 position curve for the selected heads |
 
-**Animations.** Each animated figure has a step-through player: click **▶ Step through it** under it (← / → step, space plays). New for this note: `d09i-*` (from `Days/figures/_gen/d09figs.py`) and four Manim videos `d09m-*` (from `Days/figures/_gen/manim_d09.py`); the older `d09-*` figures are reused.
+**Animations.** Each animated figure has a step-through player: click **▶ Step through it** under it (← / → step, space plays). New for this note: `d09i-*` (from `Days/figures/_gen/d09figs.py`) and four Manim videos `d09m-*` (from `Days/figures/_gen/manim_d09.py`); the older `d09-*` figures are reused. `d09r-*` are images taken from your CS728 report.
 
 ---
 
@@ -61,9 +61,10 @@ Part of [[Interview plan (Nov 2026)]]. Built from [[Day 09 - CS728 and LeNet-5]]
 
 | resume says | what the evidence says | say instead |
 |---|---|---|
-| CS728: Recall@1 **1.3% → 40.7%**, Recall@5 **25.5% → 66.9%** | **[MISSING]** no CS728 code or report on the server. The baseline that gives 1.3% is not defined anywhere you can show. | Fine to say, **if** you can name the baseline in one sentence (see §6.2). |
-| "aggregating retrieval-specialized heads across **32 heads and 3 layers**" | **[MISSING]** reads oddly next to "top 10 heads". 32 heads in each of 3 layers? 32 heads in total? | Fix from your report. Never say a number you can't explain. |
-| "Mitigated the **lost-in-the-middle** effect" | **[MISSING]** needs accuracy split by the correct tool's position. | If you only have overall recall: "aimed to reduce position bias", not "mitigated". |
+| CS728: Recall@1 **1.3% → 40.7%**, Recall@5 **25.5% → 66.9%** | ✓ **[REPORT]** p. 9 (0.0132 → 0.4068, 0.2554 → 0.6694). But 1.3% is **all 512 heads averaged**, which is chance level (1 in 100 tools). On its own the line reads as an inflated baseline. Your report also has BM25 18.5%, MiniLM 38.8% and **UAE-Large-V1 61.6%**, which beats the heads. | "Selecting 10 of Llama-3.2-1B's 512 heads raised Recall@1 from 1.3% (all heads) to 40.7%, beating BM25 (18.5%) and MiniLM (38.8%) without fine-tuning." (§6.2) |
+| "aggregating retrieval-specialized heads across **32 heads and 3 layers**" | ✗ matches nothing. The model has 16 layers × 32 heads = 512; the best K was **10** heads, spread over layers 2–10 (§4.5). | "the best 10 of 512 attention heads, chosen with 200 labelled queries" |
+| "Mitigated the **lost-in-the-middle** effect" | ✗ The report **measured** the U (attention to the correct tool vs its position, all heads, p. 4) but never measured it for the selected heads. | "measured a U-shaped position bias in attention-based ranking" (§6.4) |
+| (not on the resume, but you'll be asked) | K = 10 / 20 / 30 was compared on the **test** set; 40.7% is the best of three (§4.4). The project was a 3-person team (G Jayavardhan, Pavan Kumar, Ajay Rangoji). | Say both before you're asked; say "we". |
 | LeNet: **3.75%** of weights, **98.52%** clean, **69.83%** MNIST-C, validation split, **5 seeds** | ✓ **[REPORT]** Table 2, row "Standard, 3.75% weights" (layer-wise pruning, standard training). | As written. |
 | "**7× larger** corruption loss … **3.89 pp** … traced to a starved conv1" | ✓ 7× = 3.89 (MNIST-C drop) ÷ 0.56 (clean drop) **[REPORT]** Table 5. conv1 keeps 6 of 150 weights **[REPORT]** Table 4, **[RAN]**. | Say what the 7× compares: "the corruption drop was 7× the clean drop". |
 | "global pruning at matched sparsity closed the gap to **0.13 pp (p = 0.83)**, a **3.76 pp** gain" | ✓ **[REPORT]** Table 5; both p-values **[RAN]** (§13). "Matched" = 3.52% global vs 3.75% layer-wise (they are 15 rounds of two schedules, §11.3). | Add "Welch's t-test, 5 seeds" if asked. |
@@ -77,48 +78,79 @@ Part of [[Interview plan (Nov 2026)]]. Built from [[Day 09 - CS728 and LeNet-5]]
 
 ---
 
-# Part A. CS728: zero-shot tool retrieval with retrieval heads
+# Part A. CS728: picking a tool with the LLM's own attention
 
 ## 1. The project on one page
 
 ### 1.1 The problem, in plain words
 
-An LLM **agent** can call tools: a weather API, a flight search, a calculator. The prompt lists each tool's name and description. For each user request, something has to pick the right tool.
+An LLM **agent** can call tools: a PDF converter, a flight search, a stock-price API. The prompt lists each tool's name and description. For each user request, something has to pick the right tool.
 
-The usual answer is a **retriever**: an embedding model, trained on query–tool pairs, that turns each description and each query into a vector and picks the closest. That needs training data and a second model.
+The usual answer is a **retriever**: an embedding model, trained on query–passage pairs, that turns each description and each query into a vector and picks the closest one. That needs a second model trained for the job.
 
-Your project asks: **does the LLM already know where to look?** Inside the model, a few attention heads specialise in finding and copying information from the prompt. If we can find those heads, their attention over the tool list *is* a retriever, with no training at all ("zero-shot").
+CS728 Programming Assignment 3 asks: **does the LLM already know where to look?** Put all 100 tool descriptions and the query in one prompt, run the model once, and read its **attention**: which tool's tokens do the query's tokens look at? Most attention heads look at other things (position, grammar). If we can find the few heads that look at the right tool, their attention *is* a retriever, with no weight changed.
+
+The assignment had three parts, and your report covers all three:
+
+| part | what | your result |
+|---|---|---|
+| 1 | standard retrievers: BM25, MiniLM, UAE-Large-V1 | 18.5%, 38.8%, 61.6% Recall@1 |
+| 2 | attention of **all** heads as a retriever; does position matter ("lost in the middle")? | 1.3% Recall@1; a U-shaped position curve |
+| 3 | attention of **selected** heads only ("retrieval heads"), chosen on training queries | 40.7% Recall@1 with the best 10 heads |
 
 > [!quote] Say this
-> "In CS728 I used the LLM's own attention as a tool retriever. A few heads specialise in pointing at the part of the prompt the model is about to use. I found them with a simple count on probe queries, kept the top 10, and ranked tools by how much attention those heads put on each tool's description. With no training, Recall@1 went from 1.3% to 40.7%."
+> "In CS728 we used an LLM's attention as a tool retriever. With Llama-3.2-1B reading 100 tool descriptions and a query, averaging all 512 attention heads ranks the right tool first only 1.3% of the time, about chance, because attention mostly follows position. We scored each head on 200 labelled training queries, counting how often it gave the correct tool the most attention, and kept the best 10. Those 10 heads alone reach 40.7% Recall@1 and 66.9% Recall@5, better than BM25 and MiniLM, with no weights trained. A proper embedding model, UAE-Large-V1, still wins with 61.6%."
 
-### 1.2 The ten questions about the whole project
+### 1.2 Setup, checked against the code **[IMPL] [RAN]**
+
+Code and report: `/data/jayavardhan/projects/interview_materials/cs728/` (copied from your upload `PA3_CS728.zip`, 2026-11-17). Report: `Programming Assignment 3.pdf`, 9 pages, authors **G Jayavardhan (25M0807), Pavan Kumar (25M0803), Ajay Rangoji (25M0802)**.
+
+| item | value | where |
+|---|---|---|
+| model | `meta-llama/Llama-3.2-1B-Instruct`, fp16, eager attention, `output_attentions=True` | `run2.py:96, 107`, `utils.py:11–22` |
+| size | **16 layers × 32 query heads = 512 heads**; 8 key/value heads (grouped-query attention); head dim 64 | config **[RAN]** |
+| data | **MetaTool**: the 100 most frequent tools; 5,000 test and 1,500 training queries, disjoint | `utils.py:86–112`; overlap 0 **[RAN]** |
+| head selection | first **200** training queries (`--train_samples 200`) | `run3.py:88, 103–110` |
+| prompt | ≈ **2,980 tokens** (2,970–3,003): instruction, 100 tools, the query | **[RAN]** on 30 test prompts |
+| one tool | `tool_id: <name>\ntool description: <text>`: 13 to 69 tokens, mean 28 | `utils.py:37`; **[RAN]** |
+| tool order | **reshuffled for every query** (seed 64) | `run2.py:139–140`, `run3.py:132–133`, `code3.py:34–35` |
+| metric | Recall@1 and Recall@5 over the 5,000 test queries | `run3.py:173–187` |
+| queries per tool | very uneven: 16 to 376 test queries per tool | **[RAN]** |
+
+Two checks I ran with the real tokenizer (CPU only, no model):
+- **The tool spans are exact.** `PromptUtils` computes each tool's token positions by tokenizing pieces separately (§2.7). Decoding those positions from the full prompt gave back every tool's text exactly: **0 mismatches in 3,000** (30 prompts × 100 tools).
+- **The query span is right.** Token 2929 is `Query`, token 34192 is `Correct`; the span between them is the query text plus its newline. The comment in `run3.py:78` calls 34192 "tool_id"; that comment is wrong, the code is right.
+
+### 1.3 What is in each file
+
+| file | what | who wrote it |
+|---|---|---|
+| `utils.py` | load the model; build the prompt and the token span of every tool; load the data | course skeleton (prompt format, spans) |
+| `run2.py` | Part 2: score tools with **all** heads; Recall@k; the position plot | skeleton + the team's TODO bodies |
+| `code3.py` | Part 3: `select_retrieval_heads`, the Hit Count (and two commented-out alternatives) | the team (a `TODO 3` in the skeleton) |
+| `run3.py` | Part 3: score tools with the **selected** heads; Recall@k | skeleton + the team's `TODO 2/3` bodies |
+| `data/` | `tools.json` (100 tools), `train_queries.json`, `test_queries.json` | course |
+| report PDF | all three parts, all numbers | the team of three |
+
+"Who wrote it" is read off the `TODO` and `Do NOT change` markers in the files. The Part 1 code (BM25, MiniLM, UAE) is **not** in the zip; its numbers are **[REPORT]** only.
+
+> [!warning] Your share of the work
+> This was a three-person assignment and the files carry no record of who wrote what. In an interview say "we" for the project and "I" only for the parts you did. Know all of it anyway: you will be asked about every line.
+
+### 1.4 The ten questions about the whole project
 
 | question | answer | label |
 |---|---|---|
-| What problem? | Pick the right tool for a query from a list of tool descriptions in the prompt. | |
-| Why not just ask the LLM? | It can be done, but the model may write a tool name that doesn't exist, and "lost in the middle" makes it miss tools in the middle of a long list. | [THEORY] |
-| What is a retrieval head? | A head whose strongest attention lands on exactly the context token the model is about to copy (Wu et al. 2024). Fewer than 5% of heads. | §3 |
-| How did you find them? | **Hit Count**: run probe queries whose correct tool is known; for each head, count how often its argmax lands on the correct tool; keep the top 10. | §4, [RECON] |
-| How do they become a retriever? | Sum the chosen heads' attention over each tool's tokens; rank tools by that score. | §5 |
-| Metric? | Recall@1 and Recall@5: share of queries whose correct tool is first / in the top 5. | §6 |
-| Baseline? | 1.3% Recall@1. **[MISSING]**: you must name it (§6.2). | |
-| Result? | Recall@1 1.3% → 40.7%, Recall@5 25.5% → 66.9%. | resume; [MISSING] |
-| Trade-offs? | No training, no second model; but it needs the model's attention weights (slow "eager" path), and 40.7% is below a trained retriever's usual top-1. | §5.4, §6 |
-| What would you do next? | Use heads to **re-rank** a shortlist from an embedding retriever (your LongContext_RAG "cascade" does this for passages); measure recall per tool position. | [FUTURE] |
-
-### 1.3 Facts to fill in before the interview
-
-The CS728 code is not on the server. Before any interview, find these in your report or code and write them in [[#My notes and fumbles]]:
-
-- [ ] which LLM (and so how many layers × heads);
-- [ ] which dataset or tool set, how many tools per prompt, how many queries;
-- [ ] **what the 1.3% baseline is** (§6.2 lists the likely candidates);
-- [ ] the probe set for Hit Count: how many queries, and whether they are separate from the test queries;
-- [ ] what "32 heads and 3 layers" means;
-- [ ] how lost in the middle was measured, if it was.
-
-Until then, the code in this Part is **your LongContext_RAG repo**, which does the same three steps on passages instead of tools: the copy rule (`heads/scorer.py`), ranking heads (`heads/run_head_id.py`) and attention mass per span (`compress/head_scorer.py`). Wherever CS728 needs a step that repo doesn't have, the code is marked **[RECON]**.
+| What problem? | Pick the right tool for a query from 100 tool descriptions in the prompt. | |
+| Which model and data? | Llama-3.2-1B-Instruct (16 × 32 = 512 heads); MetaTool, 100 tools, 5,000 test queries. | [IMPL] |
+| How do you score a tool? | Mean attention from the query's tokens to the tool's tokens, averaged over heads. | §5, [IMPL] |
+| Baseline? | The same score with **all 512 heads** averaged: Recall@1 1.3%, Recall@5 25.5%. Near chance for Recall@1 (1%). | §6.2, [REPORT] |
+| How did you choose heads? | **Hit Count**: on 200 labelled training queries, count how often each head gives the correct tool its highest score; keep the top K. | §4, [IMPL] |
+| Result? | Top 10 heads: Recall@1 **40.7%**, Recall@5 **66.9%**. | [REPORT] |
+| Against real retrievers? | Beats BM25 (18.5%) and MiniLM (38.8%); loses to UAE-Large-V1 (61.6%). | [REPORT] |
+| What about position? | With all heads, attention to the correct tool is ~6× higher in the first 5 places than in the middle: a U shape. | §6.4, [REPORT] |
+| Weak spots? | K was compared on the test set; the selected heads' position curve was not measured; one prompt of 3,000 tokens per query with eager attention. | §4.4, §6.4 |
+| What next? | Choose K on held-out training queries; measure the heads' position curve; use the heads to re-rank an embedding shortlist. | [FUTURE] |
 
 ---
 
@@ -133,442 +165,428 @@ The model never sees letters. A **tokenizer** cuts the text into pieces (**token
 | token | `<s>` | weather | api | flight | search | stock | price | calc | math | fly | Paris |
 | part | start | tool A | tool A | tool B | tool B | tool C | tool C | tool D | tool D | query | query |
 
-`<s>` is a special start-of-text token. Each tool's description is a **span**: tool B is positions 3–4. Real descriptions are dozens of tokens; here they are two.
+`<s>` is a special start-of-text token. Each tool's description is a **span**: tool B is positions 3–4, written (3, 5) in Python's "start, one past the end" style. In CS728 a tool is 13 to 69 tokens and the whole prompt about 2,980.
 
 ### 2.2 Attention: one row of weights
 
-Each layer of a Transformer lets every token **look at** earlier tokens and mix in what it finds. For the token being generated, one attention head does three things:
+Each layer of a Transformer lets every token **look at** earlier tokens and mix in what it finds. For one token, one attention head does three things:
 
-1. **Score** every earlier position: score = (this token's *query* vector · that position's *key* vector) / √d. (Query and key are two learned projections of each token's vector; d is their length. Day 1 §5 builds these from scratch.)
+1. **Score** every earlier position: score = (this token's *query* vector · that position's *key* vector) / √d. (Query and key are two learned projections of each token's vector; d is their length, 64 in Llama-3.2-1B. Day 1 §5 builds these from scratch.)
 2. **Softmax** the scores: e^score for each, divided by the total, so the weights are positive and sum to 1.
 3. **Mix**: the output is the weighted average of the positions' *value* vectors.
 
-The row of weights from step 2 says where the head is looking. Its largest entry, the **argmax**, is the one position the head looks at most.
+The row of weights from step 2 says where the head is looking.
 
 ![[d09i-attn-row.svg]] [[d09i-attn-row.html|▶ Step through it]]
 
-On the toy: the score 3.0 at position 3 becomes e³ = 20.09; the total is 48.62; so the weight is 20.09 / 48.62 = **0.413**, the largest. This head is looking at "flight", inside tool B.
+On the toy: the score 3.0 at position 3 becomes e³ = 20.09; the total is 48.62; so the weight is 20.09 / 48.62 = **0.413**, the largest. This head, reading from the query token "Paris", is looking mostly at "flight", inside tool B.
 
-### 2.3 A head, a layer, and how many there are
+### 2.3 The attention matrix, and why only the query rows matter
 
-- A **head** is one independent copy of steps 1–3, with its own projections, so it learns its own way of scoring. Each produces its own row.
+Do step 1–2 for **every** token and stack the rows: an N × N matrix per head, where row i is "where token i looks". It is **causal**: token i only sees positions 0…i, so the upper triangle is 0.
+
+In the CS728 prompt the query comes **after** all 100 tools. So the rows of the query's tokens are the only rows that can see every tool, and they are exactly the question "which tool does the query look at?". CS728 reads those rows and nothing else.
+
+### 2.4 A head, a layer, and how many there are
+
+- A **head** is one independent copy of steps 1–3, with its own query projection, so it learns its own way of scoring. Each makes its own matrix.
 - A **layer** runs several heads side by side, then a small MLP.
-- Llama-3.1-8B (the model in LongContext_RAG) has **32 layers × 32 heads = 1,024 heads**, so 1,024 rows per generated token.
+- Llama-3.2-1B has **16 layers × 32 heads = 512 heads**.
+- **Grouped-query attention:** it has only 8 key/value heads; each is shared by 4 query heads. The 4 still have different query projections, so they still make 4 different attention patterns. For CS728 that means 512 distinct rows per token.
 
-We name a head by its layer and number: **L14H3** is head 3 of layer 14.
+We name a head by its layer and number, both counted from 0: **L8H19** is head 19 of layer 8 (your best head).
 
-### 2.4 The attention sink
+### 2.5 The attention sink
 
-Many heads put a lot of weight on position 0 (`<s>`) whatever the content, as a place to "park" attention they don't need. It is called the **attention sink**. In the toy row `<s>` gets 0.186. Any retrieval score must ignore it, or a head that always parks on `<s>` would look busy. §5's code removes it explicitly.
+Many heads put a lot of weight on position 0 (`<s>`) whatever the content, as a place to "park" attention they don't need. It is called the **attention sink**. In the toy row `<s>` gets 0.186. CS728's score only adds up columns inside tool spans, so the sink's column is never counted; but a head that parks 80% on the sink has only 20% left for tools, so its tool scores are small and it counts less in the average (§5.3).
 
-### 2.5 Prefill and decode
+### 2.6 One forward pass, and why it must be "eager"
 
-- **Prefill:** the model reads the whole prompt in one pass (all positions at once).
-- **Decode:** it then generates one token at a time; each new token attends over everything before it.
+CS728 runs the model **once** over the whole prompt (this is the **prefill**; no answer is generated) with `output_attentions=True`. Fast attention kernels (SDPA, FlashAttention; Day 6) never store the weight matrix, so the code loads the model with the slow **eager** implementation, which does. §5.4 works out what that costs.
 
-The attention row that matters for retrieval is the one at a **decode** step, the moment the model starts its answer. §5.4 explains why the code reads attention only there.
+### 2.7 The real prompt and the spans: `PromptUtils` (`utils.py`) **[IMPL]**
 
-### 2.6 Check yourself
+```python
+ 28      self.prompt_seperator = " \n\n"                                    # ◀ goes before every tool
+ 29      user_header = '<|start_header_id|>user<|end_header_id|>'           # ◀ Llama-3 chat format
+ 30      asst_header = '<|eot_id|><|start_header_id|>assistant<|end_header_id|>'
+ 31      self.item_instruction = f" Here are all the available tools:"
+     ⋮
+ 37      self.doc_text = lambda idx, doc_name, doc_info: f"tool_id: {doc_name}\ntool description: {doc_info}"
+ 38      self.add_text1 = f"Now, please output ONLY the correct tool_id for the query below."
+     ⋮
+ 49  def create_prompt(self, query):
+ 50      query_prompt = f"Query: {query}"+ "\nCorrect tool_id:"
+ 51      prompt = self.prompt_prefix + \                                    # ◀ header + instruction
+ 52              self.all_docs_info_string + \                              # ◀ the 100 tools, in this query's shuffled order
+ 53              self.prompt_seperator + \
+ 54              self.add_text1 + \
+ 55              self.prompt_seperator + \
+ 56              query_prompt + \                                           # ◀ "Query: … \nCorrect tool_id:"
+ 57              self.prompt_suffix                                         # ◀ the assistant header: the model would answer next
+     ⋮
+ 67      doc_st_index = self.prompt_prefix_length + 1 # inlcudes " \n\n"    # ◀ first tool starts after the prefix and one separator token
+ 68      for ix, key in enumerate(shuffled_keys):
+     ⋮
+ 72          doc_text = self.doc_text(...).strip()
+ 73          doc_text_len = len(self.tokenizer(doc_text, add_special_tokens=False).input_ids)   # ◀ this tool's length in tokens
+ 75          doc_spans.append((doc_st_index, doc_st_index + doc_text_len))  # ◀ its (start, end) in the full prompt
+ 76          doc_st_index =  doc_st_index + 1 + doc_text_len                # ◀ skip it and the next " \n\n" (1 token)
+```
 
-1. Scores [1.0, 0.0, 2.0]: softmax weights? Argmax? *(e¹ = 2.72, e⁰ = 1, e² = 7.39; total 11.11 → 0.245, 0.090, 0.665; argmax 2.)*
-2. Why can't you read "which tool" from a single head's output vector? *(The output is a blend of value vectors; the **weights** say where it looked.)*
-3. How many attention rows does Llama-3.1-8B make for one generated token? *(1,024.)*
+The query span is found by token ids (`run3.py:63–82`, same as `run2.py:79–91`):
+
+```python
+ 71      i = len(input_ids_list) - 1
+ 72      while i >= 0:                                                      # ◀ walk BACKWARDS to the last "Query" token
+ 73          if input_ids_list[i] == 2929:                                  # ◀ 2929 = "Query" [RAN]
+ 74              position_of_query = i
+     ⋮
+ 77      actual_query_st_pos = position_of_query + 2                        # ◀ skip "Query" and ":"
+ 79      for i in range(actual_query_st_pos, len(input_ids_list)):
+ 80          if input_ids_list[i] == 34192:                                 # ◀ 34192 = "Correct" [RAN] (the comment says "tool_id")
+ 81              break
+ 82      return (actual_query_st_pos, i)                                    # ◀ the query's tokens (plus its "\n")
+```
+
+| name | holds | example |
+|---|---|---|
+| `doc_spans` | one (start, end) per tool, in prompt order | first test query: `[(11, 38), (39, 67), (68, 118), …, (2899, 2936)]` **[RAN]** |
+| `dict_doc_name_id` | tool name → its index in **this** prompt's order (`utils.py:26`) | its correct tool `PDF&URLTool` → 46, span (1352, 1421) **[RAN]** |
+| `query_span` | (start, end) of the query tokens | (2954, 2964) for "How can I make this document publically available?" **[RAN]** |
+
+**Why the spans can go wrong, and why here they don't.** Tokenizing a piece on its own can give different tokens from tokenizing it inside a longer text (merges across the boundary). The code assumes each separator `" \n\n"` is exactly one token and that nothing merges across it. I checked: the decoded spans match all 3,000 tools of 30 prompts exactly **[RAN]**. Hard-coded token ids (2929, 34192) only work for the Llama-3 tokenizer; with another model they would silently find nothing. A safer version would compute the spans from the tokenizer's character offsets.
+
+### 2.8 Check yourself
+
+1. Scores [1.0, 0.0, 2.0]: softmax weights? Largest? *(e¹ = 2.72, e⁰ = 1, e² = 7.39; total 11.11 → 0.245, 0.090, 0.665; position 2.)*
+2. Why read the **query's** rows and not a tool's rows? *(Causal attention: a tool's tokens can't see the query, which comes later. Only the query rows can "look back" at all 100 tools.)*
+3. How many attention matrices does one CS728 forward pass produce? *(512: 16 layers × 32 heads, each about 2,980 × 2,980.)*
+4. Why does the sink not need special handling in CS728? *(Scores sum only columns inside tool spans; position 0 is in none.)*
 
 ---
 
-## 3. Retrieval heads (Wu et al. 2024), and your code for the copy rule
+## 3. Retrieval heads (Wu et al. 2024): the idea behind Part 3
 
 ### 3.1 What the paper says (you don't need to open it)
 
 > [!abstract] Wu et al., *Retrieval Head Mechanistically Explains Long-Context Factuality* (2024), §1–3
 > - **Question:** when a long-context model copies a fact from far back in its prompt, which part of the model finds it?
 > - **Test:** needle-in-a-haystack. Hide a sentence (the **needle**, e.g. "The secret code is 4721") in a long text and ask for it.
-> - **Retrieval score:** each time the model emits a needle token, check every head: does its argmax point at that same token in the needle? A head's score = the share of needle tokens it was "caught copying".
+> - **Retrieval score:** each time the model emits a needle token, check every head: does its strongest attention point at that same token in the needle? A head's score = the share of needle tokens it was "caught copying".
 > - **Findings:** under 5% of heads score high, so retrieval is **sparse**. These heads exist in every model family tested, are already there in base models, and survive long-context training.
 > - **Causal test:** masking the retrieval heads makes needle tests fail and the model invent facts; masking the same number of random heads barely matters.
-> - **For CS728:** Hit Count is the same idea, scored on whether the head's argmax lands on the **correct tool** instead of on a copied token.
+> - **For CS728:** the assignment borrows the idea that **a few heads do the looking-up**, but scores heads on a simpler, tool-level test (§4): does the head give the correct tool more attention than any other tool?
 
-### 3.2 The copy rule on tiny numbers
+### 3.2 The strict copy rule, on tiny numbers (background)
 
-A head **hits** at a decode step if **both** hold:
-1. its argmax position is **inside the needle**, and
+Wu et al.'s rule is stricter than CS728's. A head **hits** at a generation step if **both** hold:
+1. its strongest-attention position is **inside the needle**, and
 2. the token at that position **is the token being emitted**.
-
-Both halves matter. Inside the needle but a different token: the head is attending, not copying. The right token but argmax elsewhere: the model got the token some other way.
 
 ![[d09-1-copy-hit.svg]] [[d09-1-copy-hit.html|▶ Step through it]]
 
-### 3.3 Reading the code: every Python and PyTorch construct in this Part
+CS728 can't use this rule: the model never copies a tool description, it only has to pick a tool. So the assignment replaced "copied the right token" by "gave the right tool the most attention".
+
+> [!note] Optional: the strict rule in code
+> Your later project LongContext_RAG implements the strict rule (`/data/jayavardhan/projects/LongContext_RAG/heads/scorer.py:121–143`, `copy_hits`). If an interviewer asks how you would reproduce Wu et al. exactly, this is the walk-through:
+>
+> ![[d09i-copy-dbg.svg]] [[d09i-copy-dbg.html|▶ Step through it]]
+
+### 3.3 Question bank: retrieval heads
+
+**L1. What is an attention head, in one sentence?**
+> [!success]- Answer
+> One independent attention pattern inside a layer: for each token it scores every earlier position, softmaxes the scores into weights that sum to 1, and mixes the earlier positions' value vectors with those weights. Each head has its own learned projections, so each learns its own way of choosing where to look.
+
+**L1. What is a retrieval head?**
+> [!success]- Answer
+> A head that looks up information in the context: in Wu et al.'s definition, while the model writes something it read in the prompt, the head puts its largest attention weight on exactly that token. Fewer than 5% of heads behave like this, and masking them breaks long-context lookup while masking random heads doesn't. In CS728 we used a looser, task-level version: heads that give the correct tool the most attention.
+
+**L2. Why did CS728 not use Wu et al.'s copy rule?**
+> [!success]- Answer
+> The copy rule needs the model to copy tokens from the context while generating. In tool selection nothing is copied from the description; the question is only which tool the query attends to. So we scored heads on whether the correct tool got the highest mean attention from the query, using a single forward pass and no generation.
+
+**L3. "Couldn't a head score high just because it attends to the first or last tool?"**
+> [!success]- Answer
+> Only on queries whose correct tool happens to sit there, which is rare: the tool order is reshuffled for every query, so the correct tool lands in any of the 100 places. A purely positional head hits about 1% of the time. The heads we kept hit 40–93 times out of 200 training queries, far above that, so they must follow content.
+
+---
+
+## 4. Hit Count: choosing the heads (`code3.py`) **[IMPL]**
+
+### 4.1 The idea
+
+For each of 200 training queries (correct tool known):
+1. build the prompt (tools in a fresh random order) and run the model once;
+2. for **every** head, score every tool: the mean of the attention block "query tokens × that tool's tokens";
+3. the head **hits** if the correct tool has its highest score.
+
+Count hits per head over the 200 queries; keep the K heads with the most hits. No gradients, no weights changed: 200 forward passes.
+
+The assignment suggested this rule ("as mentioned in the assignment itself", report p. 5); you implemented it and two alternatives (§4.4).
+
+![[d09i-hitcount.svg]] [[d09i-hitcount.html|▶ Step through it]]
+
+On the toy: L1H0 picks the correct tool on all 5 queries, L1H2 on 4. L0H0 always picks the first tool and L0H1 always the last; they hit only when the answer happens to sit there. With K = 2 we keep L1H0 and L1H2.
+
+### 4.2 Reading the code: the Python and PyTorch pieces
 
 | construct | meaning | tiny example |
 |---|---|---|
-| tensor shape `[layers, heads, keys]` | a 3-D array; `attn[l, h, j]` = weight head h of layer l puts on position j | `[2, 2, 10]` = 2 layers, 2 heads, 10 positions |
-| `t.argmax(dim=-1)` | index of the largest value along the last axis; removes that axis | `[[0.1, 0.7, 0.2]] → [1]` |
-| `a >= b`, `a & b` | element-wise comparison gives True/False; `&` is element-wise AND | `[T, F] & [T, T] → [T, F]` |
-| `x[idx]` with a tensor `idx` | **gather**: look up x at each position listed in idx; result has idx's shape | `x = [11, 47, 21]`, `idx = [[2, 1]] → [[21, 47]]` |
-| `t.clamp(min, max)` | clip every element into a range | `[-4, 2, 12].clamp(0, 9) → [0, 2, 9]` |
-| `t.to(torch.int32)` | convert type; True/False → 1/0 | `[T, F] → [1, 0]` |
-| `zeros.scatter_(dim, index, src)` | **write** `src` at the positions given by `index` along `dim` (the trailing `_` means in place) | write True at slot 2 of a 4-slot row |
-| `a \|= b` | in-place OR: a position stays True once it has been True | `[F, T] \|= [T, F] → [T, T]` |
-| `t.sum(-1)` | add along the last axis | `[[1, 0, 1]] → [2]` |
-| `@torch.no_grad()` | decorator: don't record operations for gradients (saves memory; we only read) | |
-| `with ctx:` | run the block inside a context manager that sets something up and always undoes it | `with capture.recording():` turns hooks on, then off |
-| `set(xs)`, `x in s` | a set; membership test in O(1) | `47 in {47, 21} → True` |
+| `model(**inputs).attentions` | with `output_attentions=True`: a tuple, one tensor per layer, each `[batch, heads, N, N]` | 16 tensors of `[1, 32, 2980, 2980]` |
+| `attentions[l][0]` | layer l, batch item 0 → `[heads, N, N]` | |
+| `m[a:b, :]` | rows a … b−1, all columns | the query's rows |
+| `m[:, c:d].mean()` | mean of the columns c … d−1 (over every remaining row too): one number | the query × tool block |
+| `torch.argsort(x, descending=True)` | indices that sort x from largest to smallest | `[.2, .7, .1] → [1, 0, 2]` |
+| `ranked[0].item()` | the first index, as a Python int | the head's top tool |
+| `t.flatten()` | `[16, 32]` → 512 numbers, row by row | head (l, h) → index 32·l + h |
+| `idx // n`, `idx % n` | integer division and remainder | 275 → (8, 19) = L8H19 |
+| `with torch.no_grad():` | don't record operations for gradients (we only read) | |
+| `del …; gc.collect(); torch.cuda.empty_cache()` | free the 9 GB of attention before the next query | |
 
-### 3.4 The code: `copy_hits` (`LongContext_RAG/heads/scorer.py:121–143`) **[IMPL]**
+### 4.3 The code: `select_retrieval_heads` (`code3.py:7–121`)
 
 ```python
-121  def copy_hits(attn, prompt_ids, generated_token, needle_start, needle_end):   # ◀ signature shortened; returns (argmax, hit mask)
-     ⋮  # 128–137 left out: the docstring (says exactly the two-part rule of §3.2)
-138      j = attn.argmax(dim=-1)                                   # ◀ [layers, heads, keys] → [layers, heads]: where each head looks most
-139      in_span = (j >= needle_start) & (j < needle_end)          # ◀ rule part 1: is that position inside the needle?
-     ⋮  # 140–141 comment: positions past the prompt are generated tokens, never in the needle
-142      tok_at_j = prompt_ids[j.clamp(max=prompt_ids.numel() - 1)]   # ◀ gather: the token id sitting at each head's argmax
-143      return j, in_span & (tok_at_j == generated_token)         # ◀ rule part 2, AND part 1: a hit per head
+  7  def select_retrieval_heads(train_queries, model, tokenizer, tools, device, max_heads=20):
+     ⋮  # 8–21: the assignment's TODO and docstring
+ 23      num_layers = model.config.num_hidden_layers                     # ◀ 16
+ 24      num_heads = model.config.num_attention_heads                    # ◀ 32
+ 27      head_scores = torch.zeros(num_layers, num_heads, device=device) # ◀ one hit counter per head: [16, 32]
+ 29      for qix in tqdm(range(len(train_queries))):                     # ◀ 200 training queries
+     ⋮  # 30–32: the query text and its gold tool name
+ 34          tool_ids = list(tools.keys())
+ 35          random.shuffle(tool_ids)                                    # ◀ a fresh tool order per query, as at test time
+     ⋮  # 37–46: PromptUtils → the spans and name → index map
+ 48          gold_tool_id = map_docname_id[gold_tool_name]               # ◀ where the correct tool sits in THIS order
+ 50          prompt = putils.create_prompt(query=question)
+ 51          inputs = tokenizer(prompt, return_tensors="pt", add_special_tokens=False).to(device)
+ 54          with torch.no_grad():
+ 55              attentions = model(**inputs).attentions                 # ◀ ONE forward pass: 16 × [1, 32, N, N]
+     ⋮  # 57–70: the query span, same logic as §2.7
+ 72          for layer_idx in range(num_layers):
+ 73              attn = attentions[layer_idx][0]                         # ◀ [32, N, N]
+ 74              for head_idx in range(num_heads):
+ 75                  head_attn = attn[head_idx]                          # ◀ [N, N]: this head's matrix
+ 76                  query_attn = head_attn[query_start:query_end, :]    # ◀ only the query's rows: [q, N]
+ 78                  doc_scores = torch.zeros(len(item_spans), device=device)
+ 79                  for doc_i, (ds, de) in enumerate(item_spans):
+ 80                      doc_scores[doc_i] = query_attn[:, ds:de].mean() # ◀ tool score = mean of the query × tool block
+ 83                  ranked = torch.argsort(doc_scores, descending=True) # ◀ this head's ranking of the 100 tools
+ 84                  if ranked[0].item() == gold_tool_id:                # ◀ HIT: the correct tool is this head's first choice
+ 85                      head_scores[layer_idx, head_idx] += 1
+     ⋮  # 88–100: the two alternatives, commented out (§4.4)
+102          del attentions, inputs, input_ids                           # ◀ free GPU memory before the next query
+     ⋮
+107      flat_scores = head_scores.flatten()                             # ◀ [16, 32] → 512
+108      top20= torch.argsort(flat_scores, descending=True)[:max_heads]  # ◀ the K best heads (the name says 20; K is a parameter)
+111      for idx in top20:
+112          layer = idx.item() // num_heads                             # ◀ flat index → layer …
+113          head = idx.item() % num_heads                               # ◀ … and head
+114          selected_heads.append((layer, head))
+121      return selected_heads
 ```
 
-| name | type / shape | holds | toy value (first step) |
+| name | type / shape | holds | your run |
 |---|---|---|---|
-| `attn` | float `[layers, heads, keys]` | every head's attention row at this decode step | `[2, 2, 10]` |
-| `prompt_ids` | int `[T]` | the prompt's token ids | `[11 12 13 14 15 16 47 21 17 18]` |
-| `generated_token` | int | the token the model just emitted | 47 |
-| `needle_start`, `needle_end` | int | needle = positions `start … end − 1` | 4, 8 |
-| `j` | int `[layers, heads]` | argmax position per head | `[[0, 6], [7, 6]]` |
-| `in_span` | bool `[layers, heads]` | argmax inside the needle? | `[[F, T], [T, T]]` |
-| `tok_at_j` | int `[layers, heads]` | token at each argmax | `[[11, 47], [21, 47]]` |
-| returned hit mask | bool `[layers, heads]` | caught copying? | `[[F, T], [F, T]]` |
-
-**Why the `clamp` on line 142?** During decoding the keys include tokens the model has just generated, so `j` can be ≥ `len(prompt_ids)`. Indexing there would crash. Clamping keeps the lookup in range; such positions are outside the needle anyway, so `in_span` is already False and the result is unchanged.
+| `train_queries` | list of dicts | `text`, `gold_tool_name`, `qid` | the first 200 of 1,500 |
+| `attentions` | tuple of 16 × `[1, 32, N, N]` fp16 | every head's full matrix | N ≈ 2,980 |
+| `query_attn` | `[q, N]` | the query's rows for one head | q ≈ 10–40 |
+| `doc_scores` | `[100]` | mean attention per tool, for one head | |
+| `head_scores` | `[16, 32]` | hits per head | best: L8H19 = **93**, L6H11 = 83, L2H20 = 73 **[REPORT]** |
+| `selected_heads` | list of (layer, head) | the K best | §4.5 |
 
 **What breaks if you change it:**
 
 | change | result |
 |---|---|
-| drop `in_span &` (keep only the token match) | a head looking at an **earlier copy** of "47" outside the needle counts as a hit |
-| drop the token match (keep only `in_span`) | a head that stares at the needle while the model writes something else counts as a hit |
-| drop the `clamp` | an IndexError the first time any head looks at a generated token |
-| use total attention on the needle instead of argmax | diffuse heads that spread a little everywhere score well; argmax tests the sharp claim "this head points at the copied token" |
+| don't reshuffle the tools per query (drop line 35) | the correct tool for a given tool name sits in the same place every time; a head can "hit" by memorising positions, and the selection would not transfer to test, where the order is shuffled |
+| `.sum()` instead of `.mean()` on line 80 | long descriptions (69 tokens) collect more attention than short ones (13): length, not relevance, starts to win |
+| score with the last prompt token's row instead of the query rows | the row of the assistant header; it sees everything too, but mixes in the instruction; it's a reasonable alternative, not what you did |
+| keep the 9 GB `attentions` alive across queries (drop line 102) | out of GPU memory after a few queries |
 
-### 3.5 The caller: one decode step at a time (`scorer.py:56–106`) **[IMPL]**
+### 4.4 Three ways to score a head, and what K to keep **[REPORT]**
 
-```python
- 56  @torch.no_grad()                                                       # ◀ reading only, no gradients
- 57  def score_instance(self, inst: NIAHInstance) -> InstanceResult:        # ◀ one haystack-with-needle probe
- 58      ids = torch.tensor([inst.input_ids], device=self.device)           # ◀ the prompt, shape [1, T]
- 59      prompt_ids = ids[0]                                                # ◀ the same ids, shape [T]
- 61      ns, ne, klen = inst.needle_start, inst.needle_end, inst.needle_len # ◀ needle span and its length
-     ⋮  # 62–72 left out: layer and head counts, an empty KV cache, remember the attention mode
- 74      self.model(input_ids=ids[:, :-1], past_key_values=cache, use_cache=True)   # ◀ prefill all but the last token (fast path)
-     ⋮  # 75–76: restore the attention mode
- 77      covered = torch.zeros((n_layers, n_heads, klen), dtype=torch.bool, ...)    # ◀ which needle positions each head has copied
- 78      hit_steps = torch.zeros((n_layers, n_heads), dtype=torch.int32, ...)       # ◀ hit counter per head
- 80      needle_tokens = set(prompt_ids[ns:ne].tolist())                    # ◀ the needle's token ids
- 83      cur = ids[:, -1:]                                                  # ◀ last prompt token: the first one fed in the loop
- 85      for _ in range(self.max_new_tokens):                               # ◀ generate up to 32 tokens
- 86          with self.capture.recording():                                 # ◀ eager attention + hooks for THIS step only
- 87              out = self.model(input_ids=cur, past_key_values=cache, use_cache=True)
- 88          attn = self.capture.stack()                                    # ◀ [layers, heads, keys]
- 89          nxt = int(out.logits[0, -1].argmax())                          # ◀ greedy: the emitted token
- 90          if nxt in self.eos_ids:                                        # ◀ end of answer: stop
- 91              break
-     ⋮  # 92: remember the token for the decoded text
- 93          if nxt in needle_tokens:                                       # ◀ a copy OPPORTUNITY (denominator of copy-precision)
- 94              copyable_steps += 1
- 96          j, hit = copy_hits(attn, prompt_ids, nxt, ns, ne)              # ◀ §3.4
- 97          hit_steps += hit.to(torch.int32)                               # ◀ count hits per head
- 98          rel = (j - ns).clamp(0, klen - 1)                              # ◀ argmax as a needle-relative index 0 … klen−1
- 99          covered |= torch.zeros_like(covered).scatter_(                 # ◀ mark the copied needle position as True …
-100              2, rel.unsqueeze(-1), hit.unsqueeze(-1)                    #   … only where hit is True
-101          )
-103          cur = torch.tensor([[nxt]], device=self.device)                # ◀ feed the emitted token next
-     ⋮  # 105: decode the answer text
-106      scores = (covered.sum(-1).float() / klen).cpu().tolist()           # ◀ score = copied needle positions ÷ needle length
-```
+Your report (pp. 5–8) tried three head-scoring rules, all with K = 20, then varied K for the first:
 
-| name | holds | toy value at the end |
+| head score (summed over 200 training queries) | Recall@1 | Recall@5 |
 |---|---|---|
-| `cache` | the KV cache: keys and values of every token so far, so each decode step reads them instead of recomputing (Day 1 §2) | |
-| `cur` | the single token fed at this step, shape `[1, 1]` | |
-| `copyable_steps` | decode steps whose emitted token is in the needle | 2 |
-| `hit_steps` | per head, steps where it hit | `[0, 2, 1, 1]` |
-| `covered` | per head, which needle positions it ever copied | L0H1 {6, 7}, L1H0 {7}, L1H1 {6} |
-| `scores` | per head, covered ÷ `klen` | `[0, 0.5, 0.25, 0.25]` |
+| **1. Hit Count**: +1 when the correct tool is the head's first choice | **32.78%** | 61.78% |
+| 2. Reciprocal rank: + 1 / rank of the correct tool (1, ½, ⅓, …) | 32.72% | **62.30%** |
+| 3. Raw attention: + mean attention on the correct tool | 14.50% | 57.28% |
 
-![[d09i-copy-dbg.svg]] [[d09i-copy-dbg.html|▶ Step through it]]
-
-*Animated, 14 steps. The code is on the left with the running line highlighted; the variables are on the right, and the ones that just changed are red.*
-
-**`.unsqueeze(-1)` on line 100:** `scatter_` along axis 2 needs an index with the same number of axes as `covered` (3). `rel` is `[layers, heads]`; `.unsqueeze(-1)` makes it `[layers, heads, 1]`: "one slot to write per head".
-
-### 3.6 From one probe to a ranking (`heads/run_head_id.py:121–142`) **[IMPL]**
-
-```python
-121  def _aggregate(results, n_layers, n_heads, threshold):
-122      total = [[0.0] * n_heads for _ in range(n_layers)]                # ◀ sum of per-probe scores, per head
-123      hits = [[0] * n_heads for _ in range(n_layers)]                   # ◀ sum of hit steps, per head
-124      for r in results:                                                 # ◀ every probe
-     ⋮  # 125–128: add r.scores and r.hit_steps into total and hits
-130      mean = [[total[l][h] / n for h in range(n_heads)] for l in range(n_layers)]   # ◀ Wu et al.'s score, averaged
-138      copyable = sum(r.copyable_steps for r in results)                 # ◀ all copy opportunities, pooled
-139      precision = [                                                     # ◀ copy-precision: hits ÷ opportunities
-140          [(hits[l][h] / copyable if copyable else 0.0) for h in range(n_heads)]
-141          for l in range(n_layers)
-142      ]
-```
-
-Two scores, and why:
-- **Coverage** (`mean`, Wu et al.'s |g_h| / |k|) is capped by how much of the needle the answer copies: if the answer repeats 2 of 4 needle tokens, no head can pass 0.5.
-- **Copy-precision** divides by the steps where copying was possible, so short answers aren't penalised. It is **micro-averaged** (steps pooled over all probes before dividing), so one probe with a single copy step can't swing a head's score.
-
-The list comprehension `[[… for h in …] for l in …]` builds a list of lists: one row per layer, one entry per head.
-
-### 3.7 Question bank: attention and the copy rule
-
-**L1. What is an attention head, in one sentence?**
-> [!success]- Answer
-> One independent attention pattern inside a layer: for the current token it scores every earlier position, softmaxes the scores into weights that sum to 1, and mixes the earlier positions' value vectors with those weights. Each head has its own learned projections, so each learns its own way of choosing where to look.
-
-**L1. What is a retrieval head?**
-> [!success]- Answer
-> A head that, while the model writes something it read in the prompt, puts its **largest** attention weight on exactly that token in the prompt. Wu et al. found fewer than 5% of heads behave like this, in every model family they tested, and masking them breaks long-context fact lookup while masking random heads doesn't.
-
-**L2. State the copy rule, and say why both halves are needed.**
-> [!success]- Answer
-> A head hits at a decode step if its argmax position is inside the needle **and** the token there equals the token being emitted. Without the first half, a head looking at an earlier copy of the same word elsewhere would count. Without the second, a head staring at the needle while the model writes something unrelated would count. Together they mean "this head was pointing at the thing being copied, at the moment it was copied".
-
-**L2. Why argmax and not the total attention mass on the needle?**
-> [!success]- Answer
-> Argmax tests a sharp, falsifiable claim: this head points at the copied token. Total mass rewards diffuse heads that spread a little attention everywhere, including over the needle. For **ranking tools** (§5) I do use mass, because there I need a graded score for every tool, not a yes/no.
-
-**L2. Why does `copy_hits` clamp `j`?**
-> [!success]- Answer
-> At decode time the keys include tokens generated so far, beyond the end of the prompt, so `j` can exceed the last prompt index and the gather `prompt_ids[j]` would go out of range. Those positions can't be in the needle, so `in_span` is already False there; clamping only keeps the lookup legal and never changes a result.
-
-**L3. "Your coverage score can't exceed 0.5 on some probes. Is that a bug?"**
-> [!success]- Answer
-> No, it's a property of the score: coverage = needle positions copied ÷ needle length. If the answer repeats only 2 of the needle's 4 tokens, even a perfect head copies 2 of 4. That's why the code also computes copy-precision, hits ÷ steps where copying was possible, micro-averaged over all probes; it ranks heads without that ceiling.
-
-**L3. "Couldn't a head score high just because it attends to the most recent tokens?"**
-> [!success]- Answer
-> Not under this rule: a hit needs the argmax **inside the needle**, which sits at varying depths in the haystack, and the token there must match the one emitted. A recency head points at the last few tokens, which are the question, not the needle. Varying the needle's depth across probes is exactly what separates content-driven heads from positional ones.
-
----
-
-## 4. Hit Count: choosing the heads
-
-### 4.1 The idea
-
-The copy rule needs a needle and a copied token. Tool selection has neither: the model doesn't copy the tool's description. So CS728 uses a **looser hit**:
-
-> A head **hits** on a probe query if its argmax lands **anywhere inside the correct tool's span**.
-
-Then:
-1. run a set of **probe queries** whose correct tool is known;
-2. for each head, count its hits (**Hit Count**);
-3. keep the **top k** heads (k = 10 in your project).
-
-No gradients, no training: a few hundred forward passes.
-
-![[d09i-hitcount.svg]] [[d09i-hitcount.html|▶ Step through it]]
-
-On the toy: L1H0 hits on all 5 probes, L1H2 on 4, L0H2 on 2. L0H0 never hits, because it always parks on `<s>`. With k = 2 we keep L1H0 and L1H2.
-
-### 4.2 The code (reconstructed: your CS728 code is not on the server) **[RECON]**
-
-```python
-hits = torch.zeros(n_layers, n_heads)                   # ◀ one counter per head
-for query, gold in probes:                              # ◀ probe set: (query, index of its correct tool)
-    attn, spans = attention_at_answer(query, tools)     # ◀ [layers, heads, T] at the first answer token, as in §5.3
-    j = attn.argmax(dim=-1)                             # ◀ where each head looks most: [layers, heads]
-    s, e = spans[gold]                                  # ◀ the correct tool's token range
-    hits += ((j >= s) & (j < e)).float()                # ◀ +1 for every head whose argmax is inside it
-top = hits.flatten().topk(10).indices                   # ◀ the 10 largest counts, as flat indices 0 … L·H − 1
-layers, heads = top // n_heads, top % n_heads           # ◀ flat index → (layer, head)
-```
-
-| name | holds | toy value |
+| K (Hit Count) | Recall@1 | Recall@5 |
 |---|---|---|
-| `hits` | per-head hit count | L0H0 0, L0H1 1, L0H2 2, L1H0 5, L1H1 1, L1H2 4 |
-| `probes` | (query, correct tool) pairs | 5 pairs |
-| `spans[gold]` | correct tool's token range | B → (3, 5) |
-| `hits.flatten()` | the `[2, 3]` grid as a 6-long list | `[0, 1, 2, 5, 1, 4]` |
-| `.topk(k).indices` | positions of the k largest values | k = 2 → `[3, 5]` |
-| `top // n_heads`, `top % n_heads` | integer division and remainder | 3 → (1, 0) = L1H0; 5 → (1, 2) = L1H2 |
+| **10** | **40.68%** | **66.94%** |
+| 20 | 32.78% | 61.78% |
+| 30 | 26.64% | 57.78% |
 
-> [!note] What to check against your own code
-> Was the hit "argmax inside the span" (as here) or "most attention mass on the right tool"? Were `<s>` and the query excluded first? Were the probe queries separate from the test queries? If they overlapped, the selection saw the test set, and an interviewer will ask.
+**Reading the tables:**
+- **Hit Count vs reciprocal rank.** Hit Count only rewards first place, which is what Recall@1 measures; reciprocal rank also rewards 2nd–5th place, so it picks heads that are good at the shortlist (Recall@5 +0.5). The two choose almost the same heads (the report's lists share 19 of 20), so the difference is small.
+- **Why raw attention is much worse.** It rewards heads that put a lot of attention on the correct tool **in absolute terms**, even if they put as much on other tools. A head that attends strongly to everything (or to whatever sits first) scores well. Hit Count and reciprocal rank are **relative**: the correct tool has to beat the other 99.
+- **Fewer heads is better.** Recall falls as K grows: past the first 10, the added heads hit less often (the 30th has 30 hits in 200, vs 93 for the best), and averaging them in dilutes the good ones.
 
-### 4.3 Why k = 10, and what changes with k
+> [!warning] K was chosen on the test set
+> The K = 10 / 20 / 30 numbers are all on the 5,000 **test** queries, and 40.7% is the best of the three. Choosing a setting by its test score makes that score slightly optimistic. The clean protocol: split the 1,500 training queries, select heads on one part, choose K on the other, then run the test set once. With only three values of K the bias is probably small, but say it before the interviewer does.
 
-- **Too few** (k = 1–2): one head's quirks dominate; if it fails on a query type, nothing compensates. (LongContext_RAG found that its single best head alone was "causally dispensable", `compress/head_scorer.py:21–22`.)
-- **Too many** (k = 50+): you start adding heads that don't retrieve, and their spread-out attention blurs the ranking toward noise and position bias.
-- **The right way to pick k** is on held-out queries: sweep k ∈ {1, 5, 10, 25} and choose by validation recall. LongContext_RAG computes every k in one pass for that reason (`head_scorer.py:59, 126–129`). Whether CS728 swept k: **[MISSING]**.
+**One more thing the numbers suggest [THEORY].** The best head alone was right on 93 of 200 training queries (46.5%). That is on the same queries used to pick it, so it is inflated, but it is above the 10-head result on test (40.7%). K = 1, 3 and 5 were never tried; they might do as well or better.
 
-### 4.4 Question bank: Hit Count
+### 4.5 Where the selected heads are **[REPORT]**
+
+![[d09r-cs728-heads.png]]
+*From your report (p. 8): the 20 selected heads by layer (x) and head number (y); bigger circle = more hits. Layers are counted from 0 (0–15).*
+
+The top 10: L8H19 (93 hits), L6H11 (83), L2H20 (73), L4H16 (71), L7H12 (71), L8H13 (68), L6H8 (65), L10H1 (65), L5H9 (64), L5H11 (61). They sit in layers 2–10, mostly 5–10, none in the last five layers (11–15 hold only 1 of the 20). The report's reading: the middle layers do the query–tool matching. That is consistent with other findings that lookup heads sit in the middle of the network, but it is a description, not a test.
+
+### 4.6 Question bank: Hit Count
 
 **L1. What is Hit Count?**
 > [!success]- Answer
-> A head-selection rule: run probe queries with known correct tools, count for each head how many times its strongest attention lands inside the correct tool's description, and keep the heads with the highest counts (top 10 in my project). It needs only forward passes, no training.
+> A way to pick heads. On 200 training queries with known correct tools, each head scores all 100 tools by the mean attention from the query's tokens to each tool's tokens; the head gets +1 when the correct tool scores highest. We kept the heads with the most hits: the top 10 of 512 worked best.
 
-**L2. Why is no training needed?**
+**L2. Is this "training-free"?**
 > [!success]- Answer
-> The model already learned, during pre-training, heads that look up information in context. Hit Count only **finds** them; it doesn't change any weight. The retriever is then a fixed read-out: sum the chosen heads' attention per tool.
+> No weights change, so no training in the usual sense. But it is **supervised selection**: it uses 200 labelled queries to choose 10 of 512 heads. I'd call it "no fine-tuning, a small labelled set to pick heads".
 
-**L2. How would you choose k?**
+**L2. Why reshuffle the tool order for every training query?**
 > [!success]- Answer
-> On held-out queries, never on the test set: compute recall for several k (1, 5, 10, 25), and pick the smallest k near the best. Too few heads makes the ranking brittle; too many adds non-retrieval heads whose diffuse or positional attention blurs it.
+> So a head can't score by position. If tool X were always 37th, a head that always looks at place 37 would hit on every X query. With a fresh order each time, only heads whose attention follows the content of the query beat chance, and the test set is shuffled the same way.
 
-**L3. "Your probe set and test set: could Hit Count have overfitted?"**
+**L2. Why did fewer heads do better?**
 > [!success]- Answer
-> If probes and test queries overlapped, yes: the selected heads would be tuned to those exact queries. The selection has few degrees of freedom (choosing 10 of ~1,000 heads), so the risk is modest, but the honest protocol is disjoint probe and test queries, ideally disjoint tools too. [Say what your project did; if they overlapped, say so and how you'd fix it.]
+> The hit counts fall quickly: 93 for the best head, about 60 for the 10th, 30 for the 30th. Every head gets equal weight in the average, so adding weaker heads pulls the score toward their noisier, more positional attention. K = 10 was best of the three tried; smaller K wasn't tried.
 
-**L3. "Two heads always attend to the same token. Does keeping both help?"**
+**L3. "Your K was picked on the test set."**
 > [!success]- Answer
-> Not much: they add the same information twice and push the score toward their shared preference. A greedy selection that skips heads highly correlated with ones already chosen would add diversity. I didn't do that [unless you did]; it's a reasonable next step.
+> Yes. We compared K = 10, 20 and 30 on the 5,000 test queries and reported the best. With three options the optimism is small, but it's not a clean held-out number. I'd select heads on part of the 1,500 training queries and choose K on the rest, then run the test set once.
+
+**L3. "Why did raw attention on the correct tool do so badly?"**
+> [!success]- Answer
+> It's absolute, not relative. A head that spreads lots of attention over every tool, or always over the first tools, gives the correct tool a high value too, without ever ranking it first. Hit Count and reciprocal rank only reward a head when the correct tool beats the other 99, which is what retrieval needs.
+
+**L3. "Two of your heads always agree. Does keeping both help?"**
+> [!success]- Answer
+> Not much: they add the same information twice. We didn't check head correlations. A greedy selection that skips a head highly correlated with ones already chosen would add diversity; that's a cheap next step.
 
 ---
+
 ## 5. Heads as a retriever: a score for every tool
 
 ### 5.1 The idea
 
-Hit Count gave us k heads that land on the right tool. For a **new** query we don't know the right tool, so we can't check hits. Instead we give every tool a score:
+For a **test** query we don't know the correct tool, so we can't count hits. Instead, using only the chosen heads:
 
-1. Run the prompt (tools + new query) to the first answer token; read the chosen heads' attention rows.
-2. **Drop** every position that isn't a tool token (the sink `<s>`, the query, the instructions).
-3. **Renormalise** each head's row over the tool tokens, so it reads "share of this head's tool-directed attention".
-4. **Add up** each tool's share: one number per (head, tool).
-5. **Average** over the k heads, so each head counts equally.
-6. **Rank** tools by that number. The top one is the prediction.
+1. run the prompt (tools in a fresh random order) once; take each chosen head's attention matrix;
+2. keep the **query's rows**;
+3. for each tool, take the **mean** of the block "query rows × that tool's columns";
+4. **average** over the chosen heads;
+5. **rank** the tools by that number; the top one is the prediction.
 
 ![[d09m-heads.mp4]]
-*Manim video (37 s): attention rows → Hit Count over 5 probes → the chosen heads' mass per tool → Recall@k. Pause and scrub with the video controls.*
+*Manim video (37 s): one attention row → Hit Count over 5 training queries → scoring the tools of a test query → Recall@k. Pause and scrub with the video controls.*
 
-### 5.2 Reading the code: the new PyTorch pieces
-
-| construct | meaning | tiny example |
-|---|---|---|
-| `attn[l_idx, h_idx]` with two index tensors | **fancy indexing**: pairs up the i-th layer index with the i-th head index | `l_idx = [1, 1]`, `h_idx = [0, 2]` → rows of L1H0 and L1H2: shape `[2, T]` |
-| `torch.full((T,), -1)` | a tensor of length T filled with −1 | `[-1, -1, …]` |
-| `seg[s:e] = i` | write `i` into positions s … e−1 | `seg[3:5] = 1` → positions 3, 4 belong to tool 1 |
-| `x[bool_mask]`, `p[:, bool_mask]` | keep only the positions where the mask is True (`:` = every row) | drop the sink and the query |
-| `p.sum(dim=1, keepdim=True)` | row sums, kept as a column `[K, 1]` so the division broadcasts over each row | |
-| `.clamp_min(1e-12)` | never divide by exactly 0 | |
-| `zeros(K, n).index_add_(1, idx, src)` | for each column j of `src`, add it into column `idx[j]` of the result: a "bucket sum" | 8 token shares → 4 tool totals |
-| `mat[:k].mean(dim=0)` | average the first k rows (heads) | 2 heads → 1 score per tool |
-
-### 5.3 The code: `HeadAttentionScorer.score_all` (`LongContext_RAG/compress/head_scorer.py:100–130`) **[IMPL]**
-
-The same reduction CS728 needs, written for passages (sentences) instead of tools: a "chunk" here = a tool there.
+### 5.2 The code: `query_to_docs_attention_heads` (`run3.py:34–60`) and the ranking (`:165–176`) **[IMPL]**
 
 ```python
-100  @torch.no_grad()
-101  def score_all(self, question: str, chunks: list[Chunk]) -> dict[str, list[float]]:
-102      attn, spans, _ = self.attention_for(question, chunks)      # ◀ [layers, heads, T] at the first answer token + each chunk's (start, end)
-103      selected = attn[self._l_idx, self._h_idx].float()           # ◀ only the chosen heads: [K, T]
-104      del attn                                                    # ◀ free the full [layers, heads, T] tensor
-106      n_chunks = len(chunks)
-107      seg = torch.full((selected.shape[1],), -1, dtype=torch.long, device=self.device)   # ◀ owner of each position; −1 = nobody
-108      lengths = torch.ones(n_chunks, device=self.device)          # ◀ tokens per chunk (for the "mean" variant)
-109      for i, (s, e) in enumerate(spans):
-110          if e > s:
-111              seg[s:e] = i                                        # ◀ positions s … e−1 belong to chunk i
-112              lengths[i] = e - s
-114      valid = seg >= 0                                            # ◀ True only on chunk tokens
-115      seg_v = seg[valid]                                          # ◀ their owners, in order
-116      p = selected[:, valid]                                      # ◀ attention on chunk tokens only: sink and question dropped
-117      p = p / p.sum(dim=1, keepdim=True).clamp_min(1e-12)         # ◀ renormalise each head's row to sum to 1
-119      K = p.shape[0]
-120      sums = torch.zeros(K, n_chunks, device=self.device).index_add_(1, seg_v, p)   # ◀ per head, per chunk: total share
-     ⋮  # 121–123 left out: `maxes`, the same bucketing with max instead of sum
-124      per_head = {"sum": sums, "mean": sums / lengths, "max": maxes}  # ◀ three ways to score a span
-126      out: dict[str, list[float]] = {}
-127      for agg, mat in per_head.items():
-128          for k in self.k_values:                                 # ◀ k ∈ (1, 5, 10, 25), all from ONE forward pass
-129              out[f"head_{agg}_k{k}"] = mat[:k].mean(dim=0).cpu().tolist()   # ◀ average the top-k heads
-130      return out
+ 34  def query_to_docs_attention_heads(attentions, query_span, doc_spans, selected_heads):
+     ⋮  # 35–47: the assignment's TODO 2 and docstring
+ 49      doc_scores = torch.zeros(len(doc_spans), device=attentions[0].device)   # ◀ one score per tool: [100]
+ 50      query_start, query_end = query_span
+ 52      for layer_idx, head_idx in selected_heads:                  # ◀ the 10 chosen heads only
+ 53          head_attn = attentions[layer_idx][0, head_idx]          # ◀ [N, N]
+ 54          query_attn = head_attn[query_start:query_end, :]        # ◀ the query's rows: [q, N]
+ 56          for doc_i, (doc_start, doc_end) in enumerate(doc_spans):
+ 57              doc_scores[doc_i] += query_attn[:, doc_start:doc_end].mean()   # ◀ mean of the block, added per head
+ 59      doc_scores /= len(selected_heads)                           # ◀ → the mean over heads
+ 60      return doc_scores
+     ⋮
+165          ranked_docs = torch.argsort(doc_scores, descending=True) # ◀ tools, best first
+166          gold_rank = 1000
+167          for i, tool_id in enumerate(ranked_docs):
+168              if tool_id == gold_tool_id:                         # ◀ where did the correct tool land?
+169                  gold_rank = i                                   # ◀ 0 = first place
+170                  break
+173          if gold_rank<1:
+174              correct_at_1 += 1                                   # ◀ Recall@1 counter
+175          if gold_rank<5:
+176              correct_at_5 += 1                                   # ◀ Recall@5 counter
 ```
-
-| name | type / shape | holds | toy value |
-|---|---|---|---|
-| `self._l_idx`, `self._h_idx` | int `[K_max]` | layer and head of each chosen head, best first (set in `__init__`, `:72–73`) | `[1, 1]`, `[0, 2]` |
-| `spans` | list of (start, end) | each chunk's (tool's) token range | A (1,3), B (3,5), C (5,7), D (7,9) |
-| `selected` | float `[K, T]` | the chosen heads' rows | L1H0: .40 .03 .02 .25 .15 .02 .03 .02 .02 .03 .03 |
-| `seg` | int `[T]` | chunk owning each position | −1 0 0 1 1 2 2 3 3 −1 −1 |
-| `p` | float `[K, n_chunk_tokens]` | renormalised share per chunk token | L1H0: .056 .037 .463 .278 .037 .056 .037 .037 |
-| `sums` | float `[K, n_chunks]` | per head, per chunk | L1H0: .093 .741 .093 .074 |
-| `out["head_sum_k2"]` | list | per-chunk score | A .196, B .554, C .113, D .137 → B first |
 
 ![[d09i-score-dbg.svg]] [[d09i-score-dbg.html|▶ Step through it]]
 
-**The three design choices, each measured rather than assumed** (`head_scorer.py:9–22` docstring):
-- **Normalise over the spans only.** Raw attention is dominated by the sink and the question tokens, which can never be selected. In the toy, L1H0 puts 0.40 on `<s>`; renormalising over tools turns B's 0.40 of raw mass into 0.74 of its tool-directed mass.
-- **Sum, mean or max over a span.** Sum rewards long descriptions (more tokens to collect mass on); mean divides that out but rewards a short span with one spike; max takes the single best token. Tool descriptions differ in length, so this choice matters for CS728. Which one CS728 used: **[MISSING]**.
-- **Average heads equally.** A plain sum lets one diffuse head contribute most of the mass.
+*Animated, 10 steps: the code on the left with the running line highlighted, the variables on the right (the ones that just changed are red).*
 
-**What breaks if you change it:**
+| name | type / shape | holds | toy value |
+|---|---|---|---|
+| `attentions` | tuple of 16 × `[1, 32, N, N]` | all heads, all tokens | toy: N = 11 |
+| `query_span` | (start, end) | the query's tokens | (9, 11) = "fly Paris" |
+| `doc_spans` | list of (start, end) | each tool's tokens | A (1,3), B (3,5), C (5,7), D (7,9) |
+| `selected_heads` | list of (layer, head) | from §4 | toy [(1,0), (1,2)]; yours the top 10 |
+| `doc_scores` | `[n_tools]` | mean over heads of the block means | A .055, B .158, C .031, D .041 |
+| `ranked_docs` | `[n_tools]` | tool indices, best first | [B, A, D, C] |
+| `gold_rank` | int | position of the correct tool in the ranking | 0 → a Recall@1 and Recall@5 hit |
+
+On the toy: L1H0's block for tool B is (0.25 + 0.15 + 0.30 + 0.12) / 4 = **0.205**; L1H2's is 0.110; the mean over the two heads is **0.158**, the highest, so B is ranked first.
+
+### 5.3 The design choices, and what breaks if you change them
+
+- **The query's rows only.** They are the only rows that see every tool (§2.3), and they ask exactly "what does the query look at?".
+- **Mean over the block, not sum.** A sum would favour long descriptions (69 tokens collect more mass than 13); the mean divides that out. The price: a short description with one strongly attended token can win.
+- **No renormalisation.** The block means are raw attention weights. Within one head, renormalising over tool tokens would only reweight the query rows (each row divided by its own total on tools), so it would change that head's ranking little. Across heads it matters more: a head that parks most of its attention on the sink contributes small numbers to every tool and so counts less in the average. A version that renormalises each head over tool tokens would give every head an equal vote; it wasn't tried.
+- **Equal weight per head.** `doc_scores /= len(selected_heads)` is a plain mean. Weighting heads by their hit count is a natural variant.
 
 | change | result |
 |---|---|
-| skip line 116 (keep the sink and question) | every tool's share shrinks by the same sink-dominated denominator per head, but heads with a big sink weight count less, and the question tokens can't be "retrieved"; rankings get noisier |
-| sum heads instead of averaging | a head with flat attention over 30 tools adds the same small amount everywhere, while a sharp head's vote is diluted |
-| `mean` aggregation with very different description lengths | a 3-token tool with one spike beats a 40-token tool with steady attention |
+| sum over heads instead of mean | same ranking (dividing every tool by the same 10 changes nothing); only the printed scale changes |
+| `.max()` instead of `.mean()` over the block | rewards a single strongly attended token; less sensitive to description length, more to one-word matches |
+| all 512 heads (Part 2's scorer) | Recall@1 drops from 40.7% to 1.3%: position-driven heads swamp the few good ones |
 
-### 5.4 Why attention is read only at decode steps (`heads/capture.py`) **[IMPL]**
+### 5.4 The cost: one prompt, 9 GB of attention, a Python loop
 
-Fast attention kernels (SDPA, FlashAttention) never store the weight matrix; they compute the output directly (Day 6). The weights only exist on the slow "eager" path, and an eager **prefill** over T tokens builds a `[heads, T, T]` matrix per layer:
-
-$$32 \text{ heads} \times 8{,}192^2 \times 2 \text{ bytes} \approx 4.3 \text{ GB per layer}$$
-
-A **decode** step has one query, so its matrix is `[heads, 1, T]`: 32 × 8,192 × 2 bytes ≈ 0.5 MB. So the code prefills with SDPA and switches to eager for the single-token steps only:
+`load_model_tokenizer` (`utils.py:11–22`) asks for every weight matrix:
 
 ```python
- 71  @contextmanager                                       # ◀ makes `with capture.recording():` possible
- 72  def recording(self):
-     ⋮  # 73: docstring
- 74      cfg = self.model.config
- 75      previous = cfg._attn_implementation                # ◀ remember the current mode (usually "sdpa")
- 76      cfg._attn_implementation = "eager"                 # ◀ the slow path that returns weights
- 77      self._enabled = True                               # ◀ hooks start saving
- 78      self.buffer = [None] * self.n_layers
- 79      try:
- 80          yield self                                     # ◀ the body of the `with` block runs here
- 81      finally:                                           # ◀ runs even if the body crashes
- 82          self._enabled = False
- 83          cfg._attn_implementation = previous            # ◀ always restore the fast path
-     ⋮
- 95      out = torch.cat([b[:, :, -1, :] for b in self.buffer], dim=0)   # ◀ stack(): each layer's [1, heads, 1, T] → [layers, heads, T]
+ 14      model = AutoModelForCausalLM.from_pretrained(model_name,
+ 15                                                  output_attentions = True,       # ◀ return every layer's weights
+ 16                                                  attn_implementation="eager",    # ◀ the only path that has them
+ 17                                                  dtype=dtype, ...)               # ◀ fp16 (run2.py:107, run3.py)
 ```
 
-The weights reach `self.buffer` through a **forward hook** (`:60–69`): a function PyTorch calls after each attention module runs, here copying out `output[1]` (the weights) with `.detach()` so no gradient graph is kept.
+**Memory [RAN arithmetic].** Each layer returns `[1, 32, N, N]` in fp16. With N = 2,984 (the mean prompt):
 
-| construct | meaning |
-|---|---|
-| `@contextmanager` + `yield` | turns a function into a `with` block: code before `yield` runs on entry, the `finally` part on exit |
-| `try: … finally:` | the `finally` part always runs, so a crash can't leave the model stuck in slow eager mode |
-| `register_forward_hook(fn)` | PyTorch calls `fn(module, inputs, output)` every time that module runs |
-| `b[:, :, -1, :]` | take the last query position (the only one, at a decode step) |
+$$32 \times 2{,}984^2 \times 2\text{ bytes} \approx 0.57\text{ GB per layer}, \qquad \times 16 \text{ layers} \approx 9.1\text{ GB per query}$$
+
+That is why every loop ends with `del attentions … torch.cuda.empty_cache()`. It fits on a large GPU but would not scale: attention memory grows with N², so 1,000 tools (≈ 30k tokens) would need about 900 GB.
+
+**Time.** Hit Count runs a Python loop over 512 heads × 100 tools = 51,200 small `.mean()` calls per query, each a separate GPU kernel. A vectorised version would compute all tool means at once (e.g. a cumulative sum over columns, then differences at the span edges).
+
+**How it could be done more cheaply [THEORY].** Only the query's rows and only the 10 chosen heads are needed. Your later LongContext_RAG project shows the pattern: prefill with the fast kernel, then read attention on the slow path only where needed, with forward hooks that keep just the needed slice (`LongContext_RAG/heads/capture.py:60–95`). For CS728 that would cut 9 GB to a few MB.
 
 ### 5.5 Question bank: heads as a retriever
 
 **L1. How do you turn attention into a tool ranking?**
 > [!success]- Answer
-> At the first answer token, take the selected heads' attention rows, keep only positions inside tool descriptions, renormalise each head's row over those positions, sum each tool's share, average over heads, and rank tools by that score.
+> One forward pass over the prompt with attention weights returned. For each chosen head, take the rows of the query's tokens; for each tool, take the mean of the block of those rows and that tool's columns; average over the chosen heads; rank tools by the result.
 
-**L2. Why renormalise over the tool spans?**
+**L2. Why the mean over the block and not the sum?**
 > [!success]- Answer
-> Raw attention is dominated by tokens that can't be answers: the attention sink at position 0 and the question itself. If a head puts 40% on the sink, its tool shares are all scaled down, and heads would count unequally for a reason that has nothing to do with the tools. Renormalising gives "share of this head's tool-directed attention", comparable across heads.
+> Tool descriptions range from 13 to 69 tokens. A sum would give long descriptions more attention mass just for being long. The mean removes length; its weakness is that a short description with one strongly attended word can win.
 
-**L2. Sum, mean or max over a tool's tokens: which and why?**
+**L2. You don't remove the attention sink. Is that a bug?**
 > [!success]- Answer
-> Sum rewards long descriptions; mean corrects for length but lets a short description with one spike win; max uses only the single best token. Because the right one isn't obvious, the LongContext_RAG scorer computes all three in one pass and picks on held-out data. [For CS728, say which you used and why.]
+> No: the score only sums columns inside tool spans, and the sink at position 0 is in no span, so it never enters. What it does do is shrink a head's numbers if that head parks most of its attention there, so such heads count less in the average. Renormalising each head over tool tokens would equalise heads; we didn't try it.
 
-**L2. Why read attention only at the first answer token?**
+**L2. Why do you need eager attention?**
 > [!success]- Answer
-> Two reasons. Semantically, that's when the model decides what to say, so its retrieval heads point at what it's about to use. Practically, attention weights are only visible on the slow eager path, and an eager prefill would build a [heads, T, T] matrix per layer (~4 GB per layer at 8k tokens), while a single decode step's matrix is [heads, 1, T], about half a megabyte. So: prefill with SDPA, then one eager step.
+> The fast kernels (SDPA, FlashAttention) compute the output without ever storing the N × N weight matrix. Only the eager implementation materialises it, and `output_attentions=True` returns it for every layer. That's about 0.57 GB per layer and 9 GB per query at 3,000 tokens in fp16.
 
 **L3. "What is the cost of this retriever at inference?"**
 > [!success]- Answer
-> One prefill of the whole tool list plus one eager decode step, which you'd pay anyway to answer. Compared with an embedding retriever, it needs no second model and no training, but the full prompt must fit in context and be prefilled each time (no precomputed tool index), and the eager step is slower than SDPA. With many tools, a cheap embedding shortlist first, then head re-ranking, is the better design.
+> A full prefill of all 100 descriptions plus the query, about 3,000 tokens, per query, on the slow eager path, with 9 GB of attention returned. An embedding retriever encodes the 100 descriptions once and then needs one small encoder pass per query. So the head retriever is far more expensive per query; its advantage is that no retriever model is trained. In practice I'd use it to re-rank a short embedding shortlist, or read only the 10 heads' query rows with hooks.
+
+**L3. "Would this scale to 1,000 tools?"**
+> [!success]- Answer
+> Not as built. The prompt would be about 30,000 tokens, attention memory grows with its square (around 900 GB for all layers in fp16), and attention spreads thinner over more candidates. I'd shortlist the top 20–50 with an embedding model and use the heads only on that shortlist.
 
 ---
 
@@ -584,20 +602,47 @@ Six queries whose correct tools rank 1, 3, 1, 7, 2, 1:
 - Recall@1 = 3 / 6 = **50%** (ranks of 1);
 - Recall@5 = 5 / 6 = **83%** (all except the 7).
 
-Recall@1 is plain top-1 accuracy. Recall@5 matters when a later step (the LLM itself, or a re-ranker) chooses among a shortlist of 5. With N tools, a random ranking gives Recall@1 = 1/N and Recall@5 = 5/N.
+Recall@1 is plain top-1 accuracy. Recall@5 matters when a later step (the LLM itself, or a re-ranker) chooses from a shortlist of 5. With 100 tools, a random ranking gives Recall@1 = **1%** and Recall@5 = **5%**.
 
-### 6.2 What was the 1.3% baseline? **[MISSING]**
+A caution for your data: test queries per tool range from 16 to 376 **[RAN]**, so Recall@k is dominated by the most frequent tools. Per-tool (macro-averaged) recall would weight every tool equally; it wasn't reported.
 
-A baseline of 1.3% Recall@1 is **very** low; that is the first thing an interviewer will notice. Possible readings:
+### 6.2 The 1.3% baseline, named **[IMPL] [REPORT]**
 
-| candidate baseline | what Recall@1 1.3% would mean | follow-up you'll get |
-|---|---|---|
-| all heads averaged ("plain attention") | averaging all heads drowns the few retrieval heads in sink and positional attention | "So the gain is from removing noise, not from finding something special?" |
-| random ranking | 1/N = 1.3% means about 77 tools per prompt (and 5/N = 6.5% at Recall@5, so it doesn't match the 25.5%) | the 25.5% Recall@5 rules this out |
-| the LLM asked to name the tool | the model rarely writes an exact tool name, so exact match is ~1% | "Did you allow fuzzy matching?" |
-| a single random or worst head | | "Why compare with a strawman?" |
+The baseline is Part 2's scorer, `query_to_docs_attention` (`run2.py:34–49`): the same block mean, but over **all** heads.
 
-Recall@5 = 25.5% with Recall@1 = 1.3% means the baseline often ranks the right tool 2nd–5th but almost never 1st, typical of a score dominated by position (e.g. the first few tools always on top). **Check your report and write the one-sentence definition in [[#My notes and fumbles]].**
+```python
+ 40      doc_scores = torch.zeros(len(doc_spans), device=attentions[0].device)
+ 43      for layer in range(num_layers):                              # ◀ all 16 layers
+ 44          avg_attn = attentions[layer][0].mean(dim=0)              # ◀ average all 32 heads → one [N, N] matrix
+ 45          query_attn = avg_attn[query_start:query_end, :]          # ◀ the query's rows
+ 46          for i, (doc_start, doc_end) in enumerate(doc_spans):
+ 47              doc_scores[i] += query_attn[:, doc_start:doc_end].mean()   # ◀ block mean, as in §5
+ 48      doc_scores /= num_layers                                     # ◀ → mean over all 512 heads
+```
+
+Result over 5,000 test queries: **Recall@1 0.0132, Recall@5 0.2554** (report p. 3, with the run's output):
+
+![[d09r-cs728-run2-log.png]]
+
+**What the two numbers say.**
+- **Recall@1 1.3% ≈ chance (1%).** Averaged over all heads, the query's attention does not pick out the right tool for first place. §6.4 shows why: the first few places get about 6× the attention of the middle, so position, not content, mostly decides first place.
+- **Recall@5 25.5% ≫ chance (5%).** There is some content signal in the average; it gets the right tool into the top 5 a quarter of the time but almost never beats the position bonus for first place **[THEORY]**.
+
+**Is it a fair baseline?** For one claim, yes: *"selecting heads matters"*. Same model, same prompt, same score; only "all heads" changes to "10 heads". It is **not** a fair stand-in for "existing methods". For that, your report has three real baselines:
+
+| method (report p. 9) | trained for retrieval? | Recall@1 | Recall@5 |
+|---|---|---|---|
+| attention, all 512 heads | no | 1.32% | 25.54% |
+| BM25 (word overlap) | no | 18.54% | 34.74% |
+| attention, top 30 heads | no (heads picked on 200 labelled queries) | 26.64% | 57.78% |
+| attention, top 20 heads | " | 32.78% | 61.78% |
+| MiniLM (msmarco-MiniLM-L-6-v3, 384-d) | yes | 38.82% | 61.06% |
+| **attention, top 10 heads** | " | **40.68%** | **66.94%** |
+| UAE-Large-V1 (1,024-d) | yes | **61.58%** | **86.90%** |
+
+> [!important] How to state the result honestly
+> "Selecting 10 of Llama-3.2-1B's 512 heads with 200 labelled queries raised Recall@1 from 1.3% (all heads averaged) to 40.7%. That beats BM25 (18.5%) and the small MiniLM retriever (38.8%) without training anything, but a strong embedding model, UAE-Large-V1, gets 61.6%."
+> Don't say "1.3% → 40.7%" alone, and never as "31× better": a ratio against a near-chance baseline means nothing.
 
 ### 6.3 Lost in the middle (Liu et al. 2023), summarised
 
@@ -610,33 +655,65 @@ Recall@5 = 25.5% with Recall@1 = 1.3% means the baseline often ranks the right t
 
 ![[d09i-lost-middle.svg]] [[d09i-lost-middle.html|▶ Step through it]]
 
-**Why it happens [THEORY]:** a lot of attention is **positional**: the sink and early tokens get extra weight (primacy), and the last tokens sit next to the question (recency). A tool in the middle has neither.
+**Why it happens [THEORY]:** a lot of attention is **positional**: early tokens get extra weight (primacy, and the sink), and the last tokens sit next to the question (recency). A tool in the middle has neither.
 
-**Why selected heads should help [RECON]:** heads chosen because they land on the **right** tool across probes whose correct tool sits at many positions are, by construction, the heads whose argmax follows content, not position. Summing their attention should flatten the U.
+### 6.4 Your measurement: the U in attention **[IMPL] [REPORT]**
 
-**How to show it [FUTURE / MISSING]:** report Recall@1 separately for each position bucket of the correct tool (first 10%, middle, last 10%), for the baseline and for the heads. A flatter curve for the heads is the evidence for the resume's "mitigated".
+`analyze_gold_attention` (`run2.py:52–76`) takes, for every test query, the all-heads score of the **correct** tool and the place the shuffle put it (0–99, `run2.py:184–189`), groups places into 20 bins of 5, and plots the mean score per bin:
 
-### 6.4 Question bank: metrics and position
+```python
+ 53      positions = [r["gold_position"] for r in results]   # ◀ where the correct tool sat (0–99)
+ 54      scores = [r["gold_score"] for r in results]         # ◀ its all-heads score
+ 57      num_bins = 20
+ 58      bin_size = 100 // num_bins                          # ◀ 5 places per bin
+     ⋮
+ 64          bin_data = [s for p, s in zip(positions, scores) if low <= p < high]
+     ⋮
+ 67              bin_scores.append(np.mean(bin_data))        # ◀ mean score of the correct tool in this bin
+```
+
+![[d09r-cs728-position.png]]
+*Your report's plot (p. 4): mean all-heads attention from the query to the correct tool, against the correct tool's place in the list.*
+
+![[d09i-position-curve.svg]] [[d09i-position-curve.html|▶ Step through it]]
+
+Read off the plot: **0.00061** for places 0–4, about **0.0001** for places 5–90 (lowest ≈ 0.00009 around place 35), back up to **0.00029** for places 95–99. The first five places get about **6×** the attention of the middle; the last five about **3×**. That is the lost-in-the-middle U, measured on attention.
+
+**What it does and doesn't show:**
+- It shows the U for the **all-heads** score, which explains the 1.3% baseline.
+- It measures **attention**, not accuracy. The accuracy version (Recall@1 per position bin) would be the direct analogue of Liu et al.
+- It was **not** measured for the 10 selected heads. So "the selected heads reduce position bias" is a hypothesis, and your resume's "mitigated the lost-in-the-middle effect" is not supported as written. Say: *"we measured a U-shaped position bias in attention-based ranking; selecting heads raised accuracy from 1.3% to 40.7%."*
+- The experiment that would support "mitigated" **[FUTURE]**: rerun `analyze_gold_attention` with `query_to_docs_attention_heads`, and also bin Recall@1 by position, for both scorers. A flatter curve for the heads = mitigation.
+
+### 6.5 Question bank: metrics, baseline and position
 
 **L1. Define Recall@1 and Recall@5.**
 > [!success]- Answer
-> The fraction of test queries whose correct tool is ranked first, or among the first five. Recall@1 is top-1 accuracy; Recall@5 matters when a later step picks from a shortlist of five.
+> The fraction of test queries whose correct tool is ranked first, or among the first five. With 100 tools, random ranking gives 1% and 5%.
 
-**L2. "Your baseline is 1.3%. Isn't that a strawman?"**
+**L2. "What exactly is the 1.3% baseline?"**
 > [!success]- Answer
-> [Say what the baseline was.] If it was all-heads attention: it's the natural "no selection" control, and the point of the result is exactly that selection matters: averaging every head drowns the few retrieval heads in sink and positional attention. I'd also report a fair external baseline, such as an off-the-shelf embedding retriever, so the 40.7% has a real reference point.
+> The same attention score with all 512 heads averaged: for each tool, the mean attention from the query's tokens to the tool's tokens, averaged over every head and layer. It's the "no selection" control. Its Recall@1 is at chance level because attention averaged over all heads mostly follows position.
+
+**L2. "Isn't 1.3% a strawman?"**
+> [!success]- Answer
+> For the claim "selecting heads matters" it's the right control: only that one choice differs. For the claim "this is a good retriever" it's not, so I compare with BM25 (18.5%), MiniLM (38.8%) and UAE-Large-V1 (61.6%). The selected heads beat the first two and lose clearly to UAE.
+
+**L2. Why is the baseline's Recall@5 (25.5%) so much higher than its Recall@1 (1.3%)?**
+> [!success]- Answer
+> Averaged attention does carry some content signal: the right tool reaches the top five a quarter of the time, five times chance. But the first few places get about six times the attention of the middle, so first place almost always goes to whatever tool sits at the start, which is the correct one only 1% of the time.
 
 **L2. What is "lost in the middle"?**
 > [!success]- Answer
-> Long-context models use information at the start and end of the prompt best and in the middle worst: accuracy against the answer's position is U-shaped (Liu et al. 2023). In tool selection, tools listed in the middle of a long list are the ones most likely to be missed.
+> Long-context models use information at the start and end of the prompt best and the middle worst: accuracy against the answer's position is U-shaped (Liu et al. 2023). In our run the all-heads attention to the correct tool showed the same U: about 0.0006 in the first five places, 0.0001 in the middle, 0.0003 in the last five.
 
-**L3. "How do you know your heads reduce position bias, rather than just being more accurate overall?"**
+**L3. "Did your selected heads fix lost in the middle?"**
 > [!success]- Answer
-> Only by splitting recall by the correct tool's position. If heads were uniformly better, both curves would keep their U shape with the heads' curve higher. Mitigation means the heads' curve is **flatter**: the middle gains more than the ends. [Say whether you measured this; if not, that's the experiment, and I'd phrase the claim as "aimed to reduce".]
+> We didn't measure that. We measured the U for the all-heads score, and that the selected heads are far more accurate overall. To claim mitigation I'd plot the same curve, and Recall@1 per position, for the selected heads: a flatter curve would show it; a higher curve with the same U would mean they're better but still position-biased.
 
 **L3. "40.7% Recall@1. Would you ship this?"**
 > [!success]- Answer
-> Not as the only retriever. Its strengths are zero training data and no extra model. In production I'd use a cheap embedding retriever for a top-20 shortlist and the head score to re-rank it, or use the head score as one feature. My later LongContext_RAG project builds exactly that cascade for passages.
+> No, not alone: UAE-Large-V1 gets 61.6% at a fraction of the cost per query. The interesting result is that a general 1B chat model contains a few heads that match queries to tool descriptions about as well as a small trained retriever. Practically I'd use them as a re-ranking feature on an embedding shortlist.
 
 ---
 
@@ -644,40 +721,45 @@ Recall@5 = 25.5% with Recall@1 = 1.3% means the baseline often ranks the right t
 
 ### 7.1 The 30-second version
 
-> "In CS728 I built a tool retriever with no training, from the LLM's own attention. A few attention heads specialise in looking up information in the prompt. I found them with a simple count: on probe queries with a known correct tool, count how often each head's strongest attention lands inside that tool's description, and keep the top 10. For a new query, I rank tools by how much attention those heads put on each description. Recall@1 went from 1.3% to 40.7% and Recall@5 from 25.5% to 66.9%."
+> "In a CS728 assignment we used an LLM's attention as a tool retriever. Llama-3.2-1B reads 100 tool descriptions and a query; we score each tool by the mean attention from the query's tokens to the tool's tokens. Averaging all 512 heads gives Recall@1 of 1.3%, basically chance, because attention mostly follows position: we measured a U-shaped position bias. We picked the heads that most often ranked the correct tool first on 200 labelled training queries; with the best 10, Recall@1 rose to 40.7% and Recall@5 to 66.9%. That beats BM25 and MiniLM with no retriever trained, though a strong embedding model, UAE-Large-V1, gets 61.6%."
 
 ### 7.2 The 2-minute version
 
-> "The setting is an agent with a list of tools in its prompt. The standard fix is a trained embedding retriever; I wanted to see whether the LLM already contains one.
+> "An agent has to pick a tool from a list of descriptions. The usual tool is an embedding retriever; we wanted to see whether the LLM already contains one.
 >
-> Wu et al. showed that under 5% of attention heads are retrieval heads: when the model copies something from its context, those heads point exactly at it. I adapted their idea to tools. On probe queries with known answers, a head hits if its argmax lands inside the correct tool's span. Counting hits ranks every head, and I kept the top 10.
+> The setup: MetaTool's 100 most common tools, 5,000 test queries, Llama-3.2-1B-Instruct. The prompt lists all 100 descriptions in a fresh random order, then the query. One forward pass with attention weights returned; for each tool, the score is the mean of the attention block from the query's tokens to that tool's tokens.
 >
-> To score tools for a new query, I read those heads' attention at the first answer token, drop the attention sink and the query tokens, renormalise over tool tokens, sum per tool, average over heads, and rank.
+> With all 512 heads averaged, Recall@1 was 1.3%, about chance. Binning the correct tool's score by its position showed why: the first five places get about six times the attention of the middle. Lost in the middle, in attention.
 >
-> The baseline [name it] got 1.3% Recall@1; the selected heads got 40.7%, and 66.9% Recall@5. The gain is mostly from **selection**: most heads attend by position, so averaging everything mostly measures position.
+> Following the retrieval-heads idea, that only a few heads do the looking-up, we scored every head on 200 training queries: a hit when the correct tool gets the head's highest score. Keeping the top 10 gave 40.7% Recall@1 and 66.9% Recall@5; 20 and 30 heads did worse, so a few heads carry the signal. We also tried reciprocal-rank scoring, about the same, and raw attention on the correct tool, much worse because it isn't relative to the other tools.
 >
-> Limits: it needs the attention weights, so one slow eager decode step; the whole tool list must be prefilled per query; and 40.7% top-1 is below a trained retriever. The practical design is to use it as a re-ranker over an embedding shortlist."
+> Limits: K was compared on the test set; we didn't measure whether the selected heads reduce the position bias; and it costs a 3,000-token eager forward pass per query, with 9 GB of attention. UAE-Large-V1 still wins at 61.6%. The useful version is a re-ranker on an embedding shortlist."
 
 ### 7.3 Whiteboard
 
 ```
- prompt:  <s> | tool A | tool B | tool C | … | tool N | query   → first answer token
-                         ▲
- 1,024 heads → each has a row of weights over these positions
- Hit Count (probes with known tool):  hit = argmax ∈ span(correct tool);  keep top 10 heads
- Retrieve:  for each chosen head: drop sink+query → renormalise → sum per tool → mean over heads → rank
- Metric:    Recall@k = share of queries whose tool ranks ≤ k        1.3% → 40.7% (R@1)
+ prompt (≈2,980 tokens):  header | tool 1 | tool 2 | … | tool 100 | instruction | Query: … | assistant
+                                     ▲ order reshuffled per query                     ▲ query rows see every tool
+ score(tool) = mean( attention[query rows, tool columns] ),  averaged over the chosen heads
+ baseline:  all 512 heads (16 layers × 32)                  → R@1 1.3%  (chance 1%),  R@5 25.5%
+ Hit Count: 200 train queries; head hits if its top tool = correct; keep top K
+            K = 10 → R@1 40.7%, R@5 66.9%   (K = 20: 32.8%, K = 30: 26.6%)
+ compare:   BM25 18.5%   MiniLM 38.8%   UAE-Large-V1 61.6%
+ position:  all-heads attention to the correct tool: 0.00061 (first 5) / 0.0001 (middle) / 0.00029 (last 5)
 ```
 
 ### 7.4 Claims to avoid
 
 | don't say | why | say instead |
 |---|---|---|
-| "I trained a retriever" | nothing was trained | "a training-free retriever read off attention" |
-| "retrieval heads understand the query" | they're defined by where their argmax lands | "heads whose attention lands on the content being used" |
-| "mitigated lost in the middle" (without per-position numbers) | unsupported without a position split | "aimed to reduce position bias; the per-position split is the check" |
-| "1.3% → 40.7%, a 31× improvement" | ratios against a near-zero baseline mislead | quote both absolute numbers and name the baseline |
-| "32 heads and 3 layers" (unless you can explain it) | contradicts "top 10 heads" on its face | the exact selection, in one sentence |
+| "improved Recall@1 from 1.3% to 40.7%" (alone) | 1.3% is chance level; it reads as an inflated baseline | name the baseline (all heads averaged) and give BM25 / MiniLM / UAE alongside |
+| "31× improvement" | a ratio against a near-chance number | absolute numbers |
+| "32 heads and 3 layers" | matches nothing in the code or report | "the best 10 of 512 heads (16 layers × 32)" |
+| "mitigated the lost-in-the-middle effect" | only the all-heads curve was measured | "measured a U-shaped position bias in attention-based ranking" |
+| "training-free retriever" (unqualified) | 200 labelled queries pick the heads | "no fine-tuning; heads chosen with 200 labelled queries" |
+| "beats embedding retrievers" | UAE-Large-V1 gets 61.6% | "beats BM25 and MiniLM; below UAE-Large-V1" |
+| "Llama 3.1" | the code uses Llama-3.2-1B-Instruct (the report's "Llama3.1 1B" is a typo) | "Llama-3.2-1B-Instruct" |
+| "I built …" for the whole thing | a three-person assignment | "we", and "I" for your own parts |
 
 ---
 
@@ -1646,7 +1728,7 @@ Batch-1 median CPU latency rose from 0.359 to 0.383 ms, a significant **1.07× s
 
 ## 18. Eighty questions with model answers
 
-**How to drill:** read the question, answer out loud in under a minute, *then* open the answer. Mark each strong / OK / weak in [[#My notes and fumbles]]. Answers marked [say yours] depend on CS728 facts that aren't on the server.
+**How to drill:** read the question, answer out loud in under a minute, *then* open the answer. Mark each strong / OK / weak in [[#My notes and fumbles]]. Answers in [square brackets] are for you to fill with your own part of the work.
 
 ### 18.1 Fundamentals (20)
 
@@ -1668,15 +1750,15 @@ Batch-1 median CPU latency rose from 0.359 to 0.383 ms, a significant **1.07× s
 
 **F5. What is the attention sink?**
 > [!success]- Answer
-> Many heads put a large share of attention on the first token regardless of content, a place to park attention they don't need. It carries no retrieval signal, so any attention-based score must exclude it, which is why my scorer renormalises over tool tokens only.
+> Many heads put a large share of attention on the first token regardless of content, a place to park attention they don't need. It carries no retrieval signal. In CS728 it never enters a tool's score, because scores only sum columns inside tool spans; but a head that parks most of its weight there gives small numbers to every tool, so it counts less in the average over heads.
 
 **F6. Prefill vs decode?**
 > [!success]- Answer
-> Prefill processes the whole prompt in one parallel pass and fills the KV cache; decode generates one token at a time, each attending over the cached keys and values. The attention matrix at a decode step is [heads, 1, T], which is why my head scores are read there.
+> Prefill processes the whole prompt in one parallel pass and fills the KV cache; decode generates one token at a time, each attending over the cached keys and values. CS728 only needs the prefill: the query's rows of the attention matrix already show which tools the query looks at, so no answer is generated.
 
 **F7. How does an embedding retriever work, and how is the head retriever different?**
 > [!success]- Answer
-> An embedding retriever encodes queries and documents into vectors with a trained encoder and ranks by cosine similarity; the document vectors can be precomputed. The head retriever needs no training and no second model, but scores tools inside the LLM's forward pass, so nothing is precomputed and the whole list must be in the prompt.
+> An embedding retriever (MiniLM, UAE-Large-V1 in CS728 Part 1) encodes queries and documents into vectors with a trained encoder and ranks by cosine similarity; the document vectors are computed once. The head retriever needs no fine-tuning and no second model, but scores tools inside the LLM's forward pass, so nothing is precomputed and all 100 descriptions must be in every prompt.
 
 **F8. Recall@k vs precision@k?**
 > [!success]- Answer
@@ -1734,63 +1816,63 @@ Batch-1 median CPU latency rose from 0.359 to 0.383 ms, a significant **1.07× s
 
 **C1. Explain the project end to end.**
 > [!success]- Answer
-> Tool selection for an LLM agent without training a retriever. I located retrieval heads by Hit Count on probe queries (a head hits when its argmax lands inside the correct tool's description), kept the top 10, and at test time ranked tools by those heads' attention mass on each tool's tokens, read at the first answer token. Recall@1 rose from 1.3% to 40.7%, Recall@5 from 25.5% to 66.9%.
+> A CS728 assignment on tool selection from attention. Llama-3.2-1B-Instruct reads 100 MetaTool tool descriptions in a random order and then the query; each tool's score is the mean attention from the query's tokens to the tool's tokens. With all 512 heads averaged, Recall@1 was 1.3%, about chance, and the attention to the correct tool was U-shaped in its position. We counted, on 200 labelled training queries, how often each head ranked the correct tool first, kept the top 10, and got 40.7% Recall@1 and 66.9% Recall@5 on 5,000 test queries: above BM25 (18.5%) and MiniLM (38.8%), below UAE-Large-V1 (61.6%).
 
 **C2. Which model and dataset?**
 > [!success]- Answer
-> [Say yours.] Include the number of layers and heads (so the interviewer can picture "10 of N"), how many tools per prompt and how many test queries.
+> Llama-3.2-1B-Instruct in fp16 with eager attention: 16 layers × 32 query heads = 512 heads (8 shared key/value heads). MetaTool's 100 most frequent tools; 5,000 test queries and 1,500 training queries, disjoint; the first 200 training queries picked the heads. One prompt is about 2,980 tokens.
 
 **C3. What exactly was the baseline?**
 > [!success]- Answer
-> [Say yours, in one sentence.] Then: the gap is mostly selection. Most heads attend by position or to the sink, so an unselected aggregate mostly measures position; picking the few content-driven heads is what moves Recall@1.
+> The same score with no selection: for each layer, average the 32 heads' attention matrices, take the query rows, take each tool's block mean, then average over the 16 layers (`run2.py:34–49`). Recall@1 1.3%, Recall@5 25.5%. It shows that selection matters; for "is it a good retriever" the real comparisons are BM25, MiniLM and UAE.
 
-**C4. Why does Recall@5 (25.5%) far exceed Recall@1 (1.3%) for the baseline?**
+**C4. Why does the baseline's Recall@5 (25.5%) far exceed its Recall@1 (1.3%)?**
 > [!success]- Answer
-> The baseline often puts the right tool near the top but almost never first, the signature of a positional bias: a few positions (the first or last tools) systematically take rank 1. That's also why removing position-driven heads improves Recall@1 most.
+> The averaged attention carries some content signal, enough to put the right tool in the top five a quarter of the time (chance is 5%). But the first few places get about six times the attention of the middle (our position plot), so first place almost always goes to whatever sits first: the correct tool only 1% of the time.
 
-**C5. Why the first answer token?**
+**C5. Which attention rows do you read, and why?**
 > [!success]- Answer
-> It's when the model decides what to say, so its retrieval heads point at what it will use; and it's a single-query decode step, where the attention matrix is [heads, 1, T] and can be read on the eager path cheaply. An eager prefill would need [heads, T, T] per layer.
+> The rows of the query's own tokens. Attention is causal and the query comes after all 100 tools, so the query rows are the only ones that can see every tool, and they answer exactly "which tool does the query look at?". We locate them by token ids: after the last "Query" token, up to the "Correct" of "Correct tool_id:".
 
-**C6. How did you make sure the attention weights were available?**
+**C6. How did you get the attention weights, and what did it cost?**
 > [!success]- Answer
-> SDPA and FlashAttention never materialise the weights. In my LongContext_RAG code a context manager flips the model's attention implementation to eager for the one decode step and registers forward hooks on every attention module, which copy the weights out with detach; a `finally` block always restores the fast path. [Say what CS728 used, e.g. `output_attentions=True` on an older transformers version.]
+> The model is loaded with `attn_implementation="eager"` and `output_attentions=True`, because fast kernels never store the weights. That returns every layer's [1, 32, N, N] matrix: at N ≈ 3,000 in fp16 about 0.57 GB per layer, 9 GB per query. We delete it and empty the CUDA cache after each query. Cheaper: keep only the query rows of the 10 chosen heads with forward hooks.
 
 **C7. Why top 10?**
 > [!success]- Answer
-> [Say how you chose it.] The principle: choose k on held-out queries; too few heads makes it brittle, too many dilutes it with non-retrieval heads. Retrieval heads are under 5% of heads, so k in the tens is the natural range.
+> We tried K = 10, 20 and 30 with Hit Count: 40.7%, 32.8% and 26.6% Recall@1. Hit counts fall off fast (93 for the best head, about 60 for the 10th, 30 for the 30th), and every head gets equal weight, so weaker heads dilute the good ones. Two caveats: K was compared on the test set, and smaller K (1–5) wasn't tried.
 
-**C8. What does "32 heads and 3 layers" mean?**
+**C8. What does Hit Count actually count?**
 > [!success]- Answer
-> [Say yours precisely.] If it means the aggregation considered heads from 3 layers, 32 heads each, say that and how it relates to the top 10.
+> For each training query and each of the 512 heads: score all 100 tools by that head's block mean, sort, and add 1 if the correct tool is first (`code3.py:72–85`). Over 200 queries a head's count is how often it alone would have got Recall@1 right. The best, layer 8 head 19, got 93 of 200.
 
-**C9. How would you measure lost in the middle?**
+**C9. How did you measure lost in the middle, and what would you add?**
 > [!success]- Answer
-> Bucket test queries by the correct tool's position in the list (start, middle, end), or shuffle the list and place the correct tool at each position in turn, and report Recall@1 per position for the baseline and the head retriever. Mitigation = a flatter curve, not just a higher one.
+> For every test query we stored the correct tool's all-heads score and its position (0–99), binned positions in fives and plotted the mean score: about 0.0006 in the first bin, 0.0001 in the middle, 0.0003 in the last: a U. I'd add the same curve for the selected heads, and Recall@1 per position bin for both scorers; only a flatter curve for the heads would show they reduce the bias.
 
 **C10. Sum, mean or max over a tool's tokens?**
 > [!success]- Answer
-> [Say yours.] Sum favours long descriptions; mean corrects length but rewards single spikes in short ones; max uses only the best token. Choose on validation; with descriptions of very different lengths, mean or max is usually safer.
+> Mean over the block (query rows × tool columns). Descriptions range from 13 to 69 tokens, so a sum would favour long ones. The mean's weakness is that a short description with one strongly attended word can win; max over tool tokens would be the alternative to test.
 
-**C11. What happens if two tools have near-identical descriptions?**
+**C11. Why did "raw attention on the correct tool" select bad heads?**
 > [!success]- Answer
-> Attention mass splits between them and the ranking between the two becomes a coin flip; Recall@5 stays fine but Recall@1 suffers. Embedding retrievers have the same problem. Tool descriptions that state distinguishing details, or a second-stage re-ranker, help.
+> It's absolute: a head that gives lots of attention to all tools, or to whatever comes first, also gives the correct tool a lot, without ever ranking it first. Hit Count and reciprocal rank are relative to the other 99 tools. Result: 14.5% Recall@1 vs 32.8% for Hit Count at K = 20.
 
 **C12. Does this scale to 1,000 tools?**
 > [!success]- Answer
-> Not as is: all descriptions must fit in context and be prefilled per query, and attention spreads thinner over more candidates. I'd shortlist with an embedding retriever (top 20–50) and re-rank the shortlist with the heads; my later LongContext_RAG project does that cascade for passages.
+> Not as built: about 30,000 tokens per prompt, attention memory growing with its square (roughly 900 GB of returned attention in fp16), and attention spread thinner. I'd shortlist the top 20–50 with an embedding model and score only those with the heads.
 
-**C13. Are retrieval heads the same across tasks?**
+**C13. Where are the selected heads?**
 > [!success]- Answer
-> Wu et al. found retrieval heads are largely universal within a model (present in base models, stable across long-context training and tasks). But Hit Count selects for my task specifically; I'd expect strong overlap with needle-in-a-haystack retrieval heads, and that's a cheap check: compare my top 10 with the heads ranked by the copy rule.
+> The top 10 are in layers 2–10, most in 5–10; of the top 20 only one is in layers 11–15. Middle layers doing query–document matching fits other interpretability findings, but we only described it; we didn't test it.
 
-**C14. Could you causally verify the heads matter?**
+**C14. Could you verify causally that these heads matter?**
 > [!success]- Answer
-> Yes: mask the selected heads (zero their output) and measure the model's own tool-calling accuracy, against masking the same number of random heads, as Wu et al. did for needle retrieval. My LongContext_RAG repo has ablation code for exactly that (`heads/ablate.py`).
+> Yes: zero the 10 heads' outputs and let the model answer with the tool name itself; compare its accuracy with zeroing 10 random heads, as Wu et al. did for needle retrieval. We didn't do it; my later LongContext_RAG repo has head-ablation code for this (`heads/ablate.py`).
 
 **C15. What would you change with more time?**
 > [!success]- Answer
-> Disjoint probe and test tools; choose k and the aggregation on validation; a per-position recall curve for the lost-in-the-middle claim; an embedding-retriever baseline; and the cascade: embedding shortlist + head re-rank.
+> Choose K (including 1–5) and the head-scoring rule on a held-out part of the training queries; plot the position curve and per-position Recall@1 for the selected heads; report per-tool recall, since some tools have 376 test queries and some 16; read only the needed attention rows with hooks instead of returning 9 GB per query; and try the heads as a re-ranker on a UAE shortlist.
 
 ### 18.3 LeNet-5 implementation and results (20)
 
@@ -1922,7 +2004,7 @@ Batch-1 median CPU latency rose from 0.359 to 0.383 ms, a significant **1.07× s
 
 **H12. "1.3% → 40.7%: you picked a weak baseline to look good."** (CS728)
 > [!success]- Answer
-> [Name the baseline.] The comparison isolates one design choice, selecting heads versus not, and that's what it's meant to show. The fair external comparison is a trained embedding retriever, which I'd expect to beat 40.7% top-1; my claim is a zero-training retriever, best used as a re-ranker.
+> The 1.3% is all 512 heads averaged, and yes, it's at chance level. It's the right control for one claim, that selecting heads matters, because nothing else changes. It isn't the comparison for "good retriever": against BM25 (18.5%) and MiniLM (38.8%) the heads win; against UAE-Large-V1 (61.6%) they lose clearly. That's the full picture, and it's how I'd write it.
 
 **H13. "Attention isn't explanation. Why trust attention weights?"**
 > [!success]- Answer
@@ -1930,7 +2012,7 @@ Batch-1 median CPU latency rose from 0.359 to 0.383 ms, a significant **1.07× s
 
 **H14. "Your Hit Count heads were chosen on the same queries you report?"**
 > [!success]- Answer
-> [Say what you did.] If they overlapped: the risk is limited (choosing 10 heads is a small model), but the honest fix is disjoint probe and test sets, and I'd rerun that way.
+> No: heads were chosen on 200 training queries, disjoint from the 5,000 test queries (I checked: no shared ids or texts). But K was compared on the test set (10, 20, 30), and we reported the best. With three options the optimism is small; the clean fix is choosing K on held-out training queries.
 
 **H15. "What would make you abandon the LeNet conclusion?"**
 > [!success]- Answer
@@ -1972,11 +2054,11 @@ Batch-1 median CPU latency rose from 0.359 to 0.383 ms, a significant **1.07× s
 
 **D9. Your CS728 retriever ranks the first tool first for almost every query. Diagnosis?**
 > [!success]- Answer
-> Positional heads or the sink are dominating: check that the sink and the query tokens are excluded and rows renormalised, that the selected heads aren't positional (their argmax should move with the correct tool's position across probes), and shuffle tool order to confirm.
+> Position-driven heads are dominating, as in the all-heads baseline (1.3%). Check: are you averaging all heads instead of the selected ones; is the tool order really reshuffled per query (otherwise selection can reward position); do the spans line up with the tokens (decode them and compare); is the query span right (the hard-coded token ids only fit the Llama-3 tokenizer).
 
-**D10. The eager capture runs out of memory on long prompts. Why, and the fix?**
+**D10. The CS728 scorer runs out of GPU memory on longer prompts. Why, and the fix?**
 > [!success]- Answer
-> Probably the prefill also ran eagerly, building a [heads, T, T] matrix per layer (~4 GB per layer at 8k), or the captured weights kept their autograd graph. Fix: prefill with SDPA and switch to eager only for the single decode step, and `detach()` the captured weights, as `capture.py` does.
+> `output_attentions=True` with eager attention returns all 16 layers' [1, 32, N, N] matrices: 9 GB at N ≈ 3,000 in fp16, growing with N². Also check that the previous query's tensors were deleted (`del attentions; torch.cuda.empty_cache()`). The real fix is to keep only what's used: forward hooks that save the query rows of the 10 selected heads, or prefill with a fast kernel and recompute attention only for those heads.
 
 ---
 
@@ -1984,6 +2066,8 @@ Batch-1 median CPU latency rose from 0.359 to 0.383 ms, a significant **1.07× s
 
 - Wu et al. (2024), *Retrieval Head Mechanistically Explains Long-Context Factuality*: §3.1.
 - Liu et al. (2023), *Lost in the Middle: How Language Models Use Long Contexts*: §6.3.
+- CS728 Programming Assignment 3 report and code (your team): `interview_materials/cs728/`, §1–§7.
+- Wang et al. (2023), MetaTool benchmark (the tool set and queries); Li & Li (2023), AnglE / UAE-Large-V1; Robertson & Zaragoza (2009), BM25: §6.2 (named only; nothing else needed).
 - LeCun et al. (1998), *Gradient-Based Learning Applied to Document Recognition*: §9.
 - Frankle & Carbin (2019), *The Lottery Ticket Hypothesis*; Frankle et al. (2020), *Linear Mode Connectivity and the Lottery Ticket Hypothesis*; Han et al. (2015), *Learning both Weights and Connections*: §11.2.
 - Mu & Gilmer (2019), *MNIST-C*: §12.1.
@@ -1992,6 +2076,6 @@ Batch-1 median CPU latency rose from 0.359 to 0.383 ms, a significant **1.07× s
 
 ## My notes and fumbles
 
-- CS728 facts (§1.3): model = ; dataset = ; tools per prompt = ; baseline = ; probe set = ; "32 heads and 3 layers" = ; lost-in-the-middle measured? 
+- CS728: my own part of the team's work = ; new resume wording (§0.2) = 
 - LeNet: my role in Part 2 = 
 -

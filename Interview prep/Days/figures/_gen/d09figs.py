@@ -47,15 +47,15 @@ def attn_row():
     s1 = row(160, 'score', sc, lambda v: f'{v:.1f}')
     s2 = s1 + row(196, 'e^score', ex, lambda v: f'{v:.2f}')
     fr = [
-        ('The prompt: 4 tools (2 tokens each), then the query "fly Paris". The model is about to write its answer.', ''),
+        ('The prompt: 4 tools (2 tokens each), then the query "fly Paris". We look at the row of the query token "Paris".', ''),
         ('Score per position = (query vector · key vector) / √d. One number per earlier token, for this one head.', s1),
         ('Softmax, step 1: e^score makes every number positive and stretches the gaps (3.0 → 20.09, 0.0 → 1).', s2),
         (f'Softmax, step 2: divide each by the total Z = {Z:.2f}. The weights now sum to 1: where this head "looks".', s2 + bars()),
-        ('argmax = position 3, "flight", inside tool B. That index is the only thing the copy rule and Hit Count read.', s2 + bars(3)),
-        ('Note <s> (position 0) gets 0.186: the "attention sink". It is not a tool, so retrieval code must ignore it.', s2 + bars(0)),
-        ('Every head of every layer has its own row like this at each decode step (32 × 32 = 1,024 rows in Llama-3.1-8B).', s2 + bars(3)),
+        ('Most weight lands on position 3, "flight", inside tool B. CS728 adds up such weights per tool (§4–§5).', s2 + bars(3)),
+        ('Note <s> (position 0) gets 0.186: the "attention sink". It belongs to no tool, so no tool score ever counts it.', s2 + bars(0)),
+        ('Every head of every layer has its own row like this for every token: 16 × 32 = 512 rows per token in Llama-3.2-1B.', s2 + bars(3)),
     ]
-    save('d09i-attn-row.svg', W, H, 'One head, one decode step: scores → softmax → where it looks', 'toy prompt of 11 tokens; real rows are thousands of tokens long', st, fr, 4.2)
+    save('d09i-attn-row.svg', W, H, 'One head, one token: scores → softmax → where it looks', 'toy prompt of 11 tokens; the real CS728 prompt is about 2,980 tokens', st, fr, 4.2)
 
 # ───────────────────────── CS728 2: copy_hits, debugger view ─────────────────────────
 def copy_dbg():
@@ -96,13 +96,15 @@ def copy_dbg():
 def hitcount():
     W, H = 960, 470
     heads = ['L0H0', 'L0H1', 'L0H2', 'L1H0', 'L1H1', 'L1H2']
-    am = {'L0H0': [0, 0, 0, 0, 0], 'L0H1': [9, 1, 9, 9, 9], 'L0H2': [3, 9, 5, 0, 9], 'L1H0': [3, 2, 6, 7, 4], 'L1H1': [7, 9, 9, 8, 0], 'L1H2': [4, 1, 5, 9, 3]}
+    top = {'L0H0': 'AAAAA', 'L0H1': 'DDDDD', 'L0H2': 'BDCAD', 'L1H0': 'BACDB', 'L1H1': 'DDCDA', 'L1H2': 'BACAB'}
     probes = [('P1 "fly to Paris"', 'B'), ('P2 "rain tomorrow?"', 'A'), ('P3 "AAPL today"', 'C'), ('P4 "17 × 23"', 'D'), ('P5 "cheap tickets"', 'B')]
-    st = T(20, 82, 'probe queries (correct tool known)', 12, 700, MUTE)
+    st = T(20, 82, 'training queries (correct tool known)', 12, 700, MUTE)
     for k, (q, t) in enumerate(probes):
         st += T(20, 108 + k * 26, f'{q} → tool {t}', 12)
-    st += T(20, 262, 'tool spans: A = 1–2, B = 3–4, C = 5–6, D = 7–8', 11, 400, MUTE)
-    st += T(330, 82, 'per head: argmax position on each probe, and the hit counter', 12, 700, MUTE)
+    st += T(20, 262, 'per head and query: score every tool', 11, 700, MUTE)
+    st += T(20, 280, '= mean of the attention block', 11, 400, MUTE) + T(20, 296, '  query tokens × that tool\'s tokens', 11, 400, MUTE)
+    st += T(20, 314, '(code3.py:76–80)', 11, 400, MUTE)
+    st += T(330, 82, 'per head: the tool it scores highest on each query, and the hit counter', 12, 700, MUTE)
     def board(upto, sel=None):
         o = ''
         cnt = {h: 0 for h in heads}
@@ -110,9 +112,8 @@ def hitcount():
             x, y = 330 + (i % 3) * 205, 96 + (i // 3) * 150
             marks = ''
             for k in range(upto):
-                j = am[h][k]; s, e = SPANS[probes[k][1]]
-                ok = s <= j < e; cnt[h] += ok
-                marks += B(x + 8 + k * 37, y + 40, 33, 26, str(j), GREEN if ok else GREY, GT if ok else MUTE, 1.2, 12)
+                t = top[h][k]; ok = t == probes[k][1]; cnt[h] += ok
+                marks += B(x + 8 + k * 37, y + 40, 33, 26, t, GREEN if ok else GREY, GT if ok else MUTE, 1.2, 12)
             chosen = sel and h in sel
             o += R(x, y, 198, 130, YEL if chosen else WHITE, RED if chosen else '#d0d7de', 2.4 if chosen else 1, 8)
             o += T(x + 10, y + 24, h, 13, 700) + marks
@@ -120,42 +121,77 @@ def hitcount():
         if upto:
             o += R(18, 94 + (upto - 1) * 26, 290, 22, 'none', RED, 2, 4)
         return o
-    fr = [('Hit rule for CS728 (the tool version of the copy rule): a head hits if its argmax lands inside the CORRECT tool\'s span.', board(0))]
-    cap = ['P1 wants B (3–4). L0H2, L1H0 look at 3 and L1H2 at 4: three hits. L0H0 looks at <s>, L0H1 and L1H1 at the query.',
-           'P2 wants A (1–2). L0H1 (1), L1H0 (2), L1H2 (1) hit.',
-           'P3 wants C (5–6). L0H2 (5), L1H0 (6), L1H2 (5) hit.',
-           'P4 wants D (7–8). L1H0 (7) and L1H1 (8) hit; L1H2 looks at the query (9).',
-           'P5 wants B again. Only L1H0 (4) and L1H2 (3) hit.']
+    fr = [('Your rule (code3.py:83–85): on each training query, a head HITS if the correct tool gets its highest score.', board(0))]
+    cap = ['P1 wants B. L0H2, L1H0 and L1H2 score B highest: three hits. L0H0 always picks A (the first tool), L0H1 always D (the last).',
+           'P2 wants A. L0H0 hits for free (it always says A); so do L1H0 and L1H2.',
+           'P3 wants C. L0H2, L1H0, L1H1 and L1H2 hit.',
+           'P4 wants D. L0H1 hits for free (it always says D); so do L1H0 and L1H1.',
+           'P5 wants B again. Only L1H0 and L1H2 hit.']
     for k in range(5): fr.append((cap[k], board(k + 1)))
-    fr.append(('Sort by hits: L1H0 = 5, L1H2 = 4, L0H2 = 2, … Keep the top k (k = 2 here; your project kept the top 10).', board(5, {'L1H0', 'L1H2'})))
-    fr.append(('L0H0 never hits: it always looks at <s> (the sink). Counting hits filters such heads out without any training.', board(5, {'L1H0', 'L1H2'})))
-    save('d09i-hitcount.svg', W, H, 'Hit Count: probe, count, keep the top heads', 'toy: 6 heads, 5 probes, the 11-token prompt of the attention-row figure', st, fr, 4.4)
+    fr.append(('Sort by hits (code3.py:107–108): L1H0 = 5, L1H2 = 4, … Keep the top k (k = 2 here; you kept 10 of 512).', board(5, {'L1H0', 'L1H2'})))
+    fr.append(('Position-driven heads (always first / always last) hit only when the answer happens to sit there, so counting filters them out.', board(5, {'L1H0', 'L1H2'})))
+    save('d09i-hitcount.svg', W, H, 'Hit Count: score every tool, count wins, keep the top heads', 'toy: 6 heads, 5 training queries, 4 tools; your run: 512 heads, 200 queries, 100 tools', st, fr, 4.4)
 
 # ───────────────────────── CS728 4: heads as a retriever (score_all) ─────────────────────────
 def score_dbg():
-    code = [(102, 'attn, spans, _ = self.attention_for(question, chunks)'),
-            (103, 'selected = attn[self._l_idx, self._h_idx].float()'),
-            (107, 'seg = torch.full((T,), -1, dtype=torch.long)'),
-            (109, 'for i, (s, e) in enumerate(spans):'),
-            (111, '    seg[s:e] = i'),
-            (114, 'valid = seg >= 0'),
-            (115, 'seg_v = seg[valid]'),
-            (116, 'p = selected[:, valid]'),
-            (117, 'p = p / p.sum(dim=1, keepdim=True).clamp_min(1e-12)'),
-            (120, 'sums = zeros(K, n_chunks).index_add_(1, seg_v, p)'),
-            (129, 'out[key] = mat[:k].mean(dim=0)')]
-    V = ['spans (A B C D)', 'selected[L1H0]  (11 keys)', 'selected[L1H2]', 'seg', 'seg_v', 'p[L1H0]  (8 tool tokens)', 'p[L1H2]', 'sums[L1H0]  A B C D', 'sums[L1H2]  A B C D', 'score = mean over heads', 'ranking']
+    code = [(49, 'doc_scores = torch.zeros(len(doc_spans))'),
+            (50, 'query_start, query_end = query_span'),
+            (52, 'for layer_idx, head_idx in selected_heads:'),
+            (53, '    head_attn = attentions[layer_idx][0, head_idx]'),
+            (54, '    query_attn = head_attn[query_start:query_end, :]'),
+            (56, '    for doc_i, (doc_start, doc_end) in enumerate(doc_spans):'),
+            (57, '        doc_scores[doc_i] += query_attn[:, doc_start:doc_end].mean()'),
+            (59, 'doc_scores /= len(selected_heads)'),
+            (165, 'ranked_docs = torch.argsort(doc_scores, descending=True)'),
+            (169, 'gold_rank = i   # position of the gold tool in ranked_docs'),
+            (173, 'if gold_rank < 1: correct_at_1 += 1'),
+            (175, 'if gold_rank < 5: correct_at_5 += 1')]
+    V = ['doc_spans (A B C D)', 'query_span', 'head', 'row "fly"   A|B|C|D', 'row "Paris" A|B|C|D', 'block means  A B C D', 'doc_scores  A B C D', 'ranked_docs', 'gold_rank', 'correct_at_1 / correct_at_5']
+    r0 = '.02 .03|.25 .15|.02 .03|.02 .02'
+    r1 = '.03 .02|.30 .12|.02 .02|.03 .02'
+    q0 = '.10 .08|.12 .10|.04 .04|.06 .06'
+    q1 = '.09 .07|.14 .08|.05 .03|.05 .07'
     steps = [
-        ((102,), {'spans (A B C D)': '(1,3) (3,5) (5,7) (7,9)'}, 'New query "flight to Rome" (correct tool B). One decode step gives attn [layers, heads, 11] and each tool\'s token span.'),
-        ((103,), {'selected[L1H0]  (11 keys)': '.40 .03 .02 .25 .15 .02 .03 .02 .02 .03 .03', 'selected[L1H2]': '.30 .10 .08 .12 .10 .04 .04 .06 .06 .05 .05'}, 'Line 103: keep only the heads Hit Count chose (L1H0, L1H2): fancy indexing → shape [K = 2, T = 11].'),
-        ((107, 109, 111), {'seg': '-1 0 0 1 1 2 2 3 3 -1 -1'}, 'Lines 107–111: label every position with its tool number; -1 = not a tool (<s>, the query).'),
-        ((114, 115), {'seg_v': '0 0 1 1 2 2 3 3'}, 'Lines 114–115: keep tool positions only. The sink (.40 and .30!) and the query drop out here.'),
-        ((116, 117), {'p[L1H0]  (8 tool tokens)': '.056 .037 .463 .278 .037 .056 .037 .037', 'p[L1H2]': '.167 .133 .200 .167 .067 .067 .100 .100'}, 'Line 117: renormalise each head over tool tokens (÷ .54 and ÷ .60): "share of this head\'s attention that went to tools".'),
-        ((120,), {'sums[L1H0]  A B C D': '.093 .741 .093 .074', 'sums[L1H2]  A B C D': '.300 .367 .133 .200'}, 'Line 120: index_add_ adds each token\'s share into its tool\'s bucket: one number per (head, tool).'),
-        ((129,), {'score = mean over heads': 'A .196  B .554  C .113  D .137'}, 'Line 129: average the K heads, so each head counts equally (a diffuse head can\'t dominate).'),
-        ((129,), {'ranking': 'B > A > D > C   → B is rank 1 ✓'}, 'Rank tools by score. The correct tool B is first: this query counts as a Recall@1 hit.'),
+        ((49, 50), {'doc_spans (A B C D)': '(1,3) (3,5) (5,7) (7,9)', 'query_span': '(9, 11) = "fly Paris"', 'doc_scores  A B C D': '0 0 0 0'}, 'Test query "fly Paris" (correct tool B). One forward pass gave every layer\'s [1, 32, N, N] attention; the spans come from PromptUtils.'),
+        ((52, 53), {'head': 'L1H0'}, 'Lines 52–53: loop over the chosen heads only. head_attn is that head\'s full N × N matrix (row = a token, column = what it looks at).'),
+        ((54,), {'row "fly"   A|B|C|D': r0, 'row "Paris" A|B|C|D': r1}, 'Line 54: keep the rows of the QUERY tokens: "where does each query word look?" Columns 0 (<s>) and 9–10 are never used below.'),
+        ((56, 57), {'block means  A B C D': '.025 .205 .023 .023', 'doc_scores  A B C D': '.025 .205 .023 .023'}, 'Line 57: for each tool, the MEAN of its block (2 query rows × 2 tool columns), added to that tool\'s score. B: (.25+.15+.30+.12)/4 = .205.'),
+        ((52, 53, 54), {'head': 'L1H2', 'row "fly"   A|B|C|D': q0, 'row "Paris" A|B|C|D': q1}, 'Next chosen head, L1H2: a flatter head. Same slicing.'),
+        ((56, 57), {'block means  A B C D': '.085 .110 .040 .060', 'doc_scores  A B C D': '.110 .315 .063 .083'}, 'Its block means are added on top: B .205 + .110 = .315.'),
+        ((59,), {'doc_scores  A B C D': '.055 .158 .031 .041'}, 'Line 59: divide by the number of heads, so the score is the mean over heads (here 2; in your run 10).'),
+        ((165,), {'ranked_docs': '[B, A, D, C]'}, 'run3.py:165: sort tools by score, highest first.'),
+        ((169,), {'gold_rank': '0  (B is first)'}, 'Lines 166–170: find where the gold tool landed. Rank 0 = first place.'),
+        ((173, 175), {'correct_at_1 / correct_at_5': '+1 / +1'}, 'Lines 173–176: a Recall@1 hit and a Recall@5 hit. Recall@k = these counts ÷ 5,000 test queries.'),
     ]
-    dbg('d09i-score-dbg.svg', 'Heads as a retriever: attention mass per tool, then rank', 'LongContext_RAG compress/head_scorer.py:102–129 (bfb2ec9), the same reduction CS728 needs; toy numbers', code, steps, V, codew=500, sec=4.6)
+    dbg('d09i-score-dbg.svg', 'Your scorer: mean attention from the query to each tool, over the chosen heads', 'CS728 run3.py:49–59 (query_to_docs_attention_heads) and :165–176; toy numbers, 2 heads, 4 tools', code, steps, V, codew=560, sec=4.6)
+
+# ───────────────────────── CS728 4b: the measured position curve (report p. 4) ─────────────────────────
+def position_curve():
+    W, H = 960, 450
+    x0, x1, y0, y1 = 100, 900, 360, 80
+    vals = [0.00061, 0.000155, 0.000122, 0.000121, 0.000107, 0.000108, 0.000093, 0.000092, 0.000100, 0.000111,
+            0.000105, 0.000101, 0.000116, 0.000123, 0.000111, 0.000131, 0.000130, 0.000117, 0.000145, 0.000289]
+    def X(p): return x0 + (x1 - x0) * p / 100
+    def Y(v): return y0 - (y0 - y1) * v / 0.00065
+    st = L(x0, y0, x1, y0, INK, 1.2) + L(x0, y0, x0, y1, INK, 1.2)
+    st += T((x0 + x1) / 2, y0 + 38, 'position of the correct tool among the 100 (bins of 5)', 12, 600, MUTE, 'middle')
+    st += T(x0, y1 - 14, 'mean attention, query → correct tool (all 512 heads)', 12, 600, MUTE)
+    for p in (0, 20, 40, 60, 80, 100): st += T(X(p), y0 + 18, str(p), 11, 400, MUTE, 'middle')
+    for v in (0.0001, 0.0003, 0.0005): st += T(x0 - 8, Y(v) + 4, f'{v:.4f}', 11, 400, MUTE, 'end') + L(x0, Y(v), x1, Y(v), '#eaeef2', 1)
+    pts = [(X(2.5 + 5 * k), Y(v)) for k, v in enumerate(vals)]
+    def curve(n):
+        o = f"<polyline points='{' '.join(f'{a},{b}' for a, b in pts[:n])}' fill='none' stroke='{BT}' stroke-width='3'/>"
+        return o + ''.join(f"<circle cx='{a}' cy='{b}' r='5' fill='{BT}' stroke='white' stroke-width='1.5'/>" for a, b in pts[:n])
+    note = lambda k, s, dy=-14: T(pts[k][0], pts[k][1] + dy, s, 11, 700, RED, 'middle')
+    fr = [
+        ('run2.py: for every test query, score the correct tool with ALL heads averaged, and note where the shuffle put it (0–99).', ''),
+        ('Correct tool in the first 5 places: mean score 0.00061.', curve(1) + note(0, '0.00061', -12)),
+        ('Places 5–90: it falls to about 0.0001 and stays flat. The middle 80% of the list gets about 1/6 of the attention.', curve(18) + note(0, '0.00061', -12) + note(7, '≈ 0.00009', 20)),
+        ('Last 5 places (right before the query): back up to 0.00029. A U shape: "lost in the middle", measured.', curve(20) + note(0, '0.00061', -12) + note(7, '≈ 0.00009', 20) + note(19, '0.00029', -12)),
+        ('Likely why the all-heads baseline gets Recall@1 1.3% (random = 1%): position, not content, decides who comes first.', curve(20) + note(0, 'position wins', -12)),
+        ('Not measured: the same curve for the 10 selected heads. So say "showed", not "mitigated".', curve(20)),
+    ]
+    save('d09i-position-curve.svg', W, H, 'Your measurement: attention to the correct tool vs its position', 'values read off the report\'s plot (p. 4), all-heads baseline, 5,000 test queries; the plot itself is in the note', st, fr, 4.6)
 
 # ───────────────────────── CS728 5: lost in the middle (schematic) ─────────────────────────
 def lost_middle():
@@ -169,7 +205,6 @@ def lost_middle():
     for p in (1, 5, 10, 15, 20): st += T(X(p), y0 + 18, str(p), 11, 400, MUTE, 'middle')
     for a in (0, 50, 100): st += T(x0 - 8, Y(a) + 4, f'{a}%', 11, 400, MUTE, 'end')
     U = [75 - 22 * math.sin(math.pi * (p - 1) / 19) - (3 * (p - 1) / 19) for p in range(1, 21)]
-    F = [62 - 4 * math.sin(math.pi * (p - 1) / 19) for p in range(1, 21)]
     def curve(vals, col, dash=None):
         pts = ' '.join(f'{X(p)},{Y(v)}' for p, v in zip(range(1, 21), vals))
         d = f" stroke-dasharray='{dash}'" if dash else ''
@@ -189,10 +224,9 @@ def lost_middle():
         ('Middle: accuracy sags. Some models then do worse than with no list at all.', tools(10) + curve(U[:10], BT) + dot(10, U[9], BT)),
         ('End: it recovers (recency: the last items sit next to the question). The U shape is "lost in the middle".', tools(20) + curve(U, BT) + dot(20, U[-1], BT) + T(X(10), Y(U[9]) + 22, 'plain model: U-shaped (shape from Liu et al.)', 11, 700, BT, 'middle')),
         ('Why: a lot of attention is POSITIONAL (sink at the start, recency at the end). It is not about what the item says.', tools(20) + curve(U, BT)),
-        ('Heads picked because they land on the RIGHT item by content should depend less on position: a flatter curve.', tools(10) + curve(U, BT) + curve(F, GT, '7 5') + T(X(10), Y(F[9]) - 12, 'selected heads: flatter (schematic, not your numbers)', 11, 700, GT, 'middle')),
-        ('Your claim needs your own per-position Recall@1 (not on the server). Without it, say "aimed to mitigate", not "fixed".', tools(10) + curve(U, BT) + curve(F, GT, '7 5')),
+        ('Your CS728 run measured the same U in attention over 100 tools: next figure.', tools(10) + curve(U, BT)),
     ]
-    save('d09i-lost-middle.svg', W, H, '"Lost in the middle", and why content-driven heads should help', 'schematic: curve shapes only, no measured values', st, fr, 4.4)
+    save('d09i-lost-middle.svg', W, H, '"Lost in the middle" (Liu et al. 2023)', 'schematic: curve shape only, from the paper; not your numbers', st, fr, 4.4)
 
 # ───────────────────────── LeNet 1: convolution ─────────────────────────
 def conv():
@@ -411,4 +445,4 @@ def int8_bytes():
     save('d09i-int8-bytes.svg', W, H, 'Why INT8 gives 3.27×, not 4×', 'KiB = 1,024 bytes (the report\'s "KB"); stand-in converted with torch.ao.quantization, not your branch', '', fr, 4.6)
 
 if __name__ == '__main__':
-    for fn in (attn_row, copy_dbg, hitcount, score_dbg, lost_middle, conv, lenet_shapes, imp_rounds, prune_dbg, welch, pgd_dbg, int8_bytes): fn()
+    for fn in (attn_row, copy_dbg, hitcount, score_dbg, position_curve, lost_middle, conv, lenet_shapes, imp_rounds, prune_dbg, welch, pgd_dbg, int8_bytes): fn()

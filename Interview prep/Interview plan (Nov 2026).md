@@ -73,7 +73,7 @@ Each project day has a **rebuild block**: rewrite the core mechanism yourself in
   - Emotion steering: 90% is the best cell (18/20); the mean is 36%.
   - CosyVoice: why WER can be above 1.
 - [ ] Copy the CS728 and LeNet-5 code and reports into `/data/jayavardhan/projects/interview_materials/{cs728,lenet}/` before Day 7.
-  - 2026-11-17: **LeNet-5 done**: `interview_materials/lenet/` = `harshith2302/cs725_Project` (`main`, `3b2584b`) + `fml_report.pdf`. The compression branch was never pushed. **CS728 still missing.**
+  - 2026-11-17: **LeNet-5 done**: `interview_materials/lenet/` = `harshith2302/cs725_Project` (`main`, `3b2584b`) + `fml_report.pdf`. The compression branch was never pushed. **CS728 done 11-17**: `interview_materials/cs728/` (from his `PA3_CS728.zip`: code + report); Day 9 Part A rewritten from it.
 
 ---
 

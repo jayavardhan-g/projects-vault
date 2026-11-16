@@ -35,7 +35,7 @@ def caption(s):
 
 class RetrievalHeads(Scene):
     def construct(self):
-        title = T("Retrieval heads → a tool retriever (no training)", 30, bold=True).to_edge(UP, buff=0.3)
+        title = T("Retrieval heads → a tool retriever (no fine-tuning)", 30, bold=True).to_edge(UP, buff=0.3)
         self.play(FadeIn(title))
         boxes = VGroup()
         for t, c in zip(TOK, TCOL):
@@ -45,7 +45,7 @@ class RetrievalHeads(Scene):
         boxes.arrange(RIGHT, buff=0.07).shift(UP * 2.2 + RIGHT * 0.55)
         tags = VGroup(*[T(x, 15, c).next_to(boxes[i:i + 2], UP, buff=0.08)
                         for x, c, i in (("tool A", BLUE_, 1), ("tool B", GOOD, 3), ("tool C", HL, 5), ("tool D", PINK_, 7), ("query", MUTE, 9))])
-        cap = caption("A prompt that lists 4 tools, then the user's query. The model is about to answer.")
+        cap = caption("A prompt that lists 4 tools, then the user's query 'fly Paris'. One forward pass reads it all.")
         self.play(FadeIn(boxes), FadeIn(tags), FadeIn(cap))
         self.wait(1.2)
 
@@ -64,24 +64,24 @@ class RetrievalHeads(Scene):
             am = max(range(11), key=lambda i: w[i])
             bars[am].set_fill(BAD if am == 0 else GOOD)
             bars_all.add(VGroup(lab, bars))
-        self.play(Transform(cap, caption("Each head spreads its attention over the prompt (rows sum to 1). Green/red = its argmax.")))
+        self.play(Transform(cap, caption("Each head: one row of weights per query token (rows sum to 1). Shown: the row of 'Paris'.")))
         for g in bars_all:
             self.play(FadeIn(g), run_time=0.7)
         self.wait(1.5)
-        self.play(Transform(cap, caption("L0H0 always looks at <s> (the sink). L1H0 lands on 'flight': inside the right tool, B.")))
+        self.play(Transform(cap, caption("L0H0 parks on <s> (the sink, in no tool). L1H0 puts most of its weight on tool B.")))
         self.wait(2.2)
 
         # Hit Count
         self.play(FadeOut(bars_all))
         heads = ["L0H0", "L0H1", "L0H2", "L1H0", "L1H1", "L1H2"]
-        hits = [[0, 0, 0, 0, 0], [0, 1, 0, 0, 0], [1, 0, 1, 0, 0], [1, 1, 1, 1, 1], [0, 0, 0, 1, 0], [1, 1, 1, 0, 1]]
+        hits = [[0, 1, 0, 0, 0], [0, 0, 0, 1, 0], [1, 0, 1, 0, 0], [1, 1, 1, 1, 1], [0, 0, 1, 1, 0], [1, 1, 1, 0, 1]]
         cards = VGroup()
         for h in heads:
             r = RoundedRectangle(corner_radius=0.08, width=1.8, height=1.3, stroke_color=MUTE, stroke_width=1.5)
             cards.add(VGroup(r, T(h, 18, mono=True).move_to(r.get_top() + DOWN * 0.3)))
         cards.arrange_in_grid(2, 3, buff=(0.35, 0.3)).shift(DOWN * 0.4)
         nums = VGroup(*[T("0", 34, bold=True).move_to(c[0].get_center() + DOWN * 0.18) for c in cards])
-        self.play(Transform(cap, caption("Hit Count: run probe queries whose correct tool is known; count per head how often its argmax lands on it.")),
+        self.play(Transform(cap, caption("Hit Count: per training query, each head scores every tool (mean attention from the query). Hit = correct tool wins.")),
                   FadeIn(cards), FadeIn(nums))
         cnt = [0] * 6
         for p in range(5):
@@ -94,13 +94,13 @@ class RetrievalHeads(Scene):
             self.remove(plab)
         self.wait(0.6)
         self.play(*[cards[i][0].animate.set_stroke(HL, 4) for i in (3, 5)],
-                  Transform(cap, caption("Keep the heads with the most hits (here the top 2: L1H0 = 5, L1H2 = 4). Your project kept 10.")))
+                  Transform(cap, caption("Keep the heads with the most hits (here the top 2: L1H0 = 5, L1H2 = 4). You kept 10 of 512.")))
         self.wait(2.2)
 
         # retrieval on a new query
         self.play(FadeOut(cards), FadeOut(nums))
-        self.play(Transform(cap, caption("New query 'flight to Rome'. Sum the chosen heads' attention over each tool's tokens.")))
-        names = ["A", "B", "C", "D"]; vals = [.196, .554, .113, .137]; cols = [BLUE_, GOOD, HL, PINK_]
+        self.play(Transform(cap, caption("Test query: score each tool = mean attention, query tokens → tool tokens, averaged over the chosen heads.")))
+        names = ["A", "B", "C", "D"]; vals = [.055, .158, .031, .041]; cols = [BLUE_, GOOD, HL, PINK_]
         chart = VGroup()
         for k, (n, v, c) in enumerate(zip(names, vals, cols)):
             x = -3 + k * 2
@@ -108,7 +108,7 @@ class RetrievalHeads(Scene):
             bar = Rectangle(width=1.0, height=0.01, stroke_width=0, fill_color=c, fill_opacity=0.9).move_to([x, -1.9, 0], aligned_edge=DOWN)
             chart.add(VGroup(base, bar, T("tool " + n, 20, c).next_to(base, DOWN, buff=0.12)))
         self.play(FadeIn(chart))
-        self.play(*[chart[k][1].animate.stretch_to_fit_height(vals[k] * 5).move_to([-3 + k * 2, -1.9, 0], aligned_edge=DOWN) for k in range(4)], run_time=1.5)
+        self.play(*[chart[k][1].animate.stretch_to_fit_height(vals[k] * 16).move_to([-3 + k * 2, -1.9, 0], aligned_edge=DOWN) for k in range(4)], run_time=1.5)
         labs = VGroup(*[T(f"{vals[k]:.3f}", 18).next_to(chart[k][1], UP, buff=0.08) for k in range(4)])
         self.play(FadeIn(labs))
         crown = T("rank 1 = B ✓", 24, GOOD, bold=True).next_to(labs[1], UP, buff=0.15)
@@ -120,7 +120,7 @@ class RetrievalHeads(Scene):
         r5 = T("Recall@5 = share in the top 5 = 5 / 6 = 83%", 24, GOOD).next_to(r1, DOWN, buff=0.25)
         self.play(FadeIn(rk), Transform(cap, caption("Recall@k: the fraction of queries whose correct tool is in the top k.")))
         self.play(FadeIn(r1)); self.play(FadeIn(r5))
-        res = T("Your result: Recall@1 1.3% → 40.7%,  Recall@5 25.5% → 66.9%", 24, HL, bold=True).next_to(r5, DOWN, buff=0.5)
+        res = T("Yours (5,000 queries, 100 tools): R@1 1.3% all heads → 40.7% top 10", 24, HL, bold=True).next_to(r5, DOWN, buff=0.5)
         self.play(FadeIn(res)); self.wait(3)
 
 
