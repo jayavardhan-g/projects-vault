@@ -319,3 +319,121 @@ Global pruning's 3.52% and 1.15% are exactly 0.8¹⁵ and 0.8²⁰. Under layer-
 | 0.359 → 0.383 ms (1.07× slower) | INT8 CPU latency |
 | 93.40 → 90.63 | adversarially trained model, PGD-40×1 → PGD-100×5 |
 | 260 runs, 59 tests, 31 survive Holm | the experimental record |
+
+---
+
+## Appendix A: Key code, annotated
+
+Real line numbers from `src/` in `harshith2302/cs725_Project` (`main` @ `3b2584b`). `⋮` = left out; `◀` = plain-English note.
+
+**The pruning, distillation and quantization code is NOT on `main`.** It is on an unpushed branch. A.4 is the report's own Listing 1 (pseudocode) plus a reconstruction labelled [RECON]. Be upfront about this if asked to show the pruning code.
+
+### Reading the code: constructs used below
+| Construct | Meaning |
+|---|---|
+| `nn.Module.register_buffer(name, t)` | a tensor saved with the model and moved by `.to(device)`, but not trained |
+| `F.pad(x, (2,2,2,2))` | pad 2 pixels left/right/top/bottom (28×28 → 32×32) |
+| `nn.Conv2d(in, out, 5)`, `nn.AvgPool2d(2, 2)` | 5×5 convolution; 2×2 average pooling with stride 2 |
+| `torch.autograd.grad(loss, x)` | gradient of the loss w.r.t. the INPUT image (not the weights) |
+| `grad.sign()` | elementwise −1/0/+1, the FGSM/PGD step direction |
+| `t.clamp(lo, hi)` | elementwise clip |
+| `torch.randperm(n, generator=g)` | a seeded random permutation, giving a reproducible split |
+
+### A.1 Normalisation lives inside the model: `models.py`
+```python
+22  class InputNormalize(nn.Module):
+31      def __init__(self, mean=0.1307, std=0.3081, pad=2):
+34          self.register_buffer("mean", torch.tensor(mean).view(1, 1, 1, 1))
+35          self.register_buffer("std", torch.tensor(std).view(1, 1, 1, 1))
+37      def forward(self, x):                        # ◀ x = RAW pixels in [0, 1], shape (B, 1, 28, 28)
+39          x = F.pad(x, (self.pad,) * 4, mode="constant", value=0.0)   # ◀ 28 → 32, as LeCun's input
+40          return (x - self.mean) / self.std
+⋮
+51  class LeNet5(nn.Module):
+58      def __init__(self, activation="tanh", width=1, num_classes=10):
+60          c1, c3, c5, f6 = 6 * width, 16 * width, 120 * width, 84 * width   # ◀ width=2 → the distillation teacher
+62          self.normalize = InputNormalize()        # ◀ LAYER 0
+63          self.conv1 = nn.Conv2d(1, c1, kernel_size=5)    # ◀ 150 weights: the layer pruning starves
+64          self.pool2 = nn.AvgPool2d(kernel_size=2, stride=2)
+65          self.conv3 = nn.Conv2d(c1, c3, kernel_size=5)   # ◀ dense C3 (2,400 weights), not LeCun's sparse table
+66          self.pool4 = nn.AvgPool2d(kernel_size=2, stride=2)
+67          self.conv5 = nn.Conv2d(c3, c5, kernel_size=5)   # ◀ 48,000 weights; output is 1×1
+68          self.fc6 = nn.Linear(c5, f6)                    # ◀ 10,080
+69          self.fc7 = nn.Linear(f6, num_classes)           # ◀ 840; pruned at HALF rate under layer-wise pruning
+72      def forward(self, x):
+73          x = self.normalize(x)
+74          x = self.pool2(self.act(self.conv1(x)))   # ◀ 32→28→14
+75          x = self.pool4(self.act(self.conv3(x)))   # ◀ 14→10→5
+76          x = self.act(self.conv5(x))               # ◀ 5→1, 120 channels
+77          x = torch.flatten(x, 1)
+78          x = self.act(self.fc6(x))
+79          return self.fc7(x)                         # ◀ logits; softmax + CE in the loss
+⋮
+82      def prunable_modules(self):                    # ◀ what IMP masks: conv1, conv3, conv5, fc6, fc7
+```
+Why normalisation is inside: PGD's ε = 0.3 must be in **pixel** units. If normalisation were a dataset transform, an ε-ball in the attacked tensor would be ε × 0.3081 ≈ 0.09 in pixels.
+
+### A.2 PGD-L∞ with budget audits: `attacks.py`
+```python
+21  def assert_pixel_space_model(model) -> None:   # ◀ refuses to attack a model without InputNormalize
+⋮
+31  def _grad_wrt_input(model, x, y, loss_fn):
+32      x = x.clone().detach().requires_grad_(True)
+33      loss = loss_fn(model(x), y)
+34      (grad,) = torch.autograd.grad(loss, x)     # ◀ ∂loss/∂pixels
+⋮
+49  def pgd(model, x, y, eps=0.3, alpha=0.01, steps=40, random_start=True, loss_fn=None):
+65      if random_start:
+66          adv = x_orig + torch.empty_like(x_orig).uniform_(-eps, eps)   # ◀ random point inside the ε-ball
+67          adv = adv.clamp(0.0, 1.0)
+71      for _ in range(steps):
+72          grad = _grad_wrt_input(model, adv, y, loss_fn)
+73          adv = adv.detach() + alpha * grad.sign()                 # ◀ step UP the loss
+75          adv = x_orig + (adv - x_orig).clamp(-eps, eps)           # ◀ project back into the ε-ball
+76          adv = adv.clamp(0.0, 1.0)                                # ◀ stay a valid image
+⋮
+114     max_linf = max(max_linf, (adv - x).abs().max().item())       # ◀ MEASURE the real perturbation
+123     if max_linf > eps + 1e-5: raise AssertionError(...)          # ◀ a projection bug fails loudly, not as fake robustness
+```
+The report's final robustness numbers use PGD-100 with 5 restarts, because PGD-40 with 1 restart overstated robustness (§8).
+
+### A.3 Leak-free split and honest measurement: `data.py`, `evaluate.py`
+```python
+65  def train_val_indices(n_total: int = 60_000):           # data.py
+67      g = torch.Generator().manual_seed(SPLIT_SEED)         # ◀ SPLIT_SEED = 1234, fixed for every training seed
+68      perm = torch.randperm(n_total, generator=g).tolist()
+69      return perm[:N_TRAIN], perm[N_TRAIN : N_TRAIN + N_VAL]  # ◀ 55,000 train / 5,000 val; test set untouched
+⋮
+48  def latency(model, device=None, warmup=100, iters=1000, single_thread=True):   # evaluate.py
+58      torch.set_num_threads(1)                              # ◀ batch-1, single-thread CPU
+67          t0 = time.perf_counter()
+69          samples.append((time.perf_counter() - t0) * 1000.0)
+83      "latency_ms_median": statistics.median(samples),      # ◀ median of 1,000 runs
+⋮
+105 def model_size(model) -> dict:
+115     fp32_kb = _file_size_kb(lambda p: torch.save(model.state_dict(), p))   # ◀ REAL on-disk size → 245.6 KB
+```
+`model_size` measures the saved file, which is why pruned FP32 checkpoints are still 245.6 KB: the zeros are stored.
+
+### A.4 Iterative magnitude pruning (from the report's Listing 1; not in the public repo)
+```python
+def prune_step(model, scope, rate=0.20):
+    if scope == "layerwise":
+        for layer in prunable_layers(model):
+            threshold = magnitude_quantile(layer.weight, rate)     # ◀ per-layer 20% cut (fc7 at 10%)
+            layer.mask &= (layer.weight.abs() >= threshold)
+    elif scope == "global":
+        all_weights = concat_magnitudes(model)                   # ◀ ONE threshold across all layers
+        threshold = magnitude_quantile(all_weights, rate)
+        for layer in prunable_layers(model):
+            layer.mask &= (layer.weight.abs() >= threshold)
+    apply_masks(model)
+```
+[RECON] The surrounding lottery-ticket loop:
+```python
+init_state = copy.deepcopy(model.state_dict())          # θ₀
+for round in range(20):
+    train(model, epochs=20, select_on="val")             # mask kept applied after every optimizer step
+    prune_step(model, scope, rate=0.20)                   # quantile over SURVIVING weights only
+    model.load_state_dict(rewind(init_state), keep_masks=True)   # rewind survivors to θ₀ (or an early iterate)
+```

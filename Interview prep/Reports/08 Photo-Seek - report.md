@@ -350,3 +350,171 @@ Trade-off: the hybrid costs about 1.5 s per query vs 0.2 ms, for +26 points of a
 | 6 events, all loopback | offline proof |
 | 157 | tests |
 | 512 | CLIP and ArcFace embedding dims; adapter W is 512×512 |
+
+---
+
+## Appendix A: Key code, annotated
+
+Real line numbers from `src/photoseek/` (branch `upgrade-2026-10`). `⋮` = left out; `◀` = plain-English note.
+
+### Reading the code: constructs used below
+| Construct | Meaning |
+|---|---|
+| `@dataclass` / `replace(obj, field=v)` | auto-generated class; copy of `obj` with one field changed |
+| `typing.Protocol` | an interface by shape: any object with these methods fits (lets tests pass fakes) |
+| `X @ Y.T` | matrix product; on L2-normalised rows it gives cosine similarities |
+| `np.argsort(-d1)` | indices from largest to smallest `d1` |
+| SQL `EXISTS (SELECT 1 FROM faces f WHERE f.photo_id = p.id AND f.identity_id = ?)` | "this photo contains a face of that identity" |
+| `faiss.IndexIDMap2(faiss.IndexFlatIP(d))` | exact inner-product index that stores your own int64 ids |
+| `faiss.SearchParameters(sel=faiss.IDSelectorBatch(ids))` | restrict a search to a set of ids |
+| `os.replace(tmp, path)` | atomic rename (readers see the old file or the new one, never half of one) |
+| `torch.logsumexp` | numerically stable log Σ exp |
+
+### A.1 Search: filter in SQL, then rank with CLIP + FAISS (`search/engine.py`)
+```python
+78  def run(self, structured: StructuredQuery) -> list[SearchResult]:
+81      if structured.is_empty: return []
+84      if structured.place and not self._place_known(structured.place):   # ◀ no photo has that place label
+85          text = structured.text
+86          if structured.place.lower() not in text.lower():
+87              text = f"{text} {structured.place}".strip()                    # ◀ fold "beach" into the CLIP text instead
+88          structured = replace(structured, text=text, place=None)
+92      candidates = self.candidate_ids(structured)        # ◀ None = no filters; set() = filters matched nothing
+94      if candidates is not None and not candidates: return []
+97      if not structured.text.strip():                     # ◀ pure-filter query: no CLIP needed
+100         return self._hydrate([(pid, 0.0) for pid in self._by_date(candidates)][: structured.limit])
+104     self._ensure_models()                               # ◀ lazy-load CLIP + the FAISS index
+105     [vector] = self.embedder.embed_texts([structured.text])   # ◀ 512-d, L2-normalised
+106     hits = self.store.search(vector, structured.limit, subset=candidates)   # ◀ rank ONLY within the candidates
+107     return self._hydrate([(hit.id, hit.score) for hit in hits])
+⋮
+124     if structured.date_from:
+125         clauses.append("p.taken_at >= ?"); params.append(structured.date_from.isoformat())
+127     if structured.date_to:
+129         clauses.append("p.taken_at < ?")              # ◀ taken_at has a time, so use "< next day"
+130         params.append((structured.date_to + timedelta(days=1)).isoformat())
+135     if structured.people:
+136         resolved = self.resolve_people(structured.people)   # ◀ name → identity id (follows merged_into)
+137         self.last.unknown_people = [name for name, iid in resolved.items() if iid is None]
+139         if self.last.unknown_people: return set()       # ◀ an unknown name returns nothing (typos stay visible)
+141         for identity_id in dict.fromkeys(resolved.values()):
+142             clauses.append("EXISTS (SELECT 1 FROM faces f WHERE f.photo_id = p.id AND f.identity_id = ?)")
+                                                            # ◀ one clause per person → all must appear
+147     sql = "SELECT p.id FROM photos p WHERE " + " AND ".join(clauses)
+```
+
+### A.2 Exact FAISS search restricted to a subset (`index/faiss_store.py`)
+```python
+79  self._index = faiss.IndexIDMap2(faiss.IndexFlatIP(self._dim))   # ◀ exact; IP on unit vectors = cosine
+⋮
+97  if self._index.ntotal: self.remove(id_arr)          # ◀ in add(): re-embedding replaces, never duplicates
+99  self._index.add_with_ids(vecs, id_arr)              # ◀ ids = catalog photo ids
+⋮
+132 if subset is not None:                              # ◀ in search()
+133     subset_ids = np.fromiter(subset, dtype="int64")
+134     if subset_ids.size == 0: return []
+136     k = min(k, int(subset_ids.size))
+137     params = faiss.SearchParameters(sel=faiss.IDSelectorBatch(subset_ids))   # ◀ scan only these ids
+140 scores, found = self._index.search(q, k, params=params)
+⋮
+156 faiss.write_index(self._index, str(tmp))            # ◀ save(): write tmp …
+157 os.replace(tmp, path)                               # ◀ … then atomic rename
+```
+
+### A.3 Routers (`search/router.py`)
+```python
+95  def route(self, query, *, limit=None) -> StructuredQuery:       # RuleRouter
+96      remaining = " " + query.strip() + " "
+98      remaining, date_from, date_to = self._extract_dates(remaining)   # ◀ "last summer", "June 2024", "in 2023", …
+99      remaining, people = self._extract_people(remaining)              # ◀ "of/with X", quoted names, kinship words
+100     remaining, place = self._extract_place(remaining)                # ◀ "at/in/near (the) X"
+⋮                                                                  # ◀ leftover words → text (after _clean)
+175 def _season_year(self, end_month, *, previous):
+184     if previous and self.today.month <= end_month:   # ◀ "last summer" asked in July → summer hasn't ended → last year
+185         year -= 1
+⋮
+219 def _is_person(self, term):
+230     return term[0].isupper() and term.isalpha()      # ◀ capitalised = name ("photos of sunsets" stays text)
+⋮
+314 def route(self, query, *, limit=None):              # OllamaRouter
+317     raw = self._generate(query)                      # ◀ POST /api/generate with format = SCHEMA (:261), local qwen2.5:7b
+318     parsed = _extract_json(raw)                      # ◀ outermost {...} in the completion
+324     structured = StructuredQuery.from_dict(parsed)   # ◀ unknown keys dropped, bad dates → None
+327     if structured.is_empty: raise ValueError(...)
+⋮
+332 except Exception as exc:                             # ◀ ANY failure (server down, junk JSON) …
+335     self.last_fallback, self.last_error = True, str(exc)
+337     return self._fallback.route(query, limit=limit)  # ◀ … falls back to the rule router
+⋮
+383 def route(self, query, *, limit=None):              # HybridRouter
+384     structured = self.llm.route(query, limit=limit)  # ◀ people, place, text from the LLM
+385     ruled = self.rules.route(query, limit=limit)
+386     if ruled.date_from or ruled.date_to:             # ◀ when the rules recognise a date phrase …
+387         structured.date_from, structured.date_to = ruled.date_from, ruled.date_to   # ◀ … their dates win
+```
+
+### A.4 Active learning: picking questions (`faces/active.py`, in `next_batch`)
+```python
+114     Z = self.head.transform(X)                          # ◀ ArcFace 512-d → adapter (identity if untrained)
+⋮
+121     dist = 1.0 - Z[candidates] @ centroids.T            # ◀ cosine distance of each unpinned face to each identity
+126     d1 = dist[np.arange(len(candidates)), proposed]     # ◀ distance to its own/proposed identity
+128     others[np.arange(len(candidates)), proposed] = np.inf
+129     d2 = others.min(axis=1)                             # ◀ distance to the next-nearest identity
+137 if strategy == "uncertainty":
+138     order = np.argsort(-d1, kind="stable")              # ◀ farthest from its centroid first
+141 elif strategy == "margin":
+142     order = np.argsort(d2 - d1, kind="stable")          # ◀ nearly as close to another person first (best: −41% error)
+⋮                                                       # ◀ then at most 2 questions per identity per batch (_spread)
+```
+
+### A.5 Recording a correction (`faces/active.py`, in `record`)
+```python
+211 correction_id = self.catalog.add_correction(kind.value, face_id=face_id, identity_id=identity_id, ...)
+                                                        # ◀ append-only log: training history is never overwritten
+221 if kind is CorrectionKind.ASSIGN and face_id is not None:
+222     self.catalog.assign_identity(face_id, identity_id, distance=0.0, pin=True)   # ◀ PIN: clustering may never move it
+⋮                                                       # ◀ REJECT → unassign (becomes a cannot-link)
+226 elif kind is CorrectionKind.MERGE and ...:
+227     moved_n = self.catalog.merge_identities(other_id, identity_id)   # ◀ sets merged_into; faces move
+```
+
+### A.6 Refinement: head, then constrained incremental update (`faces/active.py` → `faces/cluster.py`)
+```python
+290 def refine(self, *, train_head=True):                    # active.py
+311     labelled = [i for i in range(len(ids)) if pinned[i] and assigned[i] is not None]
+314     head = self.fit_refinement_head(X[labelled], [assigned[i] for i in labelled])   # ◀ needs ≥ 20 labels, ≥ 3 identities
+317     Z = self.head.transform(X)
+318     pinned_map = {ids[i]: assigned[i] for i in labelled}
+319     rejected = [(row["face_id"], row["identity_id"]) for row in ... "WHERE kind = 'reject'"]
+327     result = clusterer.refine(ids, Z, dict(zip(ids, assigned)), pinned=pinned_map, rejected=rejected)
+333     self.catalog.consume_corrections([row["id"] for row in pending])   # ◀ only after success
+⋮
+174 def refine(self, face_ids, embeddings, current, *, pinned=None, rejected=(), iterations=2):   # cluster.py
+232     means = np.stack([X[m].mean(axis=0) for m in members])   # ◀ UNnormalised mean of each identity's members
+233     dist = 1.0 - X @ means.T                                 # ◀ = average cosine distance to members (average linkage)
+235     if fid in pinned: continue                               # ◀ pinned faces never move
+240     allowed[index[iid]] = np.inf                             # ◀ for each rejected (face, identity) pair
+244     if allowed[best] < allowed[index[own]]:                  # ◀ an assigned face moves only if STRICTLY closer elsewhere
+245         assign[fid] = identities[best]
+246     elif np.isfinite(allowed[best]) and allowed[best] <= threshold:   # ◀ an unassigned face joins within the threshold
+⋮                                                            # ◀ leftovers: clustered among themselves (agglomerative/HDBSCAN)
+299 model = AgglomerativeClustering(n_clusters=None, metric="precomputed", linkage="average",
+    ⋮                               distance_threshold=cfg.distance_threshold)   # ◀ chosen on dev for CPLFW: 0.75
+```
+The two `refine` bugs from §6.3 are exactly here. Version 1 re-seeded identities from the pinned outliers. Version 2 used normalised centroids against an average-linkage threshold. Lines 232–233 are the fix for the second.
+
+### A.7 The adapter head (`faces/head.py`)
+```python
+86  W = torch.nn.Parameter(eye.clone())                         # ◀ 512×512, starts as the IDENTITY (a no-op)
+⋮
+94  for _ in range(config.steps):                               # ◀ 200 Adam steps, lr 1e-3
+95      Z = torch.nn.functional.normalize(X @ W.T, dim=1)       # ◀ project + renormalise
+96      logits = (Z @ Z.T) / config.temperature                 # ◀ cosine sims / 0.1
+97      logits = logits - 1e9 * torch.eye(len(t))               # ◀ remove self-pairs
+98      log_prob = logits - torch.logsumexp(logits, dim=1, keepdim=True)
+99      per_anchor = -(positives * log_prob).sum(1) / positives.sum(1).clamp(min=1)   # ◀ SupCon: pull same-identity together
+100     loss = per_anchor[has_positive].mean() ...
+101     loss = loss + config.identity_reg * ((W - eye) ** 2).sum()   # ◀ pull W back toward I (stay close to ArcFace)
+```
+Measured effect: +0.00 BCubed F1 on LFW and −0.07 on CPLFW. The frozen ArcFace backbone is never updated.

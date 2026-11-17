@@ -108,7 +108,7 @@ Query: <query>\nCorrect tool_id:<|eot_id|><|start_header_id|>assistant<|end_head
 ```
 - **Tool spans:** `create_doc_pool_string` (`:61-82`) tokenizes each `tool_id: … tool description: …` block on its own to get its length. It then records `(start, end)` token positions for each tool, starting after the prefix and advancing by 1 + length for the separator.
   **[CHECKED]** Decoding the spans from the real tokenizer gives exactly the first and last tool blocks.
-- **Query span** (`get_query_span`, `run2.py:79-91`, `run3.py:183-202`): search backward for token **2929 = "Query"**, skip 2 tokens (`Query` and `:`), then search forward for token **34192 = "Correct"**.
+- **Query span** (`get_query_span`, `run2.py:79-91`, `run3.py:63-82`): search backward for token **2929 = "Query"**, skip 2 tokens (`Query` and `:`), then search forward for token **34192 = "Correct"**.
   **[CHECKED]** The span decodes to `" How can I make this document publically available?\n"`. It is exactly the query text, plus the newline.
 - **[CHECKED]** Prompt length is about **2,972 tokens**.
 - The tool order is **re-shuffled for every query** (`random.shuffle`, seeded with 64). The gold tool's position therefore varies, which makes the position analysis possible and prevents a fixed position bias from deciding the result.
@@ -159,14 +159,14 @@ Tool score = the **mean** attention weight in the block of (query-token rows × 
 - **Approach 3, raw attention (commented out):** `+= mean attention(query → gold tool)` (`:97-100`).
 - Flatten the 16 × 32 scores and take the top K by argsort: `layer = idx // 32`, `head = idx % 32` (`:106-118`).
 
-### 6.2 Test-time ranking with the selected heads (`query_to_docs_attention_heads`, `run3.py:154-180`)
+### 6.2 Test-time ranking with the selected heads (`query_to_docs_attention_heads`, `run3.py:34-60`)
 ```
 for (layer, head) in selected_heads:
     query_attn = attentions[layer][0, head][q_start:q_end, :]
     for each tool i: score[i] += query_attn[:, s_i:e_i].mean()
 score /= len(selected_heads)
 ```
-Each tool's score is averaged over the K heads. Tools are ranked, then R@1 and R@5 are computed over the 5,000 test queries (`run3.py:284-307`).
+Each tool's score is averaged over the K heads. Tools are ranked, then R@1 and R@5 are computed over the 5,000 test queries (`run3.py:164-187`).
 
 ### 6.3 Top heads found by Hit Count [PDF]
 Top 10 (layer, head: hits out of 200 training queries):
@@ -283,3 +283,134 @@ The team's explanation:
 | 34.7 / 61.1 / 86.9 | BM25 / MiniLM / UAE R@5 |
 | L8 H19, 93/200 | best single head (hit count) |
 | layers 5–10 | where most top heads sit |
+
+---
+
+## Appendix A: Key code, annotated
+
+Real line numbers from `/data/jayavardhan/projects/interview_materials/cs728/`. `⋮` = left out; `◀` = plain-English note.
+
+### Reading the code: constructs used below
+| Construct | Meaning |
+|---|---|
+| `AutoModelForCausalLM.from_pretrained(..., output_attentions=True, attn_implementation="eager")` | load the LLM so every forward returns all attention matrices (fused SDPA/Flash kernels never build them) |
+| `model(**inputs).attentions` | tuple with one tensor per layer, each `[batch=1, heads=32, N, N]` |
+| `A[i:j, :]`, `A[:, s:e]` | slicing rows (query tokens) and columns (tool tokens) |
+| `.mean()` | average over all elements of the slice |
+| `torch.argsort(x, descending=True)` | indices that sort `x` from largest to smallest, i.e. the ranking |
+| `idx // 32`, `idx % 32` | turn a flat index over 16×32 heads back into (layer, head) |
+
+### A.1 Building the prompt and the tool spans: `utils.py`
+```python
+24  class PromptUtils:
+25      def __init__(self, tokenizer, doc_ids, dict_all_docs):
+29          user_header = '<|start_header_id|>user<|end_header_id|>'                       # ◀ Llama-3 chat format
+30          asst_header = '<|eot_id|><|start_header_id|>assistant<|end_header_id|>'
+31          self.item_instruction = f" Here are all the available tools:"
+37          self.doc_text = lambda idx, doc_name, doc_info: f"tool_id: {doc_name}\ntool description: {doc_info}"
+38          self.add_text1 = f"Now, please output ONLY the correct tool_id for the query below."
+⋮
+49      def create_prompt(self, query):
+50          query_prompt = f"Query: {query}" + "\nCorrect tool_id:"
+51          prompt = self.prompt_prefix + self.all_docs_info_string + self.prompt_seperator + \
+54                   self.add_text1 + self.prompt_seperator + query_prompt + self.prompt_suffix
+⋮
+61      def create_doc_pool_string(self, shuffled_keys, all_docs):
+67          doc_st_index = self.prompt_prefix_length + 1          # ◀ first tool starts after the prefix + " \n\n"
+68          for ix, key in enumerate(shuffled_keys):              # ◀ 100 tools in THIS query's random order
+72              doc_text = self.doc_text(...).strip()
+73              doc_text_len = len(self.tokenizer(doc_text, add_special_tokens=False).input_ids)   # ◀ tokens in this tool block
+75              doc_spans.append((doc_st_index, doc_st_index + doc_text_len))   # ◀ [start, end) token positions of tool ix
+76              doc_st_index = doc_st_index + 1 + doc_text_len    # ◀ +1 for the separator token
+```
+Checked with the real tokenizer: the prompt is about 2,972 tokens, and the spans decode exactly to the first and last tool blocks.
+
+### A.2 Finding the query tokens: `run3.py` (identical to `run2.py:79-91`)
+```python
+63  def get_query_span(input_ids, tokenizer):
+68      input_ids_list = input_ids.tolist()
+70      i = len(input_ids_list) - 1
+71      while i >= 0:
+72          if input_ids_list[i] == 2929:          # ◀ token 2929 = "Query" (searching backward finds the LAST one)
+73              position_of_query = i
+74              break
+75          i -= 1
+76      actual_query_st_pos = position_of_query + 2   # ◀ skip "Query" and ":"
+78      for i in range(actual_query_st_pos, len(input_ids_list)):
+79          if input_ids_list[i] == 34192:          # ◀ token 34192 = "Correct" (from "\nCorrect tool_id:")
+80              break
+82      return (actual_query_st_pos, i)            # ◀ [start, end): just the user's question (+ trailing "\n")
+```
+
+### A.3 Part 2: all-head scoring: `run2.py`
+```python
+34  def query_to_docs_attention(attentions, query_span, doc_spans):
+40      doc_scores = torch.zeros(len(doc_spans), device=attentions[0].device)
+43      for layer in range(num_layers):                         # ◀ 16 layers
+44          avg_attn = attentions[layer][0].mean(dim=0)          # ◀ AVERAGE over all 32 heads → [N, N]
+45          query_attn = avg_attn[query_start:query_end, :]      # ◀ rows = query tokens
+46          for i, (doc_start, doc_end) in enumerate(doc_spans):
+47              doc_scores[i] += query_attn[:, doc_start:doc_end].mean()   # ◀ mean attention query → tool i
+48      doc_scores /= num_layers
+⋮
+180     ranked_docs = torch.argsort(doc_scores, descending=True)
+181     gold_rank = (ranked_docs == gold_tool_id).nonzero(as_tuple=True)[0].item()   # ◀ 0 = ranked first
+191     if gold_rank < 1: correct_at_1 += 1
+193     if gold_rank < 5: correct_at_5 += 1
+```
+This gave R@1 0.0132 (chance is 0.01) and R@5 0.2554.
+
+### A.4 Part 3: Hit-Count head selection on training queries: `code3.py`
+```python
+7   def select_retrieval_heads(train_queries, model, tokenizer, tools, device, max_heads=20):
+27      head_scores = torch.zeros(num_layers, num_heads, device=device)   # ◀ [16, 32] score per head
+29      for qix in tqdm(range(len(train_queries))):                       # ◀ 200 training queries (run3 default)
+34          tool_ids = list(tools.keys())
+35          random.shuffle(tool_ids)                                      # ◀ fresh tool order per query
+50          prompt = putils.create_prompt(query=question)
+55          attentions = model(**inputs).attentions
+⋮       # 57-70: same query-span search as A.2
+72          for layer_idx in range(num_layers):
+73              attn = attentions[layer_idx][0]                           # ◀ [32, N, N]
+74              for head_idx in range(num_heads):
+76                  query_attn = attn[head_idx][query_start:query_end, :] # ◀ ONE head, query rows
+78                  doc_scores = torch.zeros(len(item_spans), device=device)
+79                  for doc_i, (ds, de) in enumerate(item_spans):
+80                      doc_scores[doc_i] = query_attn[:, ds:de].mean()   # ◀ this head's score for each tool
+83                  ranked = torch.argsort(doc_scores, descending=True)
+84                  if ranked[0].item() == gold_tool_id:
+85                      head_scores[layer_idx, head_idx] += 1             # ◀ HIT COUNT: +1 if this head ranks gold first
+⋮       # 88-100: the commented-out alternatives (reciprocal rank 1/(rank+1); mean attention to the gold tool)
+107     flat_scores = head_scores.flatten()                               # ◀ 512 scores
+108     top20 = torch.argsort(flat_scores, descending=True)[:max_heads]   # ◀ best K heads (K = 10 / 20 / 30)
+111     for idx in top20:
+112         layer = idx.item() // num_heads                               # ◀ flat index → (layer, head)
+113         head = idx.item() % num_heads
+114         selected_heads.append((layer, head))
+```
+
+### A.5 Part 3: ranking test tools with only the selected heads: `run3.py`
+```python
+34  def query_to_docs_attention_heads(attentions, query_span, doc_spans, selected_heads):
+49      doc_scores = torch.zeros(len(doc_spans), device=attentions[0].device)
+52      for layer_idx, head_idx in selected_heads:                # ◀ e.g. (8,19), (6,11), (2,20), …
+53          head_attn = attentions[layer_idx][0, head_idx]        # ◀ [N, N] for that one head
+54          query_attn = head_attn[query_start:query_end, :]
+56          for doc_i, (doc_start, doc_end) in enumerate(doc_spans):
+57              doc_scores[doc_i] += query_attn[:, doc_start:doc_end].mean()
+59      doc_scores /= len(selected_heads)                         # ◀ average over the K heads
+⋮
+104     train_queries=train_queries[:args.train_samples],        # ◀ 200 (argparse default, :88)
+⋮
+165     ranked_docs = torch.argsort(doc_scores, descending=True)
+167     for i, tool_id in enumerate(ranked_docs):
+168         if tool_id == gold_tool_id: gold_rank = i; break
+173     if gold_rank<1: correct_at_1 += 1                         # ◀ K = 10 → 0.4068
+175     if gold_rank<5: correct_at_5 += 1                         # ◀ K = 10 → 0.6694
+```
+| Name | What it is |
+|---|---|
+| `attentions` | tuple of 16 tensors `[1, 32, ~2972, ~2972]` (fp16) |
+| `query_span` | `(start, end)` from A.2 |
+| `doc_spans` / `item_spans` | 100 `(start, end)` tool spans from A.1 |
+| `gold_tool_id` | index of the gold tool in this query's shuffled order |

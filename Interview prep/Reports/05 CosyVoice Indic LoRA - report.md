@@ -357,3 +357,150 @@ The result files are not on the server. If he has them on a laptop or in a prese
 | 25 Hz, 192-d | CV2 speech-token rate; speaker-embedding size |
 | 1.99 → 0.11 | Hindi WER zero-shot → LoRA [RESUME-ONLY; files missing] |
 | IndicConformer-600M, CTC | ASR used for WER |
+
+---
+
+## Appendix A: Key code, annotated
+
+Real line numbers from `/data/jayavardhan/cosyvoice_rnd/scripts/`. `⋮` = left out; `◀` = plain-English note. The model code (`cosyvoice/`) is upstream FunAudioLLM, not his.
+
+### Reading the code: constructs used below
+| Construct | Meaning |
+|---|---|
+| pandas boolean mask `df[(a) & (b)]` | keep rows where every condition is True (`&`, not `and`) |
+| `torch.save(dict, path)` / `torch.load` | pickle tensors and Python objects to disk |
+| `Dataset.__getitem__` + `DataLoader(collate_fn=...)` | load one item; `collate_fn` merges a list of items into one batch |
+| PEFT `LoraConfig` / `inject_adapter_in_model` | adds LoRA A/B matrices next to the named `nn.Linear` layers, in place |
+| `torch.autocast("cuda", dtype=torch.bfloat16)` | run matmuls in bf16 inside the block; weights and optimizer stay fp32 |
+| `clip_grad_norm_(params, 1.0)` | rescale gradients so their total L2 norm ≤ 1 |
+| `p.requires_grad = False` | freeze a parameter |
+| `named_parameters()` | iterate `(name, tensor)` over all parameters |
+
+### A.1 Data filtering and pre-tokenization: `phase4a_pretokenize.py`
+```python
+112  mask = (
+113      (df["duration"] >= args.min_sec) & (df["duration"] <= args.max_sec)   # ◀ 2–15 s
+114      & (df["snr"] >= args.min_snr) & (df["c50"] >= args.min_c50)           # ◀ SNR ≥ 20 dB, C50 ≥ 15 dB (clean, low reverb)
+115      & (df["cer"].apply(parse_cer) <= args.max_cer)                        # ◀ dataset transcript CER ≤ 0.10
+116  )
+⋮    # 119-139: per kept row, decode audio bytes → mono → temp wav file (the frontend expects a path)
+141  tok_ret = fe._extract_speech_token(tmp_path)      # ◀ CosyVoice2 S3 tokenizer: 25 speech tokens per second
+146  spk_ret = fe._extract_spk_embedding(tmp_path)     # ◀ 192-d speaker embedding (CAM++)
+153  text_tok_ret = fe._extract_text_token(text)       # ◀ Qwen BPE ids of the normalized Hindi text
+⋮
+162  torch.save({
+165      "text_tokens": text_tokens.cpu().to(torch.long),
+166      "speech_tokens": speech_tokens.cpu().to(torch.long),   # ◀ the TRAINING TARGETS for the LLM
+167      "spk_emb": spk_emb.cpu().to(torch.float32),
+⋮    }, cache_path)                                # ◀ one .pt per clip; manifest.csv + train/val lists written alongside
+```
+| Name | What it is |
+|---|---|
+| `df` | one IndicVoices-R parquet shard (columns: audio bytes, duration, snr, c50, cer, speaker_id, gender, normalized) |
+| `fe` | `cv.frontend`, CosyVoice's own feature extractor (`cosyvoice/cli/frontend.py`, upstream) |
+| `args.max_hours` | stop after this many hours (20 per language; real totals 18.1 h hi, 16.6 h te) |
+
+### A.2 Batching for the CosyVoice LLM: `phase4b_train_lora.py`
+```python
+55  def collate_fn(items):
+67      text_lens = [it["text_tokens"].shape[-1] for it in items]
+68      speech_lens = [it["speech_tokens"].shape[-1] for it in items]
+69      L_text = max(text_lens)                                          # ◀ longest text in the batch
+70      L_speech = max(speech_lens)
+72      text_token = torch.zeros(B, L_text, dtype=torch.long)            # ◀ zero-pad to the batch max
+73      speech_token = torch.zeros(B, L_speech, dtype=torch.long)
+74      for i, it in enumerate(items):
+77          text_token[i, :t.shape[-1]] = t
+78          speech_token[i, :s.shape[-1]] = s
+80      return {
+81          "text_token": text_token,
+82          "text_token_len": torch.tensor(text_lens, dtype=torch.int32),   # ◀ lengths let the model mask padding
+83          "speech_token": speech_token,
+84          "speech_token_len": torch.tensor(speech_lens, dtype=torch.int32),
+85          "embedding": torch.stack([it["spk_emb"].to(torch.float32) for it in items], dim=0),   # ◀ [B, 192]
+87          "instruct_token": torch.zeros(B, 0, dtype=torch.long),         # ◀ empty CV3-only keys, so one script serves both
+88          "instruct_token_len": torch.zeros(B, dtype=torch.int32),
+89      }
+```
+These keys are exactly what the upstream `Qwen2LM.forward(batch, device)` reads, and it returns `{"loss": ...}` (cross-entropy over speech tokens).
+
+### A.3 LoRA injection and freezing: `phase4b_train_lora.py`
+```python
+96  def apply_lora_to_qwen(qwen2_model, r: int, alpha: int, dropout: float):
+99      from peft import LoraConfig, inject_adapter_in_model
+101     config = LoraConfig(r=r, lora_alpha=alpha, lora_dropout=dropout,          # ◀ r=16, α=32, dropout 0.05
+105         target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
+106                         "gate_proj", "up_proj", "down_proj"],                  # ◀ all attention + MLP linears
+107         bias="none")
+109     inject_adapter_in_model(config, qwen2_model)   # ◀ IN PLACE: keeps the class, so CosyVoice's
+                                                       #   hard-coded path self.llm.model.model.embed_tokens still works
+⋮
+152 cv = AutoModel(model_dir=str(args.cv_model))      # ◀ CosyVoice2-0.5B: llm + flow + hift
+156 for sub in (cv.model.llm, cv.model.flow, cv.model.hift):
+157     for p in sub.parameters():
+158         p.requires_grad = False                   # ◀ freeze EVERYTHING (incl. speech embedding + output head)
+164 inner_qwen = cv.model.llm.llm.model               # ◀ the HF Qwen2ForCausalLM inside the wrapper
+168 lora_qwen = apply_lora_to_qwen(inner_qwen, args.lora_r, args.lora_alpha, args.lora_dropout)
+176 n_trainable = sum(p.numel() for p in all_params() if p.requires_grad)   # ◀ logged: 8,798,208
+177 n_total     = sum(p.numel() for p in all_params())                      # ◀ 647,972,675 → 1.358%
+⋮
+196 opt = torch.optim.AdamW([p for p in all_params() if p.requires_grad],
+197                         lr=args.lr, betas=(0.9, 0.999), weight_decay=0.01)   # ◀ only LoRA A/B are optimised
+```
+
+### A.4 Training loop with early stopping: `phase4b_train_lora.py`
+```python
+228 while time.time() < deadline:                     # ◀ wall-clock budget (3–6 h; real runs stopped in 0.3–0.7 h)
+231     for batch in train_loader:
+235         with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+236             out = cv.model.llm(batch, DEVICE)     # ◀ upstream forward → {"loss": CE over speech tokens}
+237             loss = out["loss"] if isinstance(out, dict) else out
+238             loss = loss / args.grad_accum         # ◀ average over 4 micro-batches
+240         loss.backward()
+243         if accum >= args.grad_accum:               # ◀ effective batch = 4 × 4 = 16 utterances
+244             torch.nn.utils.clip_grad_norm_([p for p in cv.model.llm.parameters() if p.requires_grad], max_norm=1.0)
+248             opt.step(); opt.zero_grad(); accum = 0
+256             if step > 0 and step % args.val_every == 0:   # ◀ every 200–300 steps
+258                 with torch.no_grad(), torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+260                     for vb in val_loader: ...      # ◀ mean val loss
+267                 if val_loss < best_val:
+268                     best_val = val_loss
+269                     patience_left = args.early_stop_patience   # ◀ reset to 4
+272                     lora_state = {n: p.detach().cpu() for n, p in cv.model.llm.named_parameters()
+274                                   if p.requires_grad}
+275                     torch.save(lora_state, save_dir / "lora.pt")   # ◀ only LoRA tensors: 8.8M × 4 B = 35 MB (fp32)
+279                 else:
+280                     patience_left -= 1
+284                     if patience_left <= 0: early_stopped = True; break   # ◀ 4 validations without improvement
+```
+
+### A.5 Loading the adapter and generating: `phase4c_generate.py`
+```python
+52  def load_lora_weights(cv, lora_ckpt):
+53      state = torch.load(lora_ckpt, map_location="cpu", weights_only=False)
+59      own_state = dict(cv.model.llm.named_parameters())   # ◀ after injecting the SAME LoRA structure, names match exactly
+61      for name, tensor in state.items():
+62          if name in own_state and own_state[name].shape == tensor.shape:
+64              own_state[name].data.copy_(tensor.to(own_state[name].device))   # ◀ copy weights in; mismatches reported
+⋮
+123 if cv_version == "cv3" and not args.prompt_text.endswith("<|endofprompt|>"):
+124     effective_prompt = args.prompt_text + "<|endofprompt|>"   # ◀ CV3 prompt format; CV2 must NOT have it
+⋮
+139 chunks = list(cv.inference_zero_shot(text, effective_prompt, args.prompt_wav, stream=False))
+    # ◀ zero-shot: the prompt wav + transcript set the voice; the LLM (now with LoRA) produces speech tokens
+    #   → flow matching → HiFT vocoder → 24 kHz audio
+```
+
+### A.6 WER scoring: `phase5_eval_wer.py`
+```python
+30  def normalize_hindi(text: str) -> str:
+34      text = re.sub(r"\s+", " ", text).strip()
+36      text = re.sub(r"[।.,;:?!\"'()]", "", text)   # ◀ drop punctuation incl. the Devanagari danda (ASR doesn't emit it)
+⋮
+67      hyp = model(wav, language, "ctc")            # ◀ ai4bharat/indic-conformer-600m-multilingual, CTC decoding, 16 kHz input
+⋮
+142     w = wer(ref_n, hyp_n)                        # ◀ jiwer: (S + D + I) / N_ref; can exceed 1 with many insertions
+143     c = cer(ref_n, hyp_n)
+⋮
+169     print(f"{label:<20} {len(sub):>4} {sub['wer'].mean():>6.3f} ...")   # ◀ reported WER = MEAN of per-sentence WERs
+```

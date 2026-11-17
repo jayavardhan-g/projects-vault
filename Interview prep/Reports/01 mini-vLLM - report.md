@@ -189,11 +189,11 @@ only moves tensors between the scheduler and the model.
 - `num_wasted_slots = capacity − num_tokens` is always < block_size. This is the fragmentation metric.
 
 ### 6.3 `PagedKVCache` (`kv_cache.py`)
-- One K tensor and one V tensor **per layer**, shape `[num_blocks, block_size, num_kv_heads, head_dim]` (`:309-317`).
+- One K tensor and one V tensor **per layer**, shape `[num_blocks, block_size, num_kv_heads, head_dim]` (`:131-139`).
   Blocks come first, so a block id indexes the tensor directly.
-- `k_flat(layer)` is a *view* `[num_blocks*block_size, heads, dim]` that a flat slot index addresses (`:344-354`).
-- `KVCacheConfig.from_model_config` reads `num_key_value_heads`, not `num_attention_heads`. Under GQA this is a 4× difference (`:226-251`).
-- `blocks_for_free_memory(fraction=0.9)` sizes the pool from **free** memory (`torch.cuda.mem_get_info`), because the GPU is shared (`:276-291`).
+- `k_flat(layer)` is a *view* `[num_blocks*block_size, heads, dim]` that a flat slot index addresses (`:166-176`).
+- `KVCacheConfig.from_model_config` reads `num_key_value_heads`, not `num_attention_heads`. Under GQA this is a 4× difference (`:48-73`).
+- `blocks_for_free_memory(fraction=0.9)` sizes the pool from **free** memory (`torch.cuda.mem_get_info`), because the GPU is shared (`:98-113`).
 - Why per-layer tensors [DOC]: the runner touches one layer at a time, and separate tensors keep each layer's K and V contiguous for flat slot indexing.
 
 ### 6.4 Naive paged attention, the reference (`paged_attention.py`)
@@ -497,3 +497,325 @@ Where the gap lives:
 | 33× | decode slowdown from torch's default 112 threads |
 | 421 | tests (349 CPU + 72 GPU) |
 | 20k seeds, 38 → 0 crashes | CPU oracle before and after the admission fix |
+
+---
+
+## Appendix A: Key code, annotated
+
+How to read the excerpts:
+- Real line numbers from `src/mini_vllm/` (branch `main`).
+- `⋮` marks lines left out, with what they do.
+- `◀` notes explain a line in plain English.
+- Docstrings and comments are trimmed.
+- A names table follows each block.
+
+### Reading the code: Python, PyTorch and Triton constructs used below
+| Construct | Meaning |
+|---|---|
+| `@dataclass` | auto-generates `__init__` etc. from the annotated fields |
+| `list.pop()` / `list.append()` | take from / add to the end of a list; used as a LIFO stack |
+| `divmod(a, b)` | returns `(a // b, a % b)` |
+| `t[idx_tensor] = x` | PyTorch *scatter*: write rows of `x` at the positions in `idx_tensor` |
+| `t[idx_tensor]` | PyTorch *gather*: read those rows (a copy) |
+| `.view(...)` | reinterpret a tensor's shape without copying |
+| `torch.inference_mode()` | no autograd bookkeeping (faster inference) |
+| `@triton.jit` | compiles the Python function into a GPU kernel |
+| `kernel[grid](args...)` | launches the kernel with `grid` = number of programs per axis |
+| `tl.program_id(axis)` | which program (instance) this is, like CUDA's `blockIdx` |
+| `tl.arange(0, N)` | a vector `[0, 1, …, N−1]`; Triton works on whole vectors per program |
+| `tl.load(ptr, mask=m, other=v)` | vector load; lanes where `m` is False don't touch memory and get `v` |
+| `tl.constexpr` | compile-time constant; a new kernel is compiled per value |
+| `stride_*` | how many elements to jump to move one step along a tensor dimension (address = base + Σ index·stride) |
+
+### A.1 The block pool: `block_allocator.py`
+```python
+40  def __init__(self, num_blocks: int) -> None:
+⋮
+44      self._ref_counts = [0] * num_blocks                    # ◀ one counter per physical block
+47      self._free_blocks = list(reversed(range(num_blocks)))  # ◀ free stack; pop() yields 0,1,2… first; LIFO reuse
+⋮
+70  def allocate(self) -> int:
+71      if not self._free_blocks:
+72          raise OutOfBlocksError(...)                        # ◀ the scheduler catches this and defers/preempts
+76      block_id = self._free_blocks.pop()                     # ◀ O(1): take the most recently freed block
+77      self._ref_counts[block_id] = 1                         # ◀ invariant: in free list ⇔ refcount 0
+78      return block_id
+⋮
+96  def incref(self, block_id: int) -> int:                    # ◀ a 2nd user (prefix cache / sharing sequence)
+104     if self._ref_counts[block_id] == 0: raise ValueError(...)  # ◀ can't share a free block
+108     self._ref_counts[block_id] += 1
+⋮
+111 def free(self, block_id: int) -> int:                      # ◀ drop ONE reference
+114     if self._ref_counts[block_id] == 0: raise ValueError("double free")
+116     self._ref_counts[block_id] -= 1
+117     if self._ref_counts[block_id] == 0:
+118         self._free_blocks.append(block_id)                 # ◀ last user gone → back to the pool
+```
+| Name | What it is |
+|---|---|
+| `num_blocks` | pool size; set by `blocks_for_free_memory` (90% of free GPU memory ÷ 512 KiB per block for Llama-1B) |
+| `_ref_counts[b]` | how many owners block `b` has (sequences + the prefix tree) |
+| `_free_blocks` | stack of block ids with refcount 0 |
+| `OutOfBlocksError` | exception defined at the top of the file (`:28`) |
+
+### A.2 The page table: `block_table.py`
+```python
+75  def blocks_needed_for(self, num_new_tokens: int) -> int:
+82      total = self._num_tokens + num_new_tokens
+83      blocks_after = (total + self._block_size - 1) // self._block_size   # ◀ ceil(total / 16)
+84      return max(0, blocks_after - len(self._block_ids))                  # ◀ extra blocks only; no mutation
+⋮
+106 def append_tokens(self, num_new_tokens: int) -> list[int]:
+119     needed = self.blocks_needed_for(num_new_tokens)
+121     new_blocks = self._allocator.allocate_many(needed)    # ◀ all-or-nothing: raises BEFORE changing state
+122     self._block_ids.extend(new_blocks)
+123     self._num_tokens += num_new_tokens
+⋮
+128 def locate(self, position: int) -> tuple[int, int]:
+134     logical_block, offset = divmod(position, self._block_size)   # ◀ token 37 → (block 2, offset 5)
+135     return self._block_ids[logical_block], offset                # ◀ logical block → physical id
+⋮
+137 def slot_index(self, position: int) -> int:
+144     block_id, offset = self.locate(position)
+145     return block_id * self._block_size + offset                  # ◀ flat slot in a [num_blocks*16, heads, dim] view
+```
+**Example:** `_block_ids = [17, 4, 23]`, block size 16. Token 37 → logical block 2, offset 5 → physical block 23 → slot 23·16 + 5 = **373**.
+
+| Name | What it is |
+|---|---|
+| `_block_ids` | physical block ids in logical order (the "page table") |
+| `_num_tokens` | tokens stored so far; only the last block can be partly empty |
+| `_allocator` | the `BlockAllocator` from A.1 |
+
+### A.3 Naive paged attention (the reference): `paged_attention.py`
+```python
+36  def write_kv_to_cache(cache, layer, slot_mapping, key, value):
+61      k_flat = cache.k_flat(layer)          # ◀ [num_blocks*16, kv_heads, head_dim] view of the layer's K cache
+62      v_flat = cache.v_flat(layer)
+63      slots = slot_mapping.to(device=k_flat.device, dtype=torch.long)
+64      k_flat[slots] = key.to(k_flat.dtype)  # ◀ scatter: this step's token i goes to slot slots[i]
+65      v_flat[slots] = value.to(v_flat.dtype)
+⋮
+68  def gather_kv(cache, layer, block_ids, context_len):
+85      k_cache = cache.k(layer)              # ◀ [num_blocks, 16, kv_heads, head_dim]
+87      blocks = torch.as_tensor(block_ids, dtype=torch.long, device=k_cache.device)
+89      needed = (context_len + cache.block_size - 1) // cache.block_size
+95      blocks = blocks[:needed]
+99      k = k_cache[blocks].reshape(-1, k_cache.shape[2], k_cache.shape[3])[:context_len]  # ◀ COPY into contiguous order
+100     v = v_cache[blocks].reshape(-1, v_cache.shape[2], v_cache.shape[3])[:context_len]
+⋮
+122 def causal_mask(query_len, context_len, device):
+135     q_pos = torch.arange(context_len - query_len, context_len, device=device).unsqueeze(1)  # ◀ ABSOLUTE positions of the queries
+136     k_pos = torch.arange(context_len, device=device).unsqueeze(0)
+137     return k_pos <= q_pos                 # ◀ decode (q_len 1): last query sees every key
+⋮
+214     for blocks, q_len, ctx_len in zip(block_tables, query_lens, context_lens):   # ◀ Python loop per sequence, per layer
+219         k, v = gather_kv(cache, layer, blocks, ctx_len)
+220         k = _repeat_kv_heads(k, num_q_heads)   # ◀ repeat_interleave 8 KV heads → 32 (GQA)
+222         outputs.append(attention_scores(q, k, v, scale, compute_dtype))
+```
+That Python loop over sequences × 16 layers, with a gather copy each time, is the thousands of small launches per decode step that A.4 removes.
+
+### A.4 The fused decode kernel: `paged_attention_triton.py`
+```python
+63  @triton.jit
+64  def _paged_attention_decode_kernel(q_ptr, k_ptr, v_ptr, out_ptr, block_table_ptr, context_lens_ptr,
+    ⋮   scale, stride_* ..., block_size, num_kv_groups, HEAD_DIM: tl.constexpr, BLOCK_N: tl.constexpr):
+83      seq = tl.program_id(0)                  # ◀ which sequence this program serves
+84      q_head = tl.program_id(1)               # ◀ which query head
+85      kv_head = q_head // num_kv_groups       # ◀ GQA: 4 query heads share one KV head
+87      ctx_len = tl.load(context_lens_ptr + seq)
+89      offs_d = tl.arange(0, HEAD_DIM)         # ◀ [0..63]
+90      q = tl.load(q_ptr + seq * stride_qt + q_head * stride_qh + offs_d * stride_qd)
+91      q = q.to(tl.float32)
+97      m_i = float("-inf")                     # ◀ running max of scores
+98      l_i = 0.0                               # ◀ running softmax denominator
+99      acc = tl.zeros([HEAD_DIM], dtype=tl.float32)   # ◀ running weighted sum of V
+101     for start_n in range(0, ctx_len, BLOCK_N):     # ◀ walk the context 128 tokens at a time
+102         offs_n = start_n + tl.arange(0, BLOCK_N)   # ◀ logical token positions of this chunk
+103         valid = offs_n < ctx_len
+108         logical_block = offs_n // block_size
+109         offset_in_block = offs_n % block_size
+110         phys_block = tl.load(block_table_ptr + seq * stride_bts + logical_block * stride_btb,
+111                              mask=valid, other=0)  # ◀ THE PAGING INDIRECTION, per token
+116         kv_base = phys_block[:, None] * stride_kb + offset_in_block[:, None] * stride_kp
+117         k = tl.load(k_ptr + kv_base + kv_head * stride_kh + offs_d[None, :] * stride_kd,
+118                     mask=valid[:, None], other=0.0).to(tl.float32)   # ◀ [BLOCK_N, HEAD_DIM] read straight from scattered blocks
+123         scores = tl.sum(q[None, :] * k, axis=1) * scale             # ◀ q·k for 128 tokens at once
+125         scores = tl.where(valid, scores, float("-inf"))             # ◀ stale slots past ctx_len → −inf (not 0!)
+127         m_new = tl.maximum(m_i, tl.max(scores, axis=0))
+128         alpha = tl.exp(m_i - m_new)                                 # ◀ rescale factor for everything summed so far
+129         p = tl.exp(scores - m_new)
+131         v_base = ...                                                # ◀ same addressing for V
+132         v = tl.load(..., mask=valid[:, None], other=0.0).to(tl.float32)
+138         l_i = l_i * alpha + tl.sum(p, axis=0)
+139         acc = acc * alpha + tl.sum(p[:, None] * v, axis=0)          # ◀ online softmax update
+140         m_i = m_new
+142     out = acc / l_i                                                 # ◀ exact softmax(qKᵀ)·V, never materialised
+143     tl.store(out_ptr + seq * stride_ot + q_head * stride_oh + offs_d * stride_od,
+145              out.to(out_ptr.dtype.element_ty))
+⋮
+242     grid = (num_seqs, num_q_heads)          # ◀ 32 seqs × 32 heads = 1,024 programs
+244     _paged_attention_decode_kernel[grid](query, k_cache, v_cache, out, meta.block_tables, meta.context_lens, scale,
+    ⋮       ..., HEAD_DIM=head_dim, BLOCK_N=128, num_warps=4)
+```
+| Name | What it is (Llama-3.2-1B values) |
+|---|---|
+| `q_ptr` | query tensor `[num_seqs, 32, 64]`, one token per sequence |
+| `k_ptr`, `v_ptr` | one layer's cache `[num_blocks, 16, 8, 64]` |
+| `block_table_ptr` | int32 `[num_seqs, max_blocks]`, zero-padded (`build_decode_metadata`, `:164-193`) |
+| `context_lens_ptr` | int32 `[num_seqs]`, including this step's token |
+| `num_kv_groups` | 32 / 8 = 4 |
+| `HEAD_DIM`, `BLOCK_N` | 64 and 128 (compile-time) |
+
+### A.5 Radix prefix cache: `prefix_cache.py`
+```python
+136 def _blocks_of(self, token_ids):
+138     full = len(token_ids) // self.block_size
+139     return [tuple(token_ids[i*16:(i+1)*16]) for i in range(full)]   # ◀ only FULL blocks; tuple = hashable key
+⋮
+144 def match(self, token_ids, record_stats=True) -> PrefixMatch:
+155     node = self.root
+158     for chunk in self._blocks_of(token_ids):
+159         child = node.children.get(chunk)     # ◀ dict lookup by the block's 16 token ids
+160         if child is None or child.block_id is None:
+161             break                            # ◀ longest cached prefix ends here
+162         node = child
+163         block_ids.append(child.block_id)
+⋮                                             # ◀ note: NO refcount taken here (a probe)
+210 def insert(self, token_ids, block_ids, now=None) -> int:
+226     for index, chunk in enumerate(chunks):
+229         child = node.children.get(chunk)
+230         if child is None:
+231             child = RadixNode(token_ids=chunk, block_id=block_ids[index], parent=node)
+232             node.children[chunk] = child
+235             self.allocator.incref(block_ids[index])   # ◀ the TREE's own reference keeps the block alive
+⋮
+253     return [node for node in self._nodes.values()
+256             if node.is_leaf and node.block_id is not None
+258             and self.allocator.ref_count(node.block_id) == 1]   # ◀ evictable ⇔ leaf AND only the tree holds it
+⋮
+278     while freed < num_blocks:
+279         candidates = self._evictable_leaves()
+282         candidates.sort(key=lambda n: n.last_accessed)   # ◀ LRU first
+283         for node in candidates:
+286             self._remove(node)                          # ◀ detach + allocator.free (tree's ref)
+287             freed += 1
+```
+| Name | What it is |
+|---|---|
+| `RadixNode` | dataclass (`:52-71`): `token_ids` (the key), `block_id`, `parent`, `children: dict[tuple, RadixNode]`, `last_accessed` |
+| `PrefixMatch` | dataclass (`:74-88`): `block_ids`, `num_tokens`, `nodes` |
+| `self._nodes` | every cached node, for eviction scans |
+
+### A.6 Scheduler: running first, then admission (`scheduler.py`)
+```python
+322 def _schedule_running(self, output, budget):
+325     while index < len(self.running):
+326         request = self.running[index]
+327         num_new = request.num_uncomputed_tokens            # ◀ 1 for a decode
+332         needed = request.table.blocks_needed_for(num_new)   # ◀ 0 or 1 block
+333         while self.allocator.num_free_blocks < needed:
+344             if self._evict_for(needed):                    # ◀ 1st choice: drop unused cached blocks
+345                 continue
+346             victim = self._pick_victim(protect_index=index) # ◀ 2nd: preempt the NEWEST running request
+347             if victim is None:
+349                 self._preempt(request); output.preempted.append(request); break
+352             self._preempt(victim)                          # ◀ recompute later: free blocks, computed=0
+353             output.preempted.append(victim)
+354         else:                                              # ◀ Python while-else: runs if no `break`
+356             output.scheduled.append(self._prepare(request))
+357             budget -= num_new; index += 1
+⋮
+383 while self.waiting:                                       # ◀ inside _schedule_waiting
+386     request = self.waiting[0]                             # ◀ strict FCFS head
+391     if request.num_uncomputed_tokens > budget: break
+402     match = self._match_cached_prefix(request, table)     # ◀ PROBE only (record_stats=False)
+403     needed = self._blocks_to_admit(request, table, match) # ◀ blocks beyond the cached prefix
+414     while self.allocator.num_free_blocks - needed < self.watermark_blocks:
+415         if self._evict_for(needed) == 0: break
+417         match = self._match_cached_prefix(request, table) # ◀ eviction may have removed our prefix → re-price
+418         needed = self._blocks_to_admit(request, table, match)
+419     if self.allocator.num_free_blocks - needed < self.watermark_blocks: break
+424     chunk = self._first_uncached_chunk(request, match)
+425     if chunk is not None and chunk in pending: break      # ◀ same uncached prefix admitted this iteration → wait 1
+430     if match is not None:
+431         self._adopt_cached_prefix(request, table, match)  # ◀ COMMIT: incref, adopt_blocks, num_computed_tokens
+⋮
+440     output.scheduled.append(self._prepare(request))
+⋮
+578 num_full = request.num_computed_tokens // self.block_size  # ◀ _publish_blocks: only full, computed blocks
+579 if num_full <= request.num_published_blocks: return 0
+581 newly_cached = self.prefix_cache.insert(request.all_token_ids[: num_full * self.block_size],
+583                                         request.table.block_ids)
+⋮
+626 def _preempt(self, request):
+633     request.table.free()                 # ◀ refs dropped (published blocks fall to the tree's ref only)
+634     request.num_computed_tokens = 0      # ◀ will re-prefill prompt + generated tokens
+644     self.waiting.insert(0, request)      # ◀ front of the queue: keeps FCFS
+⋮
+667 for scheduled, token_id in zip(output.scheduled, sampled_token_ids):   # ◀ inside update()
+670     request.num_computed_tokens = request.num_tokens   # ◀ BEFORE appending the new token (it has no KV yet)
+673     self._publish_blocks(request)
+677     request.output_token_ids.append(int(token_id))
+681     if hit_limit or hit_eos: self._finish(request, now)   # ◀ publish, then table.free() → blocks back now
+```
+| Name | What it is |
+|---|---|
+| `request.num_uncomputed_tokens` | `num_tokens − num_computed_tokens` (prompt + output minus tokens with KV) |
+| `budget` | `max_num_batched_tokens` (8,192) minus tokens already scheduled this iteration |
+| `watermark_blocks` | 1% of the pool kept free |
+| `pending` | set of first-uncached 16-token chunks admitted this iteration |
+| `_prepare` | grows the block table, returns `ScheduledRequest(token_ids, positions, slot_mapping)` (`:599-612`) |
+
+### A.7 One engine step: `engine.py`
+```python
+111 def step(self) -> list[Request]:
+113     output = self.scheduler.schedule()
+122     token_ids, positions, slots, query_lens = [], [], [], []
+123     for scheduled in output.scheduled:          # ◀ flatten into ONE ragged batch, no padding
+124         token_ids.extend(scheduled.token_ids)
+125         positions.extend(scheduled.positions)
+126         slots.extend(scheduled.slot_mapping)
+127         query_lens.append(scheduled.num_tokens)
+132     logits_indices, offset = [], 0
+133     for q_len in query_lens:
+134         offset += q_len
+135         logits_indices.append(offset - 1)        # ◀ last token of each request only
+137     with torch.inference_mode():
+138         logits = self.model(input_ids=..., positions=..., cache=self.cache, slot_mapping=...,
+143                             block_tables=[s.request.table.block_ids for s in output.scheduled],
+144                             query_lens=query_lens,
+145                             context_lens=[s.request.num_tokens for s in output.scheduled],
+146                             logits_indices=self._tensor(logits_indices))
+149     sampled = logits.argmax(dim=-1).tolist()     # ◀ greedy decoding
+150     return self.scheduler.update(output, sampled)
+```
+Example: request A prefills 20 tokens and B decodes 1. Then `token_ids` has 21 entries, `query_lens = [20, 1]`, and `logits_indices = [19, 20]`.
+
+### A.8 Llama layer over the paged cache: `model/llama.py`
+```python
+271 decode_meta = None
+272 if self.use_fused_decode and can_use_decode_kernel(query_lens, hidden.device):   # ◀ every query_len == 1
+273     decode_meta = build_decode_metadata(block_tables, context_lens, hidden.device)  # ◀ once per pass, not per layer
+275 for index, layer in enumerate(self.layers):            # ◀ 16 decoder layers (HF weights reused)
+280     residual = hidden
+281     x = input_norm(hidden)                             # ◀ RMSNorm in fp32
+283     q = attn.q_proj(x).view(total_tokens, self.num_q_heads, self.head_dim)    # ◀ [T, 32, 64]
+284     k = attn.k_proj(x).view(total_tokens, self.num_kv_heads, self.head_dim)   # ◀ [T, 8, 64]
+285     v = attn.v_proj(x).view(total_tokens, self.num_kv_heads, self.head_dim)
+286     q, k = apply_rope(q, k, cos, sin)                  # ◀ rotary with llama3 scaling, θ = 500000
+290     write_kv_to_cache(cache, index, slot_mapping, k, v)   # ◀ write BEFORE attending (seq sees its own new tokens)
+292     if decode_meta is not None:
+293         out = paged_attention_decode(q, cache, index, decode_meta, self.scale)   # ◀ A.4
+294     else:
+295         out = paged_attention(q, cache, index, block_tables, query_lens, context_lens, self.scale)  # ◀ A.3
+298     out = out.reshape(total_tokens, self.num_q_heads * self.head_dim)   # ◀ [T, 2048]
+299     hidden = residual + attn.o_proj(out)
+301     residual = hidden
+302     x = post_norm(hidden)
+304     hidden = residual + mlp.down_proj(nn.functional.silu(mlp.gate_proj(x)) * mlp.up_proj(x))  # ◀ SwiGLU MLP
+308 hidden = self.norm(hidden)
+310 hidden = hidden[logits_indices]                        # ◀ keep last token per request
+311 return self.lm_head(hidden)                            # ◀ [num_requests, 128256]
+```

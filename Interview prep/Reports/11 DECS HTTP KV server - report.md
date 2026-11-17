@@ -273,3 +273,126 @@ try {
 | 800 | configured HTTP worker threads |
 | core 1 | PostgreSQL pinned via `taskset` |
 | 0.27.0 | cpp-httplib version (TCP_NODELAY default false) |
+
+---
+
+## Appendix A: Key code, annotated
+
+Real line numbers from `project/` (`server.cpp`, `KVCache.h`, `DBPool.h`, `load_gen/*.js`). `⋮` = left out; `◀` = plain-English note.
+
+### Reading the code: C++ / library constructs
+| Construct | Meaning |
+|---|---|
+| `std::list<std::pair<int,std::string>>` | doubly linked list of (key, value) nodes; iterators stay valid while other nodes move |
+| `std::unordered_map<int, list::iterator>` | hash map key → the node's position in the list |
+| `items.splice(items.begin(), items, it)` | move node `it` to the front in O(1), no copy, no allocation |
+| `std::lock_guard<std::mutex> lock(mtx)` | locks now, unlocks automatically at the end of the scope (RAII) |
+| `std::unique_lock` + `cv.wait(lock, pred)` | sleep until `pred()` is true; releases the mutex while sleeping |
+| `cv.notify_one()` | wake one waiting thread |
+| `[&](const Request& req, Response& res) {…}` | lambda capturing outer variables by reference (here the cache and pool) |
+| `srv.new_task_queue = [] { return new ThreadPool(n); }` | cpp-httplib: handle connections with a pool of n worker threads |
+| `pqxx::work txn{*conn}` | libpqxx transaction on a connection; `txn.commit()` ends it |
+| `exec_params(sql, a, b)` | parameterised query (`$1`, `$2`): no SQL injection |
+
+### A.1 The LRU cache (`KVCache.h`)
+```cpp
+12  class KVCache {
+13    size_t capacity;
+14    std::list<std::pair<int, std::string>> items;       // ◀ front = most recently used
+15    std::unordered_map<int, std::list<std::pair<int, std::string>>::iterator> index;   // ◀ key → node
+16    std::mutex mtx;                                      // ◀ ONE lock for everything
+⋮
+21    bool get(int key, std::string &value) {
+22      std::lock_guard<std::mutex> lock(mtx);             // ◀ exclusive even for reads (get mutates order)
+23      auto it = index.find(key);
+24      if (it == index.end()) return false;               // ◀ miss
+28      items.splice(items.begin(), items, it->second);    // ◀ O(1) move-to-front = "recently used"
+29      value = it->second->second;
+30      return true;
+32    }
+34    void put(int key, const std::string &value) {
+35      std::lock_guard<std::mutex> lock(mtx);
+36      if (index.count(key)) {
+37        items.erase(index[key]);                         // ◀ update: drop the old node
+38      } else if (items.size() >= capacity) {
+39        auto last = items.back();                        // ◀ full: evict the LEAST recently used (tail)
+40        index.erase(last.first);
+41        items.pop_back();
+42      }
+43      items.emplace_front(key, value);
+44      index[key] = items.begin();
+```
+
+### A.2 The connection pool (`DBPool.h`)
+```cpp
+20  LibpqxxPool(int size, const std::string &connStr) : conn_string(connStr) {
+21    for (int i = 0; i < size; i++) {
+23        pool.push(new pqxx::connection(conn_string));   // ◀ open all connections up front
+⋮
+31  pqxx::connection *acquire() {
+32    std::unique_lock<std::mutex> lock(mtx);
+33    cv.wait(lock, [&] { return !pool.empty(); });       // ◀ block (no timeout) until a connection is free
+34    pqxx::connection *conn = pool.front();
+35    pool.pop();
+36    return conn;
+⋮
+39  void release(pqxx::connection *conn) {
+40    std::unique_lock<std::mutex> lock(mtx);
+41    pool.push(conn);
+42    lock.unlock();                                       // ◀ unlock BEFORE notify (the woken thread can take the lock at once)
+43    cv.notify_one();
+```
+
+### A.3 The GET handler: cache, then the database (`server.cpp`)
+```cpp
+70  srv.new_task_queue = [http_thread] { return new httplib::ThreadPool(http_thread); };   // ◀ 800 workers in the tests
+⋮
+81  srv.Get("/val", [&](const Request &req, Response &res) {
+90      int id_int = parse_id(req.get_param_value("id"));  // ◀ stoi in try/catch; −1 = invalid → 400
+99      if (cache.get(id_int, cached_value)) {             // ◀ HIT: no database work at all
+100       res.set_content(cached_value, "text/plain");
+101       return;
+102     }
+104     db::connection *conn = nullptr;
+106       conn = pool.acquire();                            // ◀ MISS: borrow a connection (may block)
+107       db::work txn{*conn};
+108       db::result r = txn.exec_params("SELECT value FROM kv_store WHERE id = $1", id_int);
+110       txn.commit();
+111       pool.release(conn);                               // ◀ (conn is NOT reset to nullptr here; see §6.1)
+113       if (r.empty()) { res.status = 404; ... }
+118         string db_val = r[0][0].as<string>();
+119         cache.put(id_int, db_val);                      // ◀ fill the cache (races with a concurrent POST: §6.2)
+```
+
+### A.4 POST (UPSERT, write-through) and the DELETE bug (`server.cpp`)
+```cpp
+151       conn = pool.acquire();
+152       db::work txn{*conn};
+155       const string sql = "INSERT INTO kv_store (id, value) VALUES ($1, $2) "
+156                          "ON CONFLICT (id) DO UPDATE SET value = $2";   // ◀ insert-or-update in one statement
+158       txn.exec_params(sql, id_int, val);
+159       txn.commit();                                     // ◀ PostgreSQL WAL flush (fsync) here: the write ceiling
+160       pool.release(conn);
+162       cache.put(id_int, val);                           // ◀ write-through: the cache gets the new value
+⋮
+190     db::connection *conn = nullptr;                     // ◀ DELETE handler
+191     try {
+192       db::connection *conn = pool.acquire();            // ◀ BUG: a NEW variable shadows the outer conn
+⋮
+206     } catch (const std::exception &e) {
+207       if (conn) pool.release(conn);                     // ◀ outer conn is still nullptr → connection LEAKED on error
+```
+
+### A.5 The workloads that produced the two plateaus (`load_gen/*.js`)
+```javascript
+// get_popular.js: cache-heavy reads (≈11.1k TPS, monitored core 100%)
+13  const SEQ_MAX = 500;
+19    const key = (__ITER % SEQ_MAX) + 1;   // ◀ each virtual user cycles over the same 500 hot keys
+21    http.get(`${BASE}/val?id=${key}`);
+
+// put_only.js: write-heavy (≈3.1k TPS, core ~75%, disk %util 2–3%)
+13    const id = Math.floor(Math.random() * (parseInt(__ENV.KEYSPACE || '10000'))) + 1;   // ◀ KEYSPACE=20000 from script.sh
+14    const payload = { id: String(id), val: `val-${__VU}-${Math.random().toString(36).slice(2,8)}` };
+15    const res = http.post(`${BASE}/save`, payload);   // ◀ form body; cpp-httplib parses it into params
+```
+`__ITER` is k6's per-virtual-user iteration counter, and `__VU` is the virtual-user id. Each VU loops with no think time, which makes this a closed loop.

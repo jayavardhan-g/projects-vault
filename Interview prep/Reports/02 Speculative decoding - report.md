@@ -477,3 +477,153 @@ Non-forward work totals **0.33 ms of 23.6 ms (≈1.4%)**.
 | 0.804 vs 0.805 | Coder-1.5B vs 1.5B acceptance on code |
 | α ≈ 0.912 | per-token acceptance implied by acceptance_rate 0.798 at γ=4 [RECON] |
 | 152 tests | 131 CPU + 21 GPU |
+
+---
+
+## Appendix A: Key code, annotated
+
+Real line numbers from `src/specdec/` (branch `main`). `⋮` = left out; `◀` = plain-English note. Comments and docstrings are trimmed.
+
+### Reading the code: constructs used below
+| Construct | Meaning |
+|---|---|
+| `@torch.inference_mode()` | decorator: run without autograd tracking |
+| `torch.multinomial(p, 1, generator=g)` | draw one index from distribution `p` (seeded by `g`) |
+| `t.scatter_(-1, idx, 1.0)` | in place: write 1.0 at positions `idx` along the last dim (builds a one-hot) |
+| `torch.clamp(x, min=0)` | elementwise max(x, 0), i.e. the "(·)₊" in the residual |
+| `torch.compile(fn, mode="reduce-overhead", dynamic=False)` | JIT-compile `fn` with Inductor and replay it as a CUDA graph; `dynamic=False` = one compiled graph per input shape |
+| HF `StaticCache` / `DynamicCache` | transformers' preallocated vs growing KV cache objects |
+| `past_key_values=`, `cache_position=` | HF forward arguments: the cache to read/extend, and the absolute positions of the new tokens |
+| `.fill_(v)` | in-place fill (keeps the tensor's memory address, which captured CUDA graphs require) |
+
+### A.1 The accept/reject rule: `speculative.py`
+```python
+84  def verify_and_correct(draft_tokens, q_probs, p_probs, cfg, generator=None):
+109     k = int(draft_tokens.numel())                     # ◀ γ proposals
+110     if q_probs.shape[0] != k or p_probs.shape[0] != k + 1: raise ValueError(...)  # ◀ p has a bonus row
+115     for i in range(k):
+116         x = draft_tokens[i]
+117         p_i, q_i = p_probs[i], q_probs[i]             # ◀ target / draft distributions at position i
+119         if cfg.is_greedy:
+124             target_token = p_i.argmax()
+125             if bool(x == target_token):
+126                 continue                              # ◀ greedy: accept iff draft guessed the argmax
+127             return i, target_token                    # ◀ else emit the target's own token
+129         acceptance_prob = min(1.0, float(p_i[x]) / float(q_i[x]))   # ◀ min(1, p(x)/q(x))
+130         if uniform_scalar(generator, p_probs.device) < acceptance_prob:
+131             continue                                  # ◀ accepted
+133         residual = torch.clamp(p_i - q_i, min=0.0)    # ◀ (p − q)₊
+134         total = residual.sum()
+135         if bool(total <= 0):                          # ◀ only float noise can get here
+139             residual, total = p_i, p_i.sum()
+140         return i, sample_from_probs(residual / total, generator)   # ◀ i accepted + 1 corrected token
+144     return k, sample_from_probs(p_probs[k], generator)   # ◀ all γ accepted → free bonus token
+```
+| Name | Shape / meaning |
+|---|---|
+| `draft_tokens` | `(γ,)` token ids the draft sampled |
+| `q_probs` | `(γ, V)` draft distributions, V = 151,936 (canonical vocab) |
+| `p_probs` | `(γ+1, V)` target distributions from ONE verify pass |
+| return | `(n_accepted, next_token)`, so `n_accepted + 1` tokens are emitted |
+
+### A.2 The decode loop: `SpeculativeDecoder.generate` (`speculative.py`)
+```python
+178 self.vocab_size = min(target.vocab_size, draft.vocab_size)   # ◀ in __init__: narrowest vocab (151,936)
+⋮
+303 target_cache = self.caches.acquire(self.target.model, "target")
+304 draft_cache = self.caches.acquire(self.draft.model, "draft")
+321 prefill = cur_ids[: prompt_len - 1]           # ◀ hold back the last prompt token → fixed shapes later
+323     forward_with_cache(self.target.model, target_cache, prefill, 0)
+324     forward_with_cache(self.draft.model, draft_cache, prefill, 0)
+⋮
+337 while int(cur_ids.numel()) - prompt_len < max_new_tokens and not hit_eos:
+338     seq_len = int(cur_ids.numel())
+        # --- 1. draft γ tokens ---
+343     pos = cache_length(draft_cache)
+344     pending = cur_ids[pos:]                     # ◀ 1 token (or 2 after a fully accepted round)
+345     for _ in range(gamma):
+346         logits = forward_with_cache(self.draft.model, draft_cache, pending, pos)[-1]
+348         pos += int(pending.numel())
+349         q = logits_to_probs(align_vocab(logits, self.vocab_size), cfg)
+350         x = sample_from_probs(q, generator)
+351         draft_tokens.append(x); q_rows.append(q)
+353         pending = x.view(1)                     # ◀ feed the sampled token back in
+        # --- 2. verify all γ in one target pass ---
+361     t_len = cache_length(target_cache)          # ◀ always seq_len − 1
+362     feed = torch.cat([cur_ids[t_len:], proposals])   # ◀ last committed token + γ proposals = γ+1 tokens
+363     logits = forward_with_cache(self.target.model, target_cache, feed, t_len)
+368     lo = seq_len - 1 - t_len
+369     p_probs = logits_to_probs(align_vocab(logits[lo : lo + gamma + 1], self.vocab_size), cfg)
+        # --- 3. accept / reject ---
+374     n_accepted, next_token = verify_and_correct(proposals, q_probs, p_probs, cfg, generator)
+377     stats.n_proposed += gamma                   # ◀ NOTE: acceptance_rate = accepted / (γ per iteration)
+378     stats.n_accepted += n_accepted
+388     emitted = torch.cat([proposals[:n_accepted], next_token.view(1)])
+        # --- 4. commit + roll back both caches ---
+393     cur_ids = torch.cat([cur_ids, emitted])
+394     keep = seq_len + n_accepted                 # ◀ K/V valid through the last ACCEPTED proposal
+395     crop_cache(target_cache, keep)
+396     crop_cache(draft_cache, keep)
+```
+**Worked example:** γ = 4, seq_len = 100. The target cache holds 99 positions, so `feed` = token 99 + 4 proposals = 5 tokens. Proposals 1–2 are accepted and 3 is rejected:
+- `n_accepted = 2`;
+- 3 tokens are emitted;
+- `keep = 102`, so K/V for proposals 3–4 are discarded;
+- the new seq_len = 103, and the target cache (102) is again one behind.
+
+### A.3 One distribution function for every path: `sampling.py`
+```python
+42  def align_vocab(logits, vocab_size):
+64      width = logits.shape[-1]
+67      if width > vocab_size: return logits[..., :vocab_size]   # ◀ 14B pads to 152,064 → cut to 151,936
+69      pad = logits.new_full((*logits.shape[:-1], vocab_size - width), NEG_INF)
+70      return torch.cat([logits, pad], dim=-1)
+⋮
+73  def logits_to_probs(logits, cfg):
+80      logits = logits.float()
+82      if cfg.is_greedy:                                         # ◀ temperature == 0
+83          probs = torch.zeros_like(logits)
+84          probs.scatter_(-1, logits.argmax(dim=-1, keepdim=True), 1.0)   # ◀ point mass at argmax
+85          return probs
+87      logits = logits / cfg.temperature
+89      if cfg.top_k is not None: ...                             # ◀ mask all but the k largest to −inf
+94      if cfg.top_p is not None and cfg.top_p < 1.0: ...         # ◀ nucleus: keep the smallest set with mass ≥ p
+106     return torch.softmax(logits, dim=-1)
+```
+The baseline, the draft and the verifier all call this, so the `p` in A.1 is bit-for-bit what the baseline samples from. That is the exactness guarantee.
+
+### A.4 KV rollback without moving data: `cache_utils.py`
+```python
+124 def crop_cache(cache: KVCache, length: int) -> None:
+137     if length >= cache.length: return
+139     if cache.static:
+140         _rewind_static(cache.backend, length)       # ◀ StaticCache: just move the write counter back
+145     else: cache.backend.crop(length - cache.length) # ◀ DynamicCache: actually slice tensors
+146     cache.length = length                           # ◀ length tracked on the HOST (no GPU sync to read it)
+⋮
+150 def _rewind_static(backend, length):
+163     for layer in backend.layers:
+164         counter = getattr(layer, "cumulative_length", None)
+166         if counter is not None: counter.fill_(length)   # ◀ in place: a CUDA graph is bound to this tensor's address
+⋮
+170 def forward_with_cache(model, cache, tokens, start_pos):
+185     if cache.length != start_pos: raise ValueError(...)   # ◀ cache and sequence must never drift
+198     cache_position = torch.arange(start_pos, start_pos + n, device=tokens.device)
+199     forward, captured = _select_forward(model, n)          # ◀ compiled graph if width n was captured, else eager
+200     out = forward(input_ids=tokens.unsqueeze(0), past_key_values=cache.backend,
+    ⋮                 use_cache=True, cache_position=cache_position)
+206     cache.length = start_pos + n
+208     logits = out.logits[0]
+212     return logits.clone() if captured else logits         # ◀ graph replay output is overwritten by the next replay
+```
+Why stale K/V above the counter is harmless: the next forward overwrites those positions before attention reads them, and positions beyond are hidden by the causal mask. `test_static_cache.py` checks this by poisoning those slots.
+
+### A.5 Capturing the fixed-shape decode step: `compile_utils.py`
+```python
+45  def compile_decode(model, shapes, mode="reduce-overhead", fullgraph=True):
+69      shapes = frozenset(int(s) for s in shapes)        # ◀ e.g. target {γ+1, 1}, draft {1, 2}
+87      model._specdec_compiled_forward = torch.compile(
+88          model.forward, mode=mode, fullgraph=fullgraph, dynamic=False)   # ◀ one CUDA graph per input width
+90      model._specdec_decode_shapes = shapes             # ◀ forward_with_cache routes only these widths to the graph
+```
+`SpeculativeDecoder.generate` raises if γ+1 was not captured (`speculative.py:280-293`). Otherwise that width silently runs eager, and the 0.88× → 2.25× fix disappears.

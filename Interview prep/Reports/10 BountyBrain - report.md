@@ -91,7 +91,7 @@ Plus 84 unit tests and an end-to-end run (13/13 API routes, 7/7 UI pages).
 - An LLM judge can label (claim, source) pairs. Its reliability must be checked against human labels with **Cohen's κ** = (p_o − p_e)/(1 − p_e), i.e. agreement corrected for chance.
 
 ### 3.4 Guided decoding
-vLLM (with the xgrammar backend) can constrain generation to a JSON schema or a fixed set of choices. Then "pick a CWE from this shortlist" **cannot** produce an id outside the shortlist.
+vLLM (with the xgrammar backend) can constrain generation to a JSON schema or a fixed set of choices. Here the schema fixes the JSON *shape* (`cwe_id: int | None`, confidence, reasoning). It does **not** restrict which id is chosen. An id outside the shortlist is rejected by a check after generation (`classifier.py:247-250`).
 
 ---
 
@@ -204,7 +204,7 @@ vLLM (with the xgrammar backend) can constrain generation to a JSON schema or a 
 **Three strategies plus routing (`ingestion/classifier.py`, `eval/classification.py`):**
 - **keyword:** longest-alias lookup; no model; may abstain.
 - **embedding:** the nearest CWE by vector.
-- **llm:** shortlist the top-12 CWEs by embedding, then the LLM picks one *from the shortlist* with guided decoding. Hallucinated ids are **structurally impossible**.
+- **llm:** shortlist the top-12 CWEs by embedding, then the LLM picks one *from the shortlist*. Its reply is JSON-schema-guided, and any id not on the shortlist is **rejected after generation**, so a hallucinated id can never be *accepted* (it becomes an abstention).
 - **keyword→llm:** use keyword when it fires, otherwise ask the LLM.
 
 **Metrics:** exact accuracy, **hierarchy ±2** (credit within 2 ChildOf hops, so CWE-79 vs its child CWE-80 is a smaller error than CWE-89), macro-F1, **abstention rate** (so abstaining can't inflate accuracy).
@@ -331,7 +331,7 @@ vLLM (with the xgrammar backend) can constrain generation to a JSON schema or a 
 | Hybrid BM25 + dense + RRF + rerank | dense only | +0.135 R@1 over dense | [MEASURED] |
 | RRF | score interpolation | incomparable scales | [DOC] |
 | Code-fence-aware chunking | fixed-size | payloads must stay whole | [DOC] |
-| Shortlist + guided decoding | free LLM choice | no hallucinated CWE ids | [DOC] |
+| Shortlist + JSON-guided reply + post-hoc shortlist check | free LLM choice | a hallucinated CWE id is never accepted | [CODE] |
 | Keyword as the default classifier | LLM | as accurate, free, fast | [MEASURED] |
 | Smoothed conditional applicability | raw counts | the raw version lost to the prior | [MEASURED] |
 | Held-out evidence in the planner eval | grade on the same edges | avoids circularity | [DOC] |
@@ -387,3 +387,110 @@ vLLM (with the xgrammar backend) can constrain generation to a JSON schema or a 
 | κ 0.75 | judge vs hand (binary, current prompt) |
 | 86.2% | learning-path completeness for learner topics |
 | 84 tests, 13/13 routes, 7/7 pages | testing |
+
+---
+
+## Appendix A: Key code, annotated
+
+Real line numbers from `bountybrain/` (branch `upgrade-2026-10`). `⋮` = left out; `◀` = plain-English note.
+
+### Reading the code: constructs used below
+| Construct | Meaning |
+|---|---|
+| `BM25Okapi(corpus).get_scores(query_tokens)` | `rank_bm25`: one BM25 score per chunk |
+| `@lru_cache(maxsize=1)` | memoise a function, so the model loads once. **It also caches a failed load** (`None`) |
+| `CrossEncoder(...).predict([(q, passage), …])` | sentence-transformers: one relevance score per (query, passage) pair |
+| pydantic `BaseModel`, `.model_json_schema()`, `.model_validate_json()` | define a typed schema, export it as JSON Schema, parse and validate the reply |
+| OpenAI-style `response_format={"type": "json_schema", …}` | vLLM enforces the schema token by token (guided decoding) |
+| `re.search(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", s)` | whole-word match: no letter or digit directly before or after the alias |
+
+### A.1 Hybrid retrieval with RRF and reranking (`rag/hybrid.py`)
+```python
+28  RRF_K = 60                                         # ◀ standard damping constant
+33  _TOKEN = re.compile(r"[a-z0-9_.-]+")               # ◀ BM25 tokens keep "../", "cve-2021-44228", "x.y"
+⋮
+105     scores = bm.get_scores(_tokenize(query))       # ◀ in _bm25_search: score every chunk lexically
+⋮
+155 def reciprocal_rank_fusion(runs, k=RRF_K):
+159     for run in runs:                               # ◀ runs = [dense hits, bm25 hits], each ranked
+160         for rank, hit in enumerate(run, start=1):
+161             key = (hit.document_id, hit.chunk_idx) # ◀ the same chunk from either arm merges
+162             scores[key] = scores.get(key, 0.0) + 1.0 / (k + rank)   # ◀ RRF: only ranks matter, not raw scores
+⋮
+176 def search(query, top_k=5, mode="hybrid_rerank", candidates=40, flt=None):
+188     depth = max(candidates, top_k)                 # ◀ each arm fetches 40 before fusion
+195     dense = _dense_search(query, depth, flt)       # ◀ BGE-small query embedding → embedded Qdrant
+196     lexical = _bm25_search(query, depth, flt)
+198     fused = reciprocal_rank_fusion(runs) if runs else []
+200     hits = rerank(query, fused[:depth], top_n=top_k)   # ◀ hybrid_rerank: cross-encoder re-scores the 40 → top 5
+```
+Example: a chunk ranked 1st by dense and 3rd by BM25 scores 1/61 + 1/63 = 0.0323. A chunk ranked 1st by BM25 only scores 1/61 = 0.0164.
+
+### A.2 Cross-encoder reranker (`rag/reranker.py`)
+```python
+13  @lru_cache(maxsize=1)
+14  def _model():
+20      return CrossEncoder(settings.reranker_model)   # ◀ BAAI/bge-reranker-base; returns None if loading fails
+⋮
+29  pairs = [(query, h.text) for h in hits]            # ◀ in rerank(): query and passage go in TOGETHER
+30  scores = model.predict(pairs)
+31  ranked = sorted(zip(hits, scores, strict=True), key=lambda x: -x[1])
+```
+
+### A.3 CWE classification: keyword baseline and the LLM shortlist (`ingestion/classifier.py`)
+```python
+40  class WeaknessChoice(BaseModel):                   # ◀ the JSON schema the LLM's reply must match
+43      cwe_id: int | None = None                      # ◀ any int is schema-valid; the shortlist is checked after
+⋮
+151 aliases = sorted(table, key=len, reverse=True)     # ◀ classify_keyword: LONGEST alias first ("sql injection" beats "injection")
+154 lowered = " ".join(text.lower().split())
+159 if re.search(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", lowered):
+160     found = table[alias]                           # ◀ 1,389 aliases → 969 CWE ids
+⋮
+206 qv = np.asarray(embeddings.embed_queries(texts), dtype=np.float32)   # ◀ classify_llm
+207 shortlists = idx.topk(qv, k=k)                     # ◀ 12 nearest CWE descriptions
+214 for pos in shortlist:
+217     lines.append(f"- CWE-{cwe_id}: {idx.names[int(pos)]}")   # ◀ candidate list put into the prompt
+230 replies = structured_many(WeaknessChoice, requests, ...)     # ◀ concurrent, JSON-guided calls to local vLLM
+⋮
+247 # Reject anything not on the shortlist
+248 if reply.cwe_id is not None and reply.cwe_id not in ids:
+249     out.append(Prediction(None, 0.0, "llm", "model chose an id outside the shortlist"))   # ◀ becomes an abstention
+```
+Consequence: accuracy is capped by shortlist recall (the gold class is in the top 12 only 45% / 53% of the time).
+
+### A.4 Recon planner scoring (`recon/planner.py`)
+```python
+71  SMOOTHING_ALPHA = 25.0                             # ◀ "pretend 25 extra templates, spread by the global prior"
+⋮
+299 prior = _global_class_prior(s)                     # ◀ class frequency over ALL nuclei templates
+300 observed = {c: len(e["signatures"]) for c, e in per_cwe.items()}   # ◀ templates on THIS product, per class
+301 total_observed = sum(observed.values())
+302 conditional = {
+303     c: (n + SMOOTHING_ALPHA * prior.get(c, 0.0))
+304     / (total_observed + SMOOTHING_ALPHA)            # ◀ smoothed P(class | product)
+305     for c, n in observed.items()}
+⋮
+319 applicability = conditional.get(cwe_id, 0.0) / max_conditional   # ◀ best class = 1.0
+321 exploitability = float(entry["max_epss"])         # ◀ else a CWE likelihood prior
+324 weaponised = _log_scale(n_exploits, EXPLOIT_SATURATION)   # ◀ Exploit-DB count, saturating at 25
+332 economics = 0.5 * money + 0.3 * vrt + 0.2 * volume   # ◀ median bounty, VRT priority (6−P)/5, writeup volume
+334 score = (w.applicability * applicability          # ◀ 0.55
+335          + w.exploitability * exploitability      # ◀ 0.15
+    ⋮        + w.weaponisation * weaponised           # ◀ 0.05
+             + w.economics * economics)               # ◀ 0.25
+```
+**Example:** a product has 2 templates, both XSS, and the global XSS prior is 0.20. Then P(XSS | product) = (2 + 25·0.20)/(2 + 25) = 0.26, close to the prior. With 200 XSS templates out of 400 it is (200 + 5)/425 = 0.48: the evidence dominates.
+
+### A.5 JSON-guided LLM calls (`clients/llm.py`)
+```python
+105 def _json_schema_format(schema):
+107     return {"type": "json_schema",
+108             "json_schema": {"name": schema.__name__, "schema": schema.model_json_schema()}}
+⋮
+161 kwargs = {"response_format": _json_schema_format(schema)}       # ◀ in structured(): vLLM enforces the schema
+162 resp = client.chat.completions.create(model=model, messages=[...], temperature=temperature,
+    ⋮                                     max_tokens=max_tokens, **kwargs)
+173 return schema.model_validate_json(_extract_json(raw))           # ◀ parse + validate into the pydantic object
+⋮                                                                 # ◀ 175-190: other providers: JSON-only prompt, one retry
+```

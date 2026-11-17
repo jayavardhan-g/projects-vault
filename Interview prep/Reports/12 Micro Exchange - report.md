@@ -367,3 +367,195 @@ So constant-factor work (no locks, no allocation) bought about 10× at every siz
 | 13.2 µs | gateway round-trip p50 (one at a time) |
 | 200,000 | default fuzz orders (4 symbols) |
 | 78 checks, 4 ctest suites, 6 injected bugs | testing |
+
+---
+
+## Appendix A: Key code, annotated
+
+Real line numbers from `include/` and `src/` (branch `upgrade-2026-10`). `⋮` = left out; `◀` = plain-English note.
+
+### Reading the code: C++ constructs
+| Construct | Meaning |
+|---|---|
+| `template <typename T, size_t Capacity>` | compile-time parameters; `RingBuffer<Command, 65536>` is its own type with the constants folded in |
+| `static_assert(cond, "msg")` | compile-time check (e.g. capacity is a power of two, `Command` is 40 bytes) |
+| `std::atomic<size_t>` | a variable that is safe to read and write from two threads |
+| `.load(std::memory_order_relaxed)` | atomic read with no ordering promise; fine for your OWN index |
+| `.load(std::memory_order_acquire)` | reads after this see everything the other thread wrote before its matching release |
+| `.store(v, std::memory_order_release)` | writes before this become visible before `v` does (publishes the slot) |
+| `alignas(64)` | start this member on a new 64-byte cache line (avoids false sharing) |
+| `std::atomic_ref<uint64_t>(x)` | treat a plain variable (here in mmap'd memory) as atomic for one operation |
+| `x & (Capacity - 1)` | same as `x % Capacity` when Capacity is a power of two, but one instruction |
+| `Order*` / `->` | a pointer to an Order / access a member through the pointer |
+| `std::unique_ptr<T[]>` | an owned array, freed automatically |
+
+### A.1 The lock-free SPSC ring (`core/ring_buffer.hpp`)
+```cpp
+19  template <typename T, size_t Capacity>
+20  class RingBuffer {
+21      static_assert(Capacity >= 2 && (Capacity & (Capacity - 1)) == 0, "Capacity must be a power of two");
+27      bool push(const T& item) {                               // ◀ PRODUCER thread only
+28          const size_t head = head_.load(std::memory_order_relaxed);   // ◀ my own index: relaxed is enough
+29          if (head - tail_cache_ >= Capacity) {                // ◀ looks full by my STALE copy of tail …
+30              tail_cache_ = tail_.load(std::memory_order_acquire);    // ◀ … so refresh it (cross-core read, rare)
+31              if (head - tail_cache_ >= Capacity) return false;       // ◀ really full
+32          }
+33          slots_[head & (Capacity - 1)] = item;                // ◀ write the slot FIRST
+34          head_.store(head + 1, std::memory_order_release);    // ◀ then publish: the consumer sees the slot before the index
+35          return true;
+36      }
+38      bool pop(T& out) {                                       // ◀ CONSUMER (matching) thread only
+39          const size_t tail = tail_.load(std::memory_order_relaxed);
+40          if (tail == head_cache_) {                           // ◀ looks empty by my stale copy of head
+41              head_cache_ = head_.load(std::memory_order_acquire);    // ◀ acquire pairs with the release at :34
+42              if (tail == head_cache_) return false;
+43          }
+44          out = slots_[tail & (Capacity - 1)];
+45          tail_.store(tail + 1, std::memory_order_release);    // ◀ hand the slot back to the producer
+46          return true;
+47      }
+⋮
+57      std::vector<T> slots_;
+59      alignas(kCacheLine) std::atomic<size_t> head_{0};        // ◀ producer's cache line …
+60      size_t tail_cache_ = 0;                                  // ◀ … with its private copy of tail
+64      alignas(kCacheLine) std::atomic<size_t> tail_{0};        // ◀ consumer's cache line
+65      size_t head_cache_ = 0;
+```
+**What breaks if you change it:**
+- Swap the order of `:33` and `:34`, and the consumer can read a slot before it is written.
+- Make `:34` relaxed, and the CPU or compiler may reorder the same way.
+- Drop `alignas`, and every push invalidates the consumer's cache line (false sharing).
+
+### A.2 Pool, command and resting order (`core/object_pool.hpp`, `engine/order.hpp`)
+```cpp
+19          top_(capacity) {
+20          for (size_t i = 0; i < capacity; ++i) free_[i] = &storage_[i];   // ◀ every node allocated ONCE
+23      T* acquire() { return top_ > 0 ? free_[--top_] : nullptr; }       // ◀ pop the free stack; nullptr = full (order refused)
+25      void release(T* p) { free_[top_++] = p; }                          // ◀ push back; no free()/delete
+⋮
+18  struct Command {                    // order.hpp: ring-buffer item AND WAL record (memcpy'd as-is)
+    ⋮   OpType type; Side side; OrdType ord_type; uint8_t pad_; uint16_t symbol; uint64_t id; int64_t price; uint64_t qty;
+27      uint64_t tsc;                   // ◀ cycle counter at submit → end-to-end latency
+29  static_assert(sizeof(Command) == 40, "Command is the WAL record; keep it 40 bytes");
+33  struct Order {
+    ⋮   uint64_t id; int64_t price; uint64_t qty; Side side;
+38      Order*   prev;                  // ◀ INTRUSIVE list links: the node IS the list entry
+39      Order*   next;
+```
+
+### A.3 Matching with price-time priority (`src/order_book.cpp`)
+```cpp
+114 uint64_t OrderBook::submit(uint64_t id, Side side, int64_t price, uint64_t qty, OrdType type) {
+117     if (type == OrdType::Market) price = side == Side::Buy ? kMaxPrice - 1 : 1;   // ◀ market = crosses at any price
+118     if (id == 0 || price <= 0 || price >= kMaxPrice ||
+119         (type == OrdType::Limit && index_.find(id))) {   // ◀ duplicate id for an order that could rest
+120         expired_qty_ += qty; return 0;                   // ◀ refused: counted as expired
+⋮
+126     if (side == Side::Buy) {
+127         while (qty > 0 && best_ask_ <= price) {          // ◀ PRICE priority: cheapest ask level first
+128             Level& lvl = asks_[best_ask_];               // ◀ O(1): price IS the array index
+129             while (qty > 0 && lvl.head) {
+130                 Order* maker = lvl.head;                 // ◀ TIME priority: oldest order at this price
+131                 const uint64_t x = std::min(qty, maker->qty);
+132                 qty -= x; maker->qty -= x; lvl.qty -= x; resting_qty_ -= x;
+136                 filled_qty_ += 2 * x;                    // ◀ both sides, so the conservation sum balances
+140                 if (maker->qty == 0) erase_order(maker); // ◀ fully filled maker leaves the book
+141             }
+142             if (lvl.head == nullptr) raise_best_ask();   // ◀ level emptied: scan up to the next non-empty ask
+143         }
+⋮       // 144-162: the sell side, mirror image against bids_ / best_bid_
+164     if (qty > 0 && (type != OrdType::Limit || !rest(id, side, price, qty)))
+165         expired_qty_ += qty;                             // ◀ market/IOC remainder (or pool full) expires
+⋮
+90  bool OrderBook::rest(uint64_t id, Side side, int64_t price, uint64_t qty) {
+91      Order* o = pool_.acquire();
+92      if (!o) return false;                                // ◀ pool exhausted: refuse rather than allocate
+93      *o = Order{id, price, qty, side, nullptr, nullptr};
+95      Level& lvl = (side == Side::Buy ? bids_ : asks_)[price];
+96      o->prev = lvl.tail;                                  // ◀ append at the TAIL: FIFO = time priority
+97      if (lvl.tail) lvl.tail->next = o; else lvl.head = o;
+98      lvl.tail = o;
+102     index_.insert(id, o);                                // ◀ id → node, for O(1) cancel
+⋮
+169 bool OrderBook::cancel(uint64_t id) {
+170     Order* o = index_.find(id);                          // ◀ O(1) expected (open addressing)
+176     lvl.qty -= o->qty; resting_qty_ -= o->qty; cancelled_qty_ += o->qty;
+179     erase_order(o);                                      // ◀ O(1) unlink via prev/next + pool release
+⋮
+82  void OrderBook::erase_order(Order* o) {
+83      Level& lvl = (o->side == Side::Buy ? bids_ : asks_)[o->price];
+84      if (o->prev) o->prev->next = o->next; else lvl.head = o->next;   // ◀ unlink from anywhere in the queue
+85      if (o->next) o->next->prev = o->prev; else lvl.tail = o->prev;
+86      index_.erase(o->id);
+87      pool_.release(o);
+```
+**Worked example:** asks are 50@101 (#1), 30@101 (#2) and 40@102 (#3). A buy of 70@102 arrives:
+- it fills 50 against #1 (the oldest at 101), and #1 is erased;
+- it fills 20 against #2, leaving #2 with 10;
+- `best_ask_` stays at 101.
+
+That matches the README demo.
+
+### A.4 Id table with backward-shift deletion (`src/order_book.cpp`)
+```cpp
+27  : keys_(round_up_pow2(capacity * 2), kEmpty), ...      // ◀ size ≥ 2× max orders → load factor ≤ 0.5
+31  size_t IdTable::slot(uint64_t id) const { return mix(id) & mask_; }   // ◀ splitmix64 hash
+33  void IdTable::insert(uint64_t id, Order* o) {
+35      while (keys_[i] != kEmpty && keys_[i] != id) i = (i + 1) & mask_;   // ◀ linear probing
+⋮
+49  void IdTable::erase(uint64_t id) {
+57      for (size_t j = (i + 1) & mask_; keys_[j] != kEmpty; j = (j + 1) & mask_) {
+58          const size_t home = slot(keys_[j]);
+59          if (((j - home) & mask_) >= ((j - i) & mask_)) {  // ◀ can entry j legally move back into hole i?
+60              keys_[i] = keys_[j]; vals_[i] = vals_[j];       // ◀ shift it back, and the hole moves to j
+62              i = j;
+63          }
+64      }
+65      keys_[i] = kEmpty;                                    // ◀ no tombstones: probe chains stay short forever
+```
+
+### A.5 The matching thread and the write-ahead log
+```cpp
+14  using CommandQueue = RingBuffer<Command, 1u << 16>;            // engine/matching_engine.hpp
+24  void apply(const Command& c) {
+25      if (journal_) journal_->log(c, ex_);       // ◀ WRITE-AHEAD: log first …
+26      ex_.apply(c);                              // ◀ … then mutate the book (dispatch by symbol)
+29      const uint64_t cycles = rdtsc() - c.tsc;   // ◀ end-to-end latency in cycles → ns histogram
+⋮
+35  void run(CommandQueue& q, const std::atomic<bool>& producer_done) {
+38      if (q.pop(c)) apply(c);
+⋮       else if (producer_done && q.empty()) break;
+43      else cpu_pause();                          // ◀ busy-spin (x86 `pause`), never sleeps
+⋮
+76  bool append(const Command& c) {                // persistence/wal_logger.hpp
+77      const uint64_t n = header_->count;
+78      if (n >= max_records_) return false;       // ◀ segment full → the journal rotates
+79      records_[n] = c;                           // ◀ memcpy into the mmap'd file (MAP_SHARED, :162)
+80      std::atomic_ref<uint64_t>(header_->count).store(n + 1, std::memory_order_release);
+                                                   // ◀ count AFTER the record: a crash never counts a torn record,
+                                                   //   and the follower's acquire-load sees complete records
+```
+
+### A.6 Snapshots on a follower thread (`persistence/journal.hpp`)
+```cpp
+122 void rotate(const Exchange& ex) {               // ◀ matching thread: the active segment is full
+134     state_[active_].store(kSealed, std::memory_order_release);
+135     if (state_[other].load(std::memory_order_acquire) != kFree) {
+137         while (state_[other].load(std::memory_order_acquire) != kFree) cpu_pause();   // ◀ only waits if the follower is behind (never measured)
+138     }
+139     seg_[other]->reset(seq_);
+140     state_[other].store(kActive, std::memory_order_release);
+⋮
+146 void follow(uint64_t applied) {                // ◀ follower thread
+152     const uint64_t n = s.count();              // ◀ acquire: records [0, n) are complete
+155     for (uint64_t k = applied - b; k < n; ++k) replica_->apply(s.at(k));   // ◀ its OWN copy of the books
+167     if (applied > snap && (applied - snap >= every_ || urgent)) {
+169         img_.capture(*replica_, applied);      // ◀ copy the REPLICA, not the live books (no stall on the matching thread)
+170         write_or_die();                        // ◀ Snapshot::write: tmp → fsync → rename → fsync(dir)
+171         snap = applied;
+⋮
+177     if (state_[i].load(std::memory_order_acquire) != kSealed || end_of(i) > snap) continue;
+179     seg_[i]->reset(snap);                      // ◀ truncate a sealed segment fully covered by the durable snapshot
+180     state_[i].store(kFree, std::memory_order_release);
+```
+Segment lifecycle: **Active → Sealed** (matching thread) **→ Free** (follower) **→ Active** (matching thread). Each transition is made by exactly one thread. Recovery = load the snapshot + replay later records in sequence order, refusing to continue past a gap.

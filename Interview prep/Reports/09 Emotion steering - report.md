@@ -239,3 +239,107 @@ Stage 1 located the useful layers; stage 2 zoomed in.
 | 19/20 neutral | unsteered baseline labels |
 | 1.75× / [1.0, 0.75, 0.5, 0.25] | guard threshold / back-off ladder |
 | temperature 0.8, 60 new tokens | generation settings |
+
+---
+
+## Appendix A: Key code, annotated
+
+From `Project.ipynb`. Line numbers are **within each notebook cell** (cell 4 = `AppraisalSteerer`, cell 6 = the perplexity guard). `⋮` = left out; `◀` = plain-English note.
+
+### Reading the code: constructs used below
+| Construct | Meaning |
+|---|---|
+| `model(**inputs, output_hidden_states=True).hidden_states` | tuple of 17 tensors `[1, seq, 2048]`: index 0 = embeddings, i+1 = output of decoder layer i |
+| `h[:, -1, :]` | the last token's vector |
+| `module.register_forward_hook(fn)` | PyTorch calls `fn(module, input, output)` after every forward of that module, and the returned value replaces the output. Returns a handle; `handle.remove()` detaches it |
+| `try: … finally:` | the `finally` block runs even if an exception happens (so the hook is always removed) |
+| `torch.manual_seed(s)` | fixes sampling randomness, so two runs differ only by the vector |
+| `log_softmax(...).gather(-1, targets)` | log-probability the model gave to each actual next token |
+
+### A.1 Building steering vectors from contrastive sentences (cell 4)
+```python
+15  def _get_all_layer_last_token_states(self, text):
+16      inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
+17      outputs = self.model(**inputs, output_hidden_states=True)   # ◀ ONE forward gives all 17 layers
+19      return [h[:, -1, :].squeeze(0).detach().float().cpu() for h in outputs.hidden_states]   # ◀ last-token vector per layer
+⋮
+21  def calibrate_all_layers(self, calibration_data, verbose=True):
+⋮       # 22-46: for each axis, sum the 17 per-layer vectors over its 15 positive and 15 negative sentences
+48              pos_mean = pos_sums[name][i] / pos_counts[name]   # ◀ e.g. mean of the 15 Joy sentences at layer i
+49              neg_mean = neg_sums[name][i] / neg_counts[name]   # ◀ mean of the 15 Sadness sentences
+50              direction = pos_mean - neg_mean                   # ◀ DIFFERENCE OF MEANS: what Joy adds over Sadness
+51              direction = direction / direction.norm()          # ◀ unit length, so "strength" is in hidden-state units
+52              self.all_layer_vectors[i][name] = direction.to(self.device).to(self.model.dtype)
+⋮
+58  def set_layer(self, layer_id):
+61      self.vectors = self.all_layer_vectors.get(layer_id + 1, {})   # ◀ +1: hidden_states[0] is the embedding output
+```
+| Name | What it is |
+|---|---|
+| `calibration_data` | `CALIBRATION_DATA` (cell 3): `{axis: (15 positive sentences, 15 negative sentences)}` for Joy_Sadness, Trust_Disgust, Anger_Fear, Anticipation_Surprise |
+| `all_layer_vectors[i][axis]` | unit vector (2,048-d) for that axis at hidden-state index i (0..16) |
+
+### A.2 Injecting the vector during generation (cell 4)
+```python
+64  def _hook_fn(self, module, input, output):
+65      if self._inject_vec is None: return output
+67      if isinstance(output, tuple):                     # ◀ HF decoder layers return (hidden, …)
+68          hidden = output[0]
+69          hidden[:, -1, :] += self._inject_vec.to(hidden.dtype)   # ◀ add to the LAST position only
+70          return (hidden,) + output[1:]
+71      output[:, -1, :] += self._inject_vec.to(output.dtype)
+⋮
+74  def generate(self, prompt, strength=0.0, manual_vec=None, max_new_tokens=60, seed=None, return_ids=False):
+⋮       # 82-83: apply the chat template and tokenize
+85      if manual_vec is not None:
+86          self._inject_vec = manual_vec                 # ◀ any mix, e.g. 5·v_joy − 3·v_anger
+87      elif strength != 0.0 and self.vectors:
+88          self._inject_vec = sum(v * strength for v in self.vectors.values())
+92      target_layer = self.model.model.layers[self.layer_id]   # ◀ decoder layer L (best: 9)
+93      handle = target_layer.register_forward_hook(self._hook_fn)
+94      try:
+96          if seed is not None: torch.manual_seed(seed)
+98          out = self.model.generate(**inputs, max_new_tokens=max_new_tokens,
+100                                   do_sample=True, temperature=0.8, pad_token_id=self.tokenizer.eos_token_id)
+102     finally:
+103         handle.remove()                               # ◀ never leaves a vector attached to the model
+104         self._inject_vec = None
+```
+**Why "last position only" still steers every generated token:** during generation with a KV cache, each new step processes a sequence of length 1, so its only position *is* the last one. The hook therefore hits the last prompt token at prefill and every generated token after that.
+
+### A.3 The perplexity guard with back-off (cell 6)
+```python
+26  PPL_RATIO_MAX  = 1.75                       # ◀ steered PPL may be at most 1.75× the unsteered PPL
+27  BACKOFF_LADDER = [1.0, 0.75, 0.5, 0.25]
+⋮
+38  def continuation_perplexity(steerer, token_ids, prompt_len):
+43      if ids.shape[1] - prompt_len < 2: return float("nan")      # ◀ too short to score
+45      logits = steerer.model(ids).logits[:, :-1, :].float()       # ◀ scored by the UNSTEERED model (hook already removed)
+46      targets = ids[:, 1:]
+47      token_logprobs = torch.log_softmax(logits, dim=-1).gather(-1, targets.unsqueeze(-1)).squeeze(-1)
+48      return math.exp(-token_logprobs[:, prompt_len - 1:].mean().item())   # ◀ PPL of the GENERATED tokens only
+⋮
+51  def generate_guarded(steerer, prompt, vec, seed=0, max_new_tokens=60, enabled=True, ...):
+58      base_raw, base_ids, base_plen = steerer.generate(prompt, strength=0.0, seed=seed, ...)   # ◀ unsteered, SAME seed
+60      base_ppl = continuation_perplexity(steerer, base_ids, base_plen)
+66      for scale in rungs:                                         # ◀ 100%, 75%, 50%, 25% of the requested vector
+67          raw, ids, plen = steerer.generate(prompt, manual_vec=vec * scale, seed=seed, ...)
+70          ppl = continuation_perplexity(steerer, ids, plen)
+71          ratio = ppl / base_ppl if base_ppl else float("nan")
+77          if (not enabled) or (not math.isfinite(ratio)) or ratio <= ppl_ratio_max:
+78              result.update(text=strip_response(raw), applied_scale=scale, ...)   # ◀ accept the strongest coherent rung
+80              return result
+83      result.update(text=result["base_text"], applied_scale=0.0, ..., collapsed=True)   # ◀ every rung failed → unsteered text
+```
+
+### A.4 Scoring success (cell 2)
+```python
+2   CLASSIFIER_ID = "j-hartmann/emotion-english-distilroberta-base"   # ◀ 7 labels: anger, disgust, fear, joy, neutral, sadness, surprise
+4   emotion_classifier = pipeline("text-classification", model=CLASSIFIER_ID, top_k=None, ...)
+⋮
+11  def classify_emotion(text):
+15      results = emotion_classifier(text[:512])[0]
+16      results_sorted = sorted(results, key=lambda x: x["score"], reverse=True)
+19      return top["label"], round(top["score"], 3), full_scores
+```
+In the sweep CSVs, `success = (predicted_label == expected_label)`. There is no "trust" or "anticipation" label, so those poles have an empty `expected_label` and are never scored.

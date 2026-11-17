@@ -333,3 +333,10 @@ Hybrid designs such as CosyVoice (LLM for tokens, separate renderer) sit in the 
 | Spark-TTS | BiCodec: 50 tokens/s semantic + fixed-length global; Qwen2.5-0.5B; VoxBox ~100k h |
 | Spark-TTS semantic features | wav2vec 2.0 layers 11, 14, 16 averaged |
 | SpeechGPT | HuBERT units in vocab; SpeechInstruct; 3 stages (last with LoRA) |
+
+
+---
+
+## Appendix A: Code
+
+None. This seminar is a literature review with no implementation. The code that applies these ideas is in the CosyVoice project; see its report's Appendix A.

@@ -20,6 +20,8 @@ Every report has the same sections:
 
 Claims are labelled **[CODE] / [MEASURED] / [DOC] / [RECON]**, so the LLM knows what is verified and what is inferred.
 
+Every report except the seminar ends with **Appendix A: Key code, annotated**. It shows the real source lines that implement the project, with their real line numbers. Each excerpt has plain-English `◀` notes, a table defining every name, and a "Reading the code" box for language constructs. The LLM can see *how* each part is implemented, not just a description of it.
+
 | # | Report | Resume | Type |
 |---|---|---|---|
 | 01 | [[01 mini-vLLM - report]] | 4, 5 | self project |

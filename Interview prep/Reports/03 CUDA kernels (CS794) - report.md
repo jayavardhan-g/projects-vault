@@ -429,3 +429,231 @@ That is 21× overall.
 | 7.0× | from the D+1 bank-conflict padding alone |
 | N = 256 | crossover where custom flash becomes slower than explicit PyTorch |
 | 28,800 B, 50% | flash shared memory per block, theoretical occupancy |
+
+---
+
+## Appendix A: Key code, annotated
+
+Real line numbers from `matmul/matmul_bench.cu`, `mlp/mlp_bench.cu` and `flashattention/flash_lib.cu`. `⋮` = left out; `◀` = plain-English note. `#pragma unroll` lines are left out¹.
+
+### Reading the code: CUDA / C++ constructs
+| Construct | Meaning |
+|---|---|
+| `__global__ void k(...)` | a kernel: runs on the GPU, launched from the CPU |
+| `k<<<grid, block>>>(args)` | launch `grid` blocks of `block` threads each. `dim3(32,32)` = 2D, 1,024 threads per block |
+| `blockIdx.x/y`, `threadIdx.x/y`, `blockDim` | this block's index in the grid; this thread's index in its block; block size |
+| `__shared__ float sA[T][T]` | on-chip memory shared by the threads of one block (fast, about 100 KB per SM) |
+| `__syncthreads()` | barrier: every thread of the block waits here (so a tile is fully loaded before use) |
+| `fmaf(a, b, c)` | fused multiply-add a·b + c in one instruction, one rounding |
+| `template<int TILE, int R>` | compile-time parameters; each instantiation (e.g. `<64,4>`) is a separate kernel with constants folded in |
+| `(size_t)row * N` | 64-bit index (N² can exceed 2³¹ at N = 32768) |
+| `extern __shared__ float smem[]` | dynamically sized shared memory (size given as the 3rd launch parameter) |
+| `__shfl_xor_sync(mask, v, off)` | exchange a register with lane `lane ^ off` in the same warp (no shared memory) |
+| `__expf` | fast, lower-precision exp intrinsic |
+| `cudaStream_t`, `<<<g, b, 0, st[s]>>>` | a work queue; kernels in different streams may run concurrently |
+| `cudaMemGetInfo(&free, &total)` | free and total device memory in bytes |
+
+¹ `#pragma unroll` asks the compiler to copy a loop body N times (no loop counter), which helps when the trip count is a compile-time constant.
+
+### A.1 Naive vs coalesced: only the mapping changes (`matmul_bench.cu`)
+```cuda
+44  __global__ void mm_naive(const float* A, const float* B, float* C, int N) {
+46      int row = blockIdx.x * blockDim.x + threadIdx.x;   // ◀ consecutive threads → consecutive ROWS
+47      int col = blockIdx.y * blockDim.y + threadIdx.y;
+⋮
+51      for (int k = 0; k < N; ++k)
+52          acc = fmaf(A[(size_t)row * N + k], B[(size_t)k * N + col], acc);   // ◀ lanes of a warp read A N floats apart: 32 transactions
+53      C[(size_t)row * N + col] = acc;                    // ◀ writes also N apart: uncoalesced
+⋮
+60  __global__ void mm_coalesced(const float* A, const float* B, float* C, int N) {
+62      int col = blockIdx.x * blockDim.x + threadIdx.x;   // ◀ SWAPPED: consecutive threads → consecutive COLUMNS
+63      int row = blockIdx.y * blockDim.y + threadIdx.y;
+    ⋮   // same loop: now a warp reads 32 adjacent B values (1 transaction) and broadcasts one A value → 10.9×
+```
+
+### A.2 Shared-memory tiling, 1 element per thread (`mm_tiled_1to1<32>`)
+```cuda
+77  template<int TILE>
+78  __global__ void mm_tiled_1to1(const float* A, const float* B, float* C, int N) {
+80      __shared__ float sA[TILE][TILE];                 // ◀ 32×32 tile of A in shared memory
+81      __shared__ float sB[TILE][TILE];
+83      const int tx = threadIdx.x, ty = threadIdx.y;
+84      const int row = blockIdx.y * TILE + ty;          // ◀ the output element this thread owns
+85      const int col = blockIdx.x * TILE + tx;
+88      for (int t = 0; t < (N + TILE - 1) / TILE; ++t) {  // ◀ walk along K one tile at a time
+89          int aCol = t * TILE + tx;
+90          int bRow = t * TILE + ty;
+91          sA[ty][tx] = (row < N && aCol < N) ? A[(size_t)row * N + aCol] : 0.0f;  // ◀ each thread loads ONE A element
+92          sB[ty][tx] = (bRow < N && col < N) ? B[(size_t)bRow * N + col] : 0.0f;  // ◀ and ONE B element
+93          __syncthreads();                               // ◀ tile complete before anyone reads it
+96          for (int k = 0; k < TILE; ++k)
+97              acc = fmaf(sA[ty][k], sB[k][tx], acc);     // ◀ 32 FMAs from shared memory: each loaded value reused 32×
+98          __syncthreads();                               // ◀ don't overwrite the tile while others still read it
+99      }
+100     if (row < N && col < N) C[(size_t)row * N + col] = acc;
+```
+This is block matrix multiplication: C_tile = Σ_t A_tile(row, t) · B_tile(t, col).
+
+### A.3 Bigger tile than block: strided vs contiguous loads (only the changed lines)
+```cuda
+117 template<int TILE, int BLK>                        // ◀ launched as <64,32>: 32×32 threads, 64×64 tile
+118 __global__ void mm_tiled_strided(...) {
+120     constexpr int F = TILE / BLK;                  // ◀ F = 2: each thread loads 2×2 and computes 2×2 outputs
+128     float acc[F][F];                               // ◀ 4 accumulators in registers
+139             int r = ty + s * BLK;                  // ◀ STRIDED: thread loads rows ty, ty+32 …
+140             int c = tx + u * BLK;                  // ◀ … cols tx, tx+32: adjacent lanes stay adjacent → coalesced
+⋮
+194             int r = ty * F + s;                    // ◀ CONTIGUOUS variant (mm_tiled_contiguous)
+195             int c = tx * F + u;                    // ◀ lane tx loads cols 2tx, 2tx+1: lanes strided by 2 → more sectors
+```
+Measured: strided 19.36 vs contiguous 18.57 TFLOP/s at N = 32768.
+
+### A.4 2D register blocking: the 51.3× kernel (`mm_block2d<64,4>`, launched with 16×16 threads)
+```cuda
+231 template<int TILE, int R>
+232 __global__ void mm_block2d(const float* A, const float* B, float* C, int N) {
+234     __shared__ float sA[TILE][TILE];               // ◀ 64×64 = 16 KB each
+235     __shared__ float sB[TILE][TILE];
+237     const int tx = threadIdx.x, ty = threadIdx.y;  // ◀ 0..15 each
+238     const int rowBase = blockIdx.y * TILE + ty * R;   // ◀ this thread owns rows rowBase..rowBase+3
+239     const int colBase = blockIdx.x * TILE + tx * R;   // ◀ and cols colBase..colBase+3 → 16 outputs
+241     float reg[R][R];                               // ◀ 4×4 accumulators in REGISTERS
+247     for (int t = 0; t < (N + TILE - 1) / TILE; ++t) {
+248         const int kOff = t * TILE;
+⋮           // 249-259: each thread loads R×R = 16 elements of the A tile and of the B tile (256 threads × 16 = 64×64)
+260         __syncthreads();
+262         for (int k = 0; k < TILE; ++k) {
+263             float av[R], bv[R];
+265             for (int i = 0; i < R; ++i) av[i] = sA[ty * R + i][k];   // ◀ 4 values of A's column k
+267             for (int j = 0; j < R; ++j) bv[j] = sB[k][tx * R + j];   // ◀ 4 values of B's row k
+269             for (int i = 0; i < R; ++i)
+271                 for (int j = 0; j < R; ++j)
+272                     reg[i][j] = fmaf(av[i], bv[j], reg[i][j]);         // ◀ OUTER PRODUCT: 8 shared loads → 16 FMAs
+273         }
+274         __syncthreads();
+275     }
+⋮   // 277-286: write the 4×4 block of C with bounds checks
+480 dim3 gb((N + 63) / 64, (N + 63) / 64);   // ◀ host side: one block per 64×64 output tile
+481 dim3 bb(16, 16);
+482 record("block2d_t64r4", time_kernel([&]{ mm_block2d<64,4><<<gb,bb>>>(dA,dB,dC,N); }, 1, iters, budget));
+```
+| Name | Meaning (R = 4, TILE = 64) |
+|---|---|
+| `R` | outputs per thread per dimension (4 → 16 outputs) |
+| `rowBase`, `colBase` | top-left of the thread's 4×4 output patch |
+| `av`, `bv` | register copies of a column of A and a row of B |
+| `reg` | the 16 running sums |
+
+### A.5 Timing harness and TFLOP/s (`matmul_bench.cu`)
+```cuda
+322 CUDA_CHECK(cudaEventRecord(beg));     // ◀ GPU timestamps around the launch (kernel time only)
+323 launch();
+324 CUDA_CHECK(cudaEventRecord(end));
+325 CUDA_CHECK(cudaEventSynchronize(end));
+327 CUDA_CHECK(cudaEventElapsedTime(&first, beg, end));
+⋮
+347 static double tflops(int N, double ms) {
+349     return (2.0 * (double)N * N * N) / (ms * 1e-3) / 1e12;   // ◀ 2N³ FLOPs
+⋮
+391 double peak = (double)prop.multiProcessorCount * 128.0 * 2.0 * ((double)clock_khz * 1e3) / 1e12;  // ◀ 132×128×2×1.98 GHz = 66.9
+⋮
+436 cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, N, N, &alpha, dB, N, dA, N, &beta, dC, N);
+    // ◀ cuBLAS is column-major: computing B·A in column-major = A·B in row-major
+```
+
+### A.6 The MLP forward and the column-split streams (`mlp_bench.cu`)
+```cuda
+46  template<int BN, int BK>                 // ◀ BN = 256 columns per block, BK = 32 K-chunk
+47  __global__ void mm_thin(const float* A, const float* B, const float* bias, float* C, int M, int K, int N, int relu) {
+53      __shared__ float sA[BK];             // ◀ one row-slice of A (the batch row), reused by 256 columns
+55      const int m   = blockIdx.y;          // ◀ batch row
+56      const int col = blockIdx.x * BN + threadIdx.x;   // ◀ output column → B reads are coalesced
+60      for (int k0 = 0; k0 < K; k0 += BK) {
+62          for (int t = threadIdx.x; t < BK; t += BN) sA[t] = (k0 + t < K) ? A[(size_t)m * K + k0 + t] : 0.0f;
+66          __syncthreads();
+69              int kmax = (K - k0 < BK) ? (K - k0) : BK;   // ◀ last chunk may be short
+70              for (int kk = 0; kk < kmax; ++kk) acc = fmaf(sA[kk], B[(size_t)(k0 + kk) * N + col], acc);
+73          __syncthreads();
+⋮
+77      float v = acc + (bias ? bias[col] : 0.0f);
+78      C[(size_t)m * N + col] = relu ? (v > 0.0f ? v : 0.0f) : v;    // ◀ fused bias + ReLU
+⋮
+280 auto streamed_col = [&] {                // ◀ (c) column split: each stream owns N/4 output columns
+281     for (int s = 0; s < NS; ++s) {
+282         int c0 = s * cchunk;
+285         dim3 g((cols + BN - 1) / BN, B);
+286         mm_thin<BN,BK><<<g, blk, 0, st[s]>>>(X, W1 + c0, b1 + c0, A1 + c0, B, N, N, 1);   // ◀ pointer offset = column sub-block
+288     }
+289     for (int s = 0; s < NS; ++s) cudaStreamSynchronize(st[s]);   // ◀ layer 2 needs ALL of A1
+290     ...                                  // ◀ 290-298: same split for layer 2 (A1 · W2)
+```
+
+### A.7 Gradient checkpointing with one aliased arena (`mlp_bench.cu`)
+```cuda
+412 CUDA_CHECK(cudaMalloc(&A2, n2 * sizeof(float)));   // checkpoint   ◀ kept in BOTH modes
+413 CUDA_CHECK(cudaMalloc(&Z4, n4 * sizeof(float)));   // checkpoint
+414 if (!checkpointed) { /* 415-419: Z1, A1, Z2, Z3, A3 each get their own buffer */ }
+⋮
+455 if (checkpointed) {
+456     size_t segA = 2 * n1 + n2;                     // ◀ Z1, A1, Z2 (layers 1-2)
+457     size_t segB = 2 * n3;                          // ◀ Z3, A3 (layer 3)
+458     size_t arena_floats = segA > segB ? segA : segB;   // ◀ ONE buffer = the larger segment
+459     CUDA_CHECK(cudaMalloc(&arena, arena_floats * sizeof(float)));
+460     rZ1 = arena;  rA1 = rZ1 + n1;  rZ2 = rA1 + n1; // ◀ segment A layout
+461     rZ3 = arena;  rA3 = rZ3 + n3;                  // ◀ segment B ALIASES the same memory
+462 }
+⋮
+493 if (checkpointed) {                                // ◀ backward, step 1: rebuild segment B from A2
+495     mm_tiled<<<g2(Nb,H3), dim3(TS,TS)>>>(A2, W3, rZ3, Nb, H2, H3);
+⋮   // 496-497 bias + ReLU into rA3; 503-511: layer 4 and 3 gradients use rZ3/rA3
+514 if (checkpointed) {                                // ◀ z3/a3 are dead now → overwrite the arena with segment A
+515     mm_tiled<<<g2(Nb,H1), dim3(TS,TS)>>>(X, W1, rZ1, Nb, IN, H1);
+518     mm_tiled<<<g2(Nb,H2), dim3(TS,TS)>>>(rA1, W2, rZ2, Nb, H1, H2);
+```
+Note from §6.6: in this schedule the forward pass already left z3/a3 in the arena, so the recompute at `:495` is redundant.
+
+### A.8 The bug in `mm_tiled_AT` (`mlp_bench.cu:109-126`)
+```cuda
+109 __global__ void mm_tiled_AT(const float* A, const float* B, float* C, int M, int K, int N) // A is [K, M]; want C = Aᵀ·B
+114     int row = blockIdx.y * TS + ty, col = blockIdx.x * TS + tx;
+117     int aR = t * TS + tx, bR = t * TS + ty;
+118     sA[tx][ty] = (aR < K && row < M) ? A[(size_t)aR * M + row] : 0.f;   // ◀ stores sA[i][j] = A[t·TS+i][rowBase+j]
+119     sB[ty][tx] = (bR < K && col < N) ? B[(size_t)bR * N + col] : 0.f;
+122     for (int k = 0; k < TS; ++k) acc = fmaf(sA[ty][k], sB[k][tx], acc);   // ◀ reads A[t·TS+ty][rowBase+k]: WRONG
+    // ◀ correct operand is A[t·TS+k][row] = sA[k][ty] → fix: fmaf(sA[k][ty], sB[k][tx], acc)
+```
+
+### A.9 FlashAttention: the bank-conflict fix and online softmax (`flash_lib.cu`)
+```cuda
+55  const int KS = D + 1;                 // ◀ PADDED row stride: 65 instead of 64
+57  extern __shared__ float smem[];
+58  float* Qi = smem;                     // ◀ [32 × D]
+59  float* Kj = Qi + BR * D;              // ◀ [32 × (D+1)]
+60  float* Vj = Kj + BC * KS;             // ◀ [32 × D]
+61  float* S  = Vj + BC * D;              // ◀ [32 × 32] probabilities of this tile
+63  const int lane = threadIdx.x;         // ◀ 0..31
+64  const int w    = threadIdx.y;         // ◀ warp 0..7; owns query rows r0..r0+3
+⋮
+118 if (lane < kv_len) {
+119     const float* kptr = Kj + lane * KS;   // ◀ lane c reads row c: address c·65 + x → bank (c + x) mod 32, all different
+120     for (int x = 0; x < D; ++x) {
+121         const float kv = kptr[x];
+123         for (int r = 0; r < RPW; ++r)
+124             a[r] = fmaf(Qi[(r0 + r) * D + x], kv, a[r]);   // ◀ one K load feeds 4 query rows
+⋮
+131     float s = (lane < kv_len) ? a[r] * softmax_scale : -INFINITY;
+133     float m_tile = s;
+135     for (int off = 16; off > 0; off >>= 1)
+136         m_tile = fmaxf(m_tile, __shfl_xor_sync(0xffffffff, m_tile, off));   // ◀ warp-wide max in 5 steps
+138     float p = (lane < kv_len) ? __expf(s - m_tile) : 0.0f;
+⋮   // 140-143: warp-wide sum l_tile the same way; 145: S[row][lane] = p
+147     const float m_new = fmaxf(m_run[r], m_tile);
+148     e_run[r]  = __expf(m_run[r] - m_new);   // ◀ rescale old accumulators
+149     e_tile[r] = __expf(m_tile   - m_new);   // ◀ rescale this tile
+150     l_run[r]  = e_run[r] * l_run[r] + e_tile[r] * l_tile;
+⋮
+171     o_acc[r][jj] = o_acc[r][jj] * e_run[r] + pv[r] * e_tile[r];   // ◀ output accumulator update
+⋮
+182     O[base + (size_t)qrow * D + x] = o_acc[r][jj] * inv;          // ◀ inv = 1 / l_run: final normalisation
+```
+With stride 64, lane c reads `Kj[c·64 + x]`, so bank = (c·64 + x) mod 32 = x mod 32 for **every** lane. That is a 32-way conflict, and fixing it gave 7.0× on its own.
