@@ -131,8 +131,8 @@ file, and marking the cached block **dirty**.
 ## 7. `mmap` a file (alternative to read/write)
 
 Instead of `read`/`write`, map the file into the address space: `mmap(fd, ...)` returns a virtual address; file
-blocks are read into physical frames mapped into your address space (on demand, via page faults — [[14 - Demand
-Paging]]). Access it like memory.
+blocks are read into physical frames mapped into your address space (on demand, via page faults).
+See [[14 - Demand Paging]]. Access it like memory.
 - **Shared** mode: changes go to disk and are visible to others. **Private** mode: changes are private
   (copy-on-write), flushed on unmap.
 - **Avoids an extra copy**: `read` copies disk→kernel buffer→user buffer; `mmap` maps the frame straight into
